@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0"
+    />
+    <title>思绪思维导图</title>
+    <script>
+      window.externalPublicPath = './dist/'
+      window.takeOverApp = false
+    </script>
+        <script>
+      ;(() => {
+        const publicPath = window.externalPublicPath || './dist/'
+        const ensurePath = asset => {
+          if (!asset) return publicPath
+          return publicPath.replace(/\/?$/, '/') + asset
+        }
+        const head = document.head
+        const iconPath = "logo.ico"
+        if (iconPath) {
+          const icon = document.createElement('link')
+          icon.rel = 'icon'
+          icon.href = ensurePath(iconPath)
+          head.appendChild(icon)
+        }
+        const preloadPaths = ["assets/vendor-vue-BzJGdY5I.js","assets/vendor-element-p9yiFb6v.js","assets/vendor-editor-Ge335VnW.js","assets/mind-map-core-Csjf0shv.js"]
+        preloadPaths.forEach(preloadPath => {
+          const link = document.createElement('link')
+          link.rel = 'modulepreload'
+          link.crossOrigin = ''
+          link.href = ensurePath(preloadPath)
+          head.appendChild(link)
+        })
+        const stylePaths = ["assets/vendor-element-Cb_TPslV.css","assets/vendor-editor-D6OOxAoD.css","assets/mind-map-core-Bf4bJ6eu.css","assets/index-CzkIEFqq.css"]
+        stylePaths.forEach(stylePath => {
+          const link = document.createElement('link')
+          link.rel = 'stylesheet'
+          link.crossOrigin = ''
+          link.href = ensurePath(stylePath)
+          head.appendChild(link)
+        })
+        const entry = document.createElement('script')
+        entry.type = 'module'
+        entry.crossOrigin = true
+        entry.src = ensurePath("assets/index-uI_vTVB2.js")
+        head.appendChild(entry)
+      })()
+    </script>
+</head>
+  <body>
+    <noscript>
+      <strong>We're sorry but this app doesn't work properly without JavaScript enabled.</strong>
+    </noscript>
+    <div id="app"></div>
+    <script>
+      const getDataFromBackend = () => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve({
+              mindMapData: {
+                root: {
+                  data: {
+                    text: '根节点'
+                  },
+                  children: []
+                },
+                theme: {
+                  template: 'avocado',
+                  config: {}
+                },
+                layout: 'logicalStructure',
+                config: {},
+                view: null
+              },
+              mindMapConfig: {},
+              lang: 'zh',
+              localConfig: null
+            })
+          }, 200)
+        })
+      }
+
+      const setTakeOverAppMethods = data => {
+        window.takeOverAppMethods = {}
+        window.takeOverAppMethods.getMindMapData = () => data.mindMapData
+        window.takeOverAppMethods.saveMindMapData = nextData => {
+          console.log(nextData)
+        }
+        window.takeOverAppMethods.getMindMapConfig = () => data.mindMapConfig
+        window.takeOverAppMethods.saveMindMapConfig = config => {
+          console.log(config)
+        }
+        window.takeOverAppMethods.getLanguage = () => data.lang
+        window.takeOverAppMethods.saveLanguage = lang => {
+          console.log(lang)
+        }
+        window.takeOverAppMethods.getLocalConfig = () => data.localConfig
+        window.takeOverAppMethods.saveLocalConfig = config => {
+          console.log(config)
+        }
+      }
+
+      window.onload = async () => {
+        if (!window.takeOverApp) return
+        const data = await getDataFromBackend()
+        setTakeOverAppMethods(data)
+        window.$bus.$on('app_inited', mindMap => {
+          console.log(mindMap)
+        })
+        window.initApp()
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0"
+    />
+    <link rel="icon" href="dist/logo.ico" />
+    <title>思绪思维导图</title>
+    <script>
+      window.externalPublicPath = './dist/'
+      window.takeOverApp = false
+    </script>
+    <script
+      charset="UTF-8"
+      id="LA_COLLECT"
+      src="//sdk.51.la/js-sdk-pro.min.js"
+    ></script>
+    <script>
+      try {
+        LA.init({
+          id: 'KRO0WxK8GT66tYCQ',
+          ck: 'KRO0WxK8GT66tYCQ',
+          autoTrack: false
+        })
+      } catch (error) {
+        console.log(error)
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-BF88vo_Y.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C8FXj3Jt.css">
+  </head>
+  <body>
+    <noscript>
+      <strong>We're sorry but this app doesn't work properly without JavaScript enabled.</strong>
+    </noscript>
+    <div id="app"></div>
+    <script>
+      const getDataFromBackend = () => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve({
+              mindMapData: {
+                root: {
+                  data: {
+                    text: '根节点'
+                  },
+                  children: []
+                },
+                theme: {
+                  template: 'avocado',
+                  config: {}
+                },
+                layout: 'logicalStructure',
+                config: {},
+                view: null
+              },
+              mindMapConfig: {},
+              lang: 'zh',
+              localConfig: null
+            })
+          }, 200)
+        })
+      }
+
+      const setTakeOverAppMethods = data => {
+        window.takeOverAppMethods = {}
+        window.takeOverAppMethods.getMindMapData = () => data.mindMapData
+        window.takeOverAppMethods.saveMindMapData = nextData => {
+          console.log(nextData)
+        }
+        window.takeOverAppMethods.getMindMapConfig = () => data.mindMapConfig
+        window.takeOverAppMethods.saveMindMapConfig = config => {
+          console.log(config)
+        }
+        window.takeOverAppMethods.getLanguage = () => data.lang
+        window.takeOverAppMethods.saveLanguage = lang => {
+          console.log(lang)
+        }
+        window.takeOverAppMethods.getLocalConfig = () => data.localConfig
+        window.takeOverAppMethods.saveLocalConfig = config => {
+          console.log(config)
+        }
+      }
+
+      window.onload = async () => {
+        if (!window.takeOverApp) return
+        const data = await getDataFromBackend()
+        setTakeOverAppMethods(data)
+        window.$bus.$on('app_inited', mindMap => {
+          console.log(mindMap)
+        })
+        window.initApp()
+      }
+    </script>
+  </body>
+</html>
