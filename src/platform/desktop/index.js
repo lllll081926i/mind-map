@@ -35,11 +35,12 @@ export const desktopPlatform = {
     return invoke('write_bootstrap_state', { state })
   },
 
-  async openMindMapFile() {
+  async openMindMapFile(options = {}) {
     const { open, invoke } = await loadTauriModules()
     const selectedPath = await open({
       multiple: false,
       directory: false,
+      defaultPath: options.defaultPath || undefined,
       filters: [
         {
           name: 'Mind Map',
@@ -61,10 +62,10 @@ export const desktopPlatform = {
     }
   },
 
-  async saveMindMapFileAs({ suggestedName, content }) {
+  async saveMindMapFileAs({ suggestedName, content, defaultPath }) {
     const { save, invoke } = await loadTauriModules()
     const selectedPath = await save({
-      defaultPath: suggestedName,
+      defaultPath: defaultPath || suggestedName,
       filters: [
         {
           name: 'Mind Map',
@@ -104,11 +105,12 @@ export const desktopPlatform = {
     return fileRef
   },
 
-  async pickDirectory() {
+  async pickDirectory(options = {}) {
     const { open } = await loadTauriModules()
     const selectedPath = await open({
       multiple: false,
-      directory: true
+      directory: true,
+      defaultPath: options.defaultPath || undefined
     })
     if (!selectedPath || Array.isArray(selectedPath)) {
       return null
@@ -133,8 +135,16 @@ export const desktopPlatform = {
     return invoke('record_recent_file', {
       item: {
         path: fileRef.path,
-        name: fileRef.name || getFileName(fileRef.path)
+        name: fileRef.name || getFileName(fileRef.path),
+        updatedAt: Date.now()
       }
+    })
+  },
+
+  async openExternalUrl(url) {
+    const { invoke } = await loadTauriModules()
+    return invoke('open_external_url', {
+      url
     })
   },
 

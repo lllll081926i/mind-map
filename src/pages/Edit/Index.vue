@@ -13,8 +13,12 @@
 <script>
 import Toolbar from './components/Toolbar.vue'
 import Edit from './components/Edit.vue'
-import { mapState, mapMutations } from 'vuex'
 import { getLocalConfig } from '@/api'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 
 export default {
   components: {
@@ -27,11 +31,18 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isZenMode: state => state.localConfig.isZenMode,
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
-    })
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    }),
+    isZenMode() {
+      return this.localConfig.isZenMode
+    }
   },
   watch: {
     isDark() {
@@ -49,14 +60,12 @@ export default {
     this.setBodyDark()
   },
   methods: {
-    ...mapMutations(['setLocalConfig']),
-
     // 初始化本地配置
     initLocalConfig() {
       let config = getLocalConfig()
       if (config) {
-        this.setLocalConfig({
-          ...this.$store.state.localConfig,
+        applyLocalConfigPatch({
+          ...this.localConfig,
           ...config
         })
       }

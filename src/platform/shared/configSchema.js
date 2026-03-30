@@ -22,5 +22,7 @@ export const DEFAULT_BOOTSTRAP_STATE = () => ({
     ...DEFAULT_LOCAL_CONFIG
   },
   aiConfig: getDefaultAiConfig('volcanoArk'),
-  recentFiles: []
+  recentFiles: [],
+  lastDirectory: '',
+  currentDocument: null
 })

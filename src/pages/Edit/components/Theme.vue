@@ -77,18 +77,24 @@ export default {
     },
 
     currentList() {
-      return this.groupList.find(item => {
+      const currentGroup = this.groupList.find(item => {
         return item.name === this.activeName
-      }).list
+      })
+      return currentGroup ? currentGroup.list : []
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'theme') {
-        this.theme = this.mindMap.getTheme()
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (val === 'theme') {
+          this.theme = this.mindMap.getTheme()
+        }
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'theme'
+          }
+        })
       }
     }
   },
@@ -97,7 +103,7 @@ export default {
     this.theme = this.mindMap.getTheme()
     this.mindMap.on('view_theme_change', this.handleViewThemeChange)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.mindMap.off('view_theme_change', this.handleViewThemeChange)
   },
   methods: {
@@ -241,7 +247,7 @@ export default {
   .tabBox {
     flex-shrink: 0;
 
-    /deep/ .el-tabs__nav-wrap {
+    :deep(.el-tabs__nav-wrap) {
       display: flex;
       justify-content: center;
     }

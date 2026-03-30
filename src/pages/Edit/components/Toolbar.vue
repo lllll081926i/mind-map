@@ -3,7 +3,13 @@
     <div class="toolbar" ref="toolbarRef">
       <!-- 节点操作 -->
       <div class="toolbarBlock">
-        <ToolbarNodeBtnList :list="horizontalList"></ToolbarNodeBtnList>
+        <ToolbarNodeBtnList
+          :list="horizontalList"
+          @show-node-image="openNodeImageDialog"
+          @show-node-link="openNodeLinkDialog"
+          @show-node-note="openNodeNoteDialog"
+          @show-node-tag="openNodeTagDialog"
+        ></ToolbarNodeBtnList>
         <!-- 更多 -->
         <el-popover
           v-model="popoverShow"
@@ -16,12 +22,18 @@
           <ToolbarNodeBtnList
             dir="v"
             :list="verticalList"
-            @click.native="popoverShow = false"
+            @click="popoverShow = false"
+            @show-node-image="openNodeImageDialog"
+            @show-node-link="openNodeLinkDialog"
+            @show-node-note="openNodeNoteDialog"
+            @show-node-tag="openNodeTagDialog"
           ></ToolbarNodeBtnList>
-          <div slot="reference" class="toolbarBtn">
-            <span class="icon iconfont icongongshi"></span>
-            <span class="text">{{ $t('toolbar.more') }}</span>
-          </div>
+          <template #reference>
+            <div class="toolbarBtn">
+              <span class="icon iconfont icongongshi"></span>
+              <span class="text">{{ $t('toolbar.more') }}</span>
+            </div>
+          </template>
         </el-popover>
       </div>
       <!-- 导出 -->
@@ -61,30 +73,32 @@
             <span class="icon iconfont iconwenjian"></span>
             <span class="text">{{ $t('toolbar.recentFiles') }}</span>
           </div>
-          <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item
-              v-for="item in recentFiles"
-              :key="item.path"
-              :command="item"
-            >
-              {{ item.name }}
-            </el-dropdown-item>
-            <el-dropdown-item v-if="recentFiles.length <= 0" disabled>
-              {{ $t('toolbar.noRecentFiles') }}
-            </el-dropdown-item>
-          </el-dropdown-menu>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="item in recentFiles"
+                :key="item.path"
+                :command="item"
+              >
+                {{ item.name }}
+              </el-dropdown-item>
+              <el-dropdown-item v-if="recentFiles.length <= 0" disabled>
+                {{ $t('toolbar.noRecentFiles') }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
         </el-dropdown>
         <div class="toolbarBtn" @click="saveLocalFile" v-if="!isMobile">
           <span class="icon iconfont iconlingcunwei"></span>
           <span class="text">{{ $t('toolbar.saveAs') }}</span>
         </div>
-        <div class="toolbarBtn" @click="$bus.$emit('showImport')">
+        <div class="toolbarBtn" @click="openImportDialog">
           <span class="icon iconfont icondaoru"></span>
           <span class="text">{{ $t('toolbar.import') }}</span>
         </div>
         <div
           class="toolbarBtn"
-          @click="$bus.$emit('showExport')"
+          @click="openExportDialog"
           style="margin-right: 0;"
         >
           <span class="icon iconfont iconexport"></span>
@@ -122,7 +136,8 @@
               node-key="id"
               lazy
             >
-              <span class="customTreeNode" slot-scope="{ node, data }">
+              <template #default="{ node, data }">
+                <span class="customTreeNode">
                 <div class="treeNodeInfo">
                   <span
                     class="treeNodeIcon iconfont"
@@ -148,44 +163,66 @@
                     >导入</el-button
                   >
                 </div>
-              </span>
+                </span>
+              </template>
             </el-tree>
           </div>
         </div>
       </div>
     </div>
-    <NodeImage></NodeImage>
-    <NodeHyperlink></NodeHyperlink>
-    <NodeIcon></NodeIcon>
-    <NodeNote></NodeNote>
-    <NodeTag></NodeTag>
-    <Export></Export>
-    <Import ref="ImportRef"></Import>
+    <NodeImage v-if="mountedPanels.nodeImage"></NodeImage>
+    <NodeHyperlink v-if="mountedPanels.nodeHyperlink"></NodeHyperlink>
+    <NodeNote v-if="mountedPanels.nodeNote"></NodeNote>
+    <NodeTag v-if="mountedPanels.nodeTag"></NodeTag>
+    <Export v-if="mountedPanels.export"></Export>
+    <Import v-if="mountedPanels.import" ref="ImportRef"></Import>
   </div>
 </template>
 
 <script>
-import NodeImage from './NodeImage.vue'
-import NodeHyperlink from './NodeHyperlink.vue'
-import NodeIcon from './NodeIcon.vue'
-import NodeNote from './NodeNote.vue'
-import NodeTag from './NodeTag.vue'
-import Export from './Export.vue'
-import Import from './Import.vue'
 import { mapState } from 'vuex'
-import { Notification } from 'element-ui'
+import { ElNotification as Notification } from 'element-plus'
 import exampleData from 'simple-mind-map/example/exampleData'
 import { getData } from '../../../api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
+  getCurrentFileRef,
+  getLastDirectory,
   getRecentFiles,
   isDesktopApp,
-  recordRecentFile
+  markDocumentDirty,
+  recordRecentFile,
+  setLastDirectory
 } from '@/platform'
+import {
+  createDesktopFsError,
+  setCurrentFileRef,
+  updateCurrentFileRef
+} from '@/services/documentSession'
+import {
+  emitShowExport,
+  emitShowImport,
+  emitShowNodeImage,
+  emitShowNodeLink,
+  emitShowNodeNote,
+  emitShowNodeTag,
+  onWriteLocalFile
+} from '@/services/appEvents'
+import {
+  setIsHandleLocalFile,
+  setRecentFiles,
+  syncEditorFileSession
+} from '@/stores/runtime'
+
+const NodeImage = () => import('./NodeImage.vue')
+const NodeHyperlink = () => import('./NodeHyperlink.vue')
+const NodeNote = () => import('./NodeNote.vue')
+const NodeTag = () => import('./NodeTag.vue')
+const Export = () => import('./Export.vue')
+const Import = () => import('./Import.vue')
 
 // 工具栏
-let fileHandle = null
 const defaultBtnList = [
   'back',
   'forward',
@@ -211,7 +248,6 @@ export default {
   components: {
     NodeImage,
     NodeHyperlink,
-    NodeIcon,
     NodeNote,
     NodeTag,
     Export,
@@ -234,7 +270,15 @@ export default {
       fileTreeVisible: false,
       rootDirName: '',
       fileTreeExpand: true,
-      waitingWriteToLocalFile: false
+      waitingWriteToLocalFile: false,
+      mountedPanels: {
+        nodeImage: false,
+        nodeHyperlink: false,
+        nodeNote: false,
+        nodeTag: false,
+        export: false,
+        import: false
+      }
     }
   },
   computed: {
@@ -278,7 +322,7 @@ export default {
     }
   },
   created() {
-    this.$bus.$on('write_local_file', this.onWriteLocalFile)
+    this.removeWriteLocalFileListener = onWriteLocalFile(this.onWriteLocalFile)
   },
   mounted() {
     this.refreshRecentFiles()
@@ -288,15 +332,78 @@ export default {
     window.addEventListener('beforeunload', this.onUnload)
     this.$bus.$on('node_note_dblclick', this.onNodeNoteDblclick)
   },
-  beforeDestroy() {
-    this.$bus.$off('write_local_file', this.onWriteLocalFile)
+  beforeUnmount() {
+    this.removeWriteLocalFileListener && this.removeWriteLocalFileListener()
     window.removeEventListener('resize', this.computeToolbarShowThrottle)
     window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
   },
   methods: {
+    async waitForRef(refName, retries = 40) {
+      if (this.$refs[refName]) {
+        return this.$refs[refName]
+      }
+      if (retries <= 0) {
+        return null
+      }
+      await new Promise(resolve => {
+        setTimeout(resolve, 16)
+      })
+      return this.waitForRef(refName, retries - 1)
+    },
+
+    async ensurePanelMounted(panelKey, refName = '') {
+      if (!this.mountedPanels[panelKey]) {
+        this.mountedPanels[panelKey] = true
+        await this.$nextTick()
+      }
+      if (!refName) {
+        return null
+      }
+      return this.waitForRef(refName)
+    },
+
+    async openImportDialog() {
+      await this.ensurePanelMounted('import', 'ImportRef')
+      emitShowImport()
+    },
+
+    async openExportDialog() {
+      await this.ensurePanelMounted('export')
+      emitShowExport()
+    },
+
+    async openNodeImageDialog(activeNodes = []) {
+      await this.ensurePanelMounted('nodeImage')
+      emitShowNodeImage({
+        activeNodes
+      })
+    },
+
+    async openNodeLinkDialog(activeNodes = []) {
+      await this.ensurePanelMounted('nodeHyperlink')
+      emitShowNodeLink({
+        activeNodes
+      })
+    },
+
+    async openNodeNoteDialog(activeNodes = []) {
+      await this.ensurePanelMounted('nodeNote')
+      emitShowNodeNote({
+        activeNodes
+      })
+    },
+
+    async openNodeTagDialog(activeNodes = []) {
+      await this.ensurePanelMounted('nodeTag')
+      emitShowNodeTag({
+        activeNodes
+      })
+    },
+
     refreshRecentFiles() {
       this.recentFiles = this.isDesktopRuntime ? getRecentFiles() : []
+      setRecentFiles(this.recentFiles)
     },
 
     // 计算工具按钮如何显示
@@ -330,8 +437,9 @@ export default {
     // 监听本地文件读写
     onWriteLocalFile(content) {
       clearTimeout(this.timer)
-      if (fileHandle && this.isHandleLocalFile) {
+      if (getCurrentFileRef() && this.isHandleLocalFile) {
         this.waitingWriteToLocalFile = true
+        markDocumentDirty(true)
       }
       this.timer = setTimeout(() => {
         this.writeLocalFile(content)
@@ -351,13 +459,16 @@ export default {
       try {
         let directoryRef = null
         if (node.level === 0) {
-          directoryRef = await platform.pickDirectory()
+          directoryRef = await platform.pickDirectory({
+            defaultPath: getLastDirectory()
+          })
           if (!directoryRef) {
             this.fileTreeVisible = false
             resolve([])
             return
           }
           this.rootDirName = directoryRef.name
+          setLastDirectory(directoryRef.path || '')
         } else {
           directoryRef = node.data
         }
@@ -386,7 +497,8 @@ export default {
     // 编辑指定文件
     editLocalFile(data) {
       if (data.mode === 'desktop' || data.handle) {
-        fileHandle = data.mode === 'desktop' ? data : data.handle
+        setCurrentFileRef(data.mode === 'desktop' ? data : data.handle, data.mode)
+        syncEditorFileSession(data)
         this.readFile()
       }
     },
@@ -394,6 +506,8 @@ export default {
     // 导入指定文件
     async importLocalFile(data) {
       try {
+        const importRef = await this.ensurePanelMounted('import', 'ImportRef')
+        if (!importRef) return
         let file = null
         if (data.mode === 'desktop') {
           const result = await platform.readMindMapFile(data)
@@ -403,11 +517,11 @@ export default {
         } else {
           file = await data.handle.getFile()
         }
-        this.$refs.ImportRef.onChange({
+        importRef.onChange({
           raw: file,
           name: file.name
         })
-        this.$refs.ImportRef.confirm()
+        importRef.confirm()
       } catch (error) {
         console.log(error)
       }
@@ -415,18 +529,22 @@ export default {
 
     openRecentFile(item) {
       if (!item || !item.path) return
-      fileHandle = item
+      setCurrentFileRef(item, item.mode || 'desktop')
+      syncEditorFileSession(item)
       this.readFile()
     },
 
     // 打开本地文件
     async openLocalFile() {
       try {
-        const nextFileHandle = await platform.openMindMapFile()
+        const nextFileHandle = await platform.openMindMapFile({
+          defaultPath: getLastDirectory()
+        })
         if (!nextFileHandle) {
           return
         }
-        fileHandle = nextFileHandle
+        setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
+        syncEditorFileSession(nextFileHandle)
         this.readFile()
       } catch (error) {
         console.log(error)
@@ -440,15 +558,19 @@ export default {
     // 读取本地文件
     async readFile() {
       try {
+        const currentFileRef = getCurrentFileRef()
+        if (!currentFileRef) return
         if (isDesktopApp()) {
-          const result = await platform.readMindMapFile(fileHandle)
-          this.$store.commit('setIsHandleLocalFile', true)
+          const result = await platform.readMindMapFile(currentFileRef)
+          setIsHandleLocalFile(true)
           this.setData(result.content)
-          fileHandle = {
-            ...fileHandle,
+          updateCurrentFileRef(result)
+          syncEditorFileSession(result)
+          await recordRecentFile({
+            ...currentFileRef,
             ...result
-          }
-          await recordRecentFile(fileHandle)
+          })
+          markDocumentDirty(false)
           this.refreshRecentFiles()
           Notification.closeAll()
           Notification({
@@ -461,11 +583,16 @@ export default {
           })
           return
         }
-        let file = await fileHandle.getFile()
+        let file = await currentFileRef.getFile()
         let fileReader = new FileReader()
         fileReader.onload = async () => {
-          this.$store.commit('setIsHandleLocalFile', true)
+          setIsHandleLocalFile(true)
           this.setData(fileReader.result)
+          syncEditorFileSession({
+            path: currentFileRef.path || currentFileRef.name || file.name,
+            name: file.name
+          })
+          markDocumentDirty(false)
           Notification.closeAll()
           Notification({
             title: this.$t('toolbar.tip'),
@@ -479,7 +606,8 @@ export default {
         fileReader.readAsText(file)
       } catch (error) {
         console.log(error)
-        this.$message.error(this.$t('toolbar.fileOpenFailed'))
+        const fileError = createDesktopFsError(error)
+        this.$message.error(fileError.message || this.$t('toolbar.fileOpenFailed'))
       }
     },
 
@@ -508,7 +636,8 @@ export default {
 
     // 写入本地文件
     async writeLocalFile(content) {
-      if (!fileHandle || !this.isHandleLocalFile) {
+      const currentFileRef = getCurrentFileRef()
+      if (!currentFileRef || !this.isHandleLocalFile) {
         this.waitingWriteToLocalFile = false
         return
       }
@@ -518,17 +647,20 @@ export default {
         }
         let string = JSON.stringify(content)
         if (isDesktopApp()) {
-          await platform.writeMindMapFile(fileHandle, string)
-          await recordRecentFile(fileHandle)
+          await platform.writeMindMapFile(currentFileRef, string)
+          await recordRecentFile(currentFileRef)
+          markDocumentDirty(false)
           this.refreshRecentFiles()
           return
         }
-        const writable = await fileHandle.createWritable()
+        const writable = await currentFileRef.createWritable()
         await writable.write(string)
         await writable.close()
+        markDocumentDirty(false)
       } catch (error) {
         console.log(error)
-        this.$message.error(this.$t('toolbar.fileOpenFailed'))
+        const fileError = createDesktopFsError(error)
+        this.$message.error(fileError.message || this.$t('toolbar.fileOpenFailed'))
       } finally {
         this.waitingWriteToLocalFile = false
       }
@@ -550,7 +682,8 @@ export default {
       try {
         const nextFileHandle = await platform.saveMindMapFileAs({
           suggestedName: this.$t('toolbar.defaultFileName'),
-          content: JSON.stringify(content)
+          content: JSON.stringify(content),
+          defaultPath: getLastDirectory()
         })
         if (!nextFileHandle) {
           return
@@ -562,10 +695,12 @@ export default {
           background: 'rgba(0, 0, 0, 0.7)'
         })
         try {
-          fileHandle = nextFileHandle
-          this.$store.commit('setIsHandleLocalFile', true)
+          setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
+          setIsHandleLocalFile(true)
+          syncEditorFileSession(nextFileHandle)
           this.isFullDataFile = true
-          await recordRecentFile(fileHandle)
+          await recordRecentFile(nextFileHandle)
+          markDocumentDirty(false)
           this.refreshRecentFiles()
           await this.readFile()
         } finally {
@@ -582,7 +717,11 @@ export default {
 
     onNodeNoteDblclick(node, e) {
       e.stopPropagation()
-      this.$bus.$emit('showNodeNote', node)
+      this.ensurePanelMounted('nodeNote').then(() => {
+        emitShowNodeNote({
+          node
+        })
+      })
     }
   }
 }
@@ -599,7 +738,7 @@ export default {
         .fileTreeBox {
           background-color: #262a2e;
 
-          /deep/ .el-tree {
+          :deep(.el-tree) {
             background-color: #262a2e;
 
             &.el-tree--highlight-current {

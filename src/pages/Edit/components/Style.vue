@@ -68,13 +68,18 @@
         <div class="row">
           <div class="btnGroup">
             <el-tooltip :content="$t('style.color')" placement="bottom">
-              <div class="styleBtn" v-popover:popover>
-                A
-                <span
-                  class="colorShow"
-                  :style="{ backgroundColor: style.color || '#eee' }"
-                ></span>
-              </div>
+              <el-popover placement="bottom" trigger="hover">
+                <template #reference>
+                  <div class="styleBtn">
+                    A
+                    <span
+                      class="colorShow"
+                      :style="{ backgroundColor: style.color || '#eee' }"
+                    ></span>
+                  </div>
+                </template>
+                <Color :color="style.color" @change="changeFontColor"></Color>
+              </el-popover>
             </el-tooltip>
             <el-tooltip :content="$t('style.addFontWeight')" placement="bottom">
               <div
@@ -102,50 +107,49 @@
               :content="$t('style.textDecoration')"
               placement="bottom"
             >
-              <div
-                class="styleBtn u"
-                :style="{ textDecoration: style.textDecoration || 'none' }"
-                v-popover:popover2
-              >
-                U
-              </div>
+              <el-popover placement="bottom" trigger="hover">
+                <template #reference>
+                  <div
+                    class="styleBtn u"
+                    :style="{ textDecoration: style.textDecoration || 'none' }"
+                  >
+                    U
+                  </div>
+                </template>
+                <el-radio-group
+                  size="mini"
+                  v-model="style.textDecoration"
+                  @change="update('textDecoration')"
+                >
+                  <el-radio-button label="none">{{
+                    $t('style.none')
+                  }}</el-radio-button>
+                  <el-radio-button label="underline">{{
+                    $t('style.underline')
+                  }}</el-radio-button>
+                  <el-radio-button label="line-through">{{
+                    $t('style.lineThrough')
+                  }}</el-radio-button>
+                  <el-radio-button label="overline">{{
+                    $t('style.overline')
+                  }}</el-radio-button>
+                </el-radio-group>
+              </el-popover>
             </el-tooltip>
           </div>
-          <el-popover ref="popover" placement="bottom" trigger="hover">
-            <Color :color="style.color" @change="changeFontColor"></Color>
-          </el-popover>
-          <el-popover ref="popover2" placement="bottom" trigger="hover">
-            <el-radio-group
-              size="mini"
-              v-model="style.textDecoration"
-              @change="update('textDecoration')"
-            >
-              <el-radio-button label="none">{{
-                $t('style.none')
-              }}</el-radio-button>
-              <el-radio-button label="underline">{{
-                $t('style.underline')
-              }}</el-radio-button>
-              <el-radio-button label="line-through">{{
-                $t('style.lineThrough')
-              }}</el-radio-button>
-              <el-radio-button label="overline">{{
-                $t('style.overline')
-              }}</el-radio-button>
-            </el-radio-group>
-          </el-popover>
         </div>
         <!-- 边框 -->
         <div class="title">{{ $t('style.border') }}</div>
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('style.color') }}</span>
-            <span
-              class="block"
-              v-popover:popover3
-              :style="{ width: '80px', backgroundColor: style.borderColor }"
-            ></span>
-            <el-popover ref="popover3" placement="bottom" trigger="hover">
+            <el-popover placement="bottom" trigger="hover">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ width: '80px', backgroundColor: style.borderColor }"
+                ></span>
+              </template>
               <Color
                 :color="style.borderColor"
                 @change="changeBorderColor"
@@ -237,12 +241,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('style.color') }}</span>
-            <span
-              class="block"
-              v-popover:popover4
-              :style="{ backgroundColor: style.fillColor }"
-            ></span>
-            <el-popover ref="popover4" placement="bottom" trigger="hover">
+            <el-popover placement="bottom" trigger="hover">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: style.fillColor }"
+                ></span>
+              </template>
               <Color :color="style.fillColor" @change="changeFillColor"></Color>
             </el-popover>
             <span class="name" style="margin-left: 20px;">{{
@@ -257,12 +262,13 @@
         <div class="row" v-if="style.gradientStyle">
           <div class="rowItem">
             <span class="name">{{ $t('style.startColor') }}</span>
-            <span
-              class="block"
-              v-popover:popover6
-              :style="{ backgroundColor: style.startColor }"
-            ></span>
-            <el-popover ref="popover6" placement="bottom" trigger="hover">
+            <el-popover placement="bottom" trigger="hover">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: style.startColor }"
+                ></span>
+              </template>
               <Color
                 :color="style.startColor"
                 @change="changeStartColor"
@@ -271,12 +277,13 @@
           </div>
           <div class="rowItem">
             <span class="name">{{ $t('style.endColor') }}</span>
-            <span
-              class="block"
-              v-popover:popover7
-              :style="{ backgroundColor: style.endColor }"
-            ></span>
-            <el-popover ref="popover7" placement="bottom" trigger="hover">
+            <el-popover placement="bottom" trigger="hover">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: style.endColor }"
+                ></span>
+              </template>
               <Color :color="style.endColor" @change="changeEndColor"></Color>
             </el-popover>
           </div>
@@ -345,12 +352,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('style.color') }}</span>
-            <span
-              class="block"
-              v-popover:popover5
-              :style="{ width: '80px', backgroundColor: style.lineColor }"
-            ></span>
-            <el-popover ref="popover5" placement="bottom" trigger="hover">
+            <el-popover placement="bottom" trigger="hover">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ width: '80px', backgroundColor: style.lineColor }"
+                ></span>
+              </template>
               <Color :color="style.lineColor" @change="changeLineColor"></Color>
             </el-popover>
           </div>
@@ -624,25 +632,32 @@ export default {
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'nodeStyle') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (val === 'nodeStyle') {
+          this.activeNodes = [...this.mindMap.renderer.activeNodeList]
+          this.initNodeStyle()
+        }
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'nodeStyle'
+          }
+        })
       }
     }
   },
   created() {
     this.$bus.$on('node_active', this.onNodeActive)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.onNodeActive)
   },
   methods: {
     // 监听节点激活事件
     onNodeActive(...args) {
       this.$nextTick(() => {
-        this.activeNodes = [...args[1]]
+        this.activeNodes = [...(args[1] || [])]
         this.initNodeStyle()
       })
     },

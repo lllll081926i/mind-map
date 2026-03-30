@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node ./scripts/copy-index.js",
+    "dev": "npm run web:dev",
+    "web:dev": "vite",
+    "build": "npm run web:build",
+    "web:build": "vite build && node ./scripts/copy-index.js",
     "build:desktop-web": "vite build --mode desktop",
     "build:app": "vite build && node ./scripts/copy-index.js",
     "build:library": "node ./scripts/updateVersion.js && vite build --config ./vite.lib.config.js && node ./scripts/build-library-min.js",
@@ -12,35 +14,40 @@
     "createNodeImageList": "node ./scripts/createNodeImageList.js",
     "ai:serve": "node ./scripts/ai.js",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build",
+    "desktop:build": "tauri build --bundles nsis",
+    "desktop:build:windows": "tauri build --bundles nsis",
+    "desktop:build:macos": "tauri build --bundles app,dmg",
+    "desktop:build:linux": "tauri build --bundles deb,appimage",
     "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "format": "prettier --write src/* src/*/* src/*/*/* src/*/*/*/*",
-    "preview": "vite preview"
+    "preview": "npm run web:preview",
+    "web:preview": "vite preview"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.1",
     "@toast-ui/editor": "^3.1.5",
+    "@vue/compat": "^3.5.13",
     "axios": "^1.14.0",
     "buffer": "^6.0.3",
     "codemirror": "^5.65.21",
     "core-js": "^3.49.0",
-    "element-ui": "^2.15.14",
+    "element-plus": "^2.11.4",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
-    "pinia": "^2.3.1",
+    "pinia": "^3.0.4",
     "punycode": "^2.3.1",
     "simple-mind-map": "file:./simple-mind-map",
     "simple-mind-map-plugin-themes": "^1.0.1",
     "viewerjs": "^1.11.7",
-    "vue": "^2.7.16",
-    "vue-i18n": "^8.28.2",
-    "vue-router": "^3.6.5",
-    "vuex": "^3.6.2"
+    "vue": "^3.5.13",
+    "vue-i18n": "^9.14.1",
+    "vue-router": "^4.5.1",
+    "vuex": "^4.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.4",
-    "@vitejs/plugin-vue2": "^2.3.3",
+    "@vitejs/plugin-vue": "^6.0.1",
     "chokidar": "^3.5.3",
     "esbuild": "^0.27.4",
     "events": "^3.3.0",
@@ -51,7 +58,6 @@
     "prettier": "^3.5.3",
     "stream-browserify": "^3.0.0",
     "vconsole": "^3.15.1",
-    "vite": "^7.1.0",
-    "vue-template-compiler": "^2.7.16"
+    "vite": "^7.1.0"
   }
 }

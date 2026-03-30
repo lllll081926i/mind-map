@@ -20,7 +20,7 @@ export const webPlatform = {
         {
           description: '',
           accept: {
-            'application/json': ['.smm']
+            'application/json': ['.smm', '.json']
           }
         }
       ],
@@ -92,7 +92,7 @@ export const webPlatform = {
       if (isFile && !/\.(smm|xmind|md|json)$/.test(value.name)) {
         continue
       }
-      const enableEdit = isFile && /\.smm$/.test(value.name)
+      const enableEdit = isFile && /\.(smm|json)$/i.test(value.name)
       const data = {
         id: key,
         name: value.name,
@@ -113,6 +113,13 @@ export const webPlatform = {
   },
 
   async recordRecentFile() {},
+
+  async openExternalUrl(url) {
+    const popup = window.open(url, '_blank', 'noopener,noreferrer')
+    if (popup) {
+      popup.opener = null
+    }
+  },
 
   async startAiProxyRequest() {
     throw new Error('Web 平台不使用 Tauri AI 命令')

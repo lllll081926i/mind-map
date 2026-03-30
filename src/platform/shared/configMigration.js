@@ -1,6 +1,10 @@
 import exampleData from 'simple-mind-map/example/exampleData'
 import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
-import { AI_CONFIG_KEYS, normalizeAiConfig } from '@/utils/aiProviders.mjs'
+import {
+  AI_CONFIG_KEYS,
+  normalizeAiConfig,
+  separateAppAndAiConfig
+} from '@/utils/aiProviders.mjs'
 import {
   DEFAULT_BOOTSTRAP_STATE,
   DEFAULT_LOCAL_CONFIG,
@@ -53,9 +57,12 @@ export const createDefaultBootstrapState = () => {
 
 export const normalizeBootstrapState = input => {
   const defaults = createDefaultBootstrapState()
+  const separatedLocalConfig = separateAppAndAiConfig(
+    (input && input.localConfig) || {}
+  )
   const localConfig = {
     ...DEFAULT_LOCAL_CONFIG,
-    ...((input && input.localConfig) || {})
+    ...separatedLocalConfig.localConfig
   }
   return {
     version: DESKTOP_STATE_VERSION,
@@ -68,8 +75,25 @@ export const normalizeBootstrapState = input => {
         ? input.mindMapConfig
         : null,
     localConfig,
-    aiConfig: normalizeAiConfig(pickAiConfigInput(input)),
-    recentFiles: normalizeRecentFiles(input && input.recentFiles)
+    aiConfig: normalizeAiConfig({
+      ...pickAiConfigInput(input),
+      ...separatedLocalConfig.aiConfig
+    }),
+    recentFiles: normalizeRecentFiles(input && input.recentFiles),
+    lastDirectory:
+      input && typeof input.lastDirectory === 'string' ? input.lastDirectory : '',
+    currentDocument:
+      input &&
+      input.currentDocument &&
+      typeof input.currentDocument === 'object' &&
+      typeof input.currentDocument.path === 'string'
+        ? {
+            path: input.currentDocument.path,
+            name: String(input.currentDocument.name || ''),
+            source: String(input.currentDocument.source || ''),
+            dirty: !!input.currentDocument.dirty
+          }
+        : null
   }
 }
 

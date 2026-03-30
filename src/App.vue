@@ -10,7 +10,7 @@ export default {
   mounted() {
     window.addEventListener('keydown', this.handleGlobalTabKeydown, true)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     window.removeEventListener('keydown', this.handleGlobalTabKeydown, true)
   },
   methods: {

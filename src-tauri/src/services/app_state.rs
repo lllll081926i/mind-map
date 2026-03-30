@@ -10,6 +10,7 @@ const MAX_RECENT_FILES: usize = 20;
 pub struct RecentFileItem {
   pub path: String,
   pub name: String,
+  #[serde(default)]
   pub updated_at: u64,
 }
 
@@ -22,6 +23,8 @@ pub struct DesktopState {
   pub local_config: serde_json::Value,
   pub ai_config: serde_json::Value,
   pub recent_files: Vec<RecentFileItem>,
+  pub last_directory: String,
+  pub current_document: Option<serde_json::Value>,
 }
 
 impl DesktopState {
@@ -29,15 +32,30 @@ impl DesktopState {
     if item.path.trim().is_empty() {
       return;
     }
+    let normalized_item = RecentFileItem {
+      updated_at: if item.updated_at > 0 {
+        item.updated_at
+      } else {
+        current_timestamp_millis()
+      },
+      ..item
+    };
     self
       .recent_files
-      .retain(|current| current.path.trim() != item.path.trim());
-    self.recent_files.insert(0, item);
+      .retain(|current| current.path.trim() != normalized_item.path.trim());
+    self.recent_files.insert(0, normalized_item);
     self
       .recent_files
       .sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
     self.recent_files.truncate(MAX_RECENT_FILES);
   }
+}
+
+fn current_timestamp_millis() -> u64 {
+  std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|duration| duration.as_millis() as u64)
+    .unwrap_or(0)
 }
 
 fn default_state() -> DesktopState {
@@ -48,6 +66,8 @@ fn default_state() -> DesktopState {
     local_config: serde_json::Value::Null,
     ai_config: serde_json::Value::Null,
     recent_files: vec![],
+    last_directory: String::new(),
+    current_document: None,
   }
 }
 

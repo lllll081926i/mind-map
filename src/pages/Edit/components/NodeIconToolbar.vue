@@ -16,141 +16,154 @@ import { nodeIconList as _nodeIconList } from 'simple-mind-map/src/svg/icons'
 import { mapState, mapMutations } from 'vuex'
 
 export default {
-    props: {
-        mindMap: {
-            type: Object
-        }
-    },
-    data() {
-        return {
-            showNodeIconToolbar: false,
-            style: {
-                left: 0,
-                top: 0
-            },
-            node: null,
-            iconType: '',
-            iconName: '',
-            nodeIconList: [],
-            iconList: [],
-            allIconList: [..._nodeIconList],
-            iconLoaded: false
-        }
-    },
-    computed: {
-        ...mapState(['activeSidebar']),
-    },
-    created() {
-        this.mindMap.on('node_icon_click', this.show)
-        this.mindMap.on('draw_click', this.close)
-        this.mindMap.on('svg_mousedown', this.close)
-        this.mindMap.on('node_dblclick', this.close)
-        this.mindMap.on('node_active', this.onNodeActive)
-        this.mindMap.on('scale', this.onScale)
-        this.$bus.$on('close_node_icon_toolbar', this.close)
-    },
-    mounted() {
-        document.body.append(this.$refs.nodeIconToolbar)
-    },
-    beforeDestroy() {
-        this.mindMap.off('node_icon_click', this.show)
-        this.mindMap.off('draw_click', this.close)
-        this.mindMap.off('svg_mousedown', this.close)
-        this.mindMap.off('node_dblclick', this.close)
-        this.mindMap.off('node_active', this.onNodeActive)
-        this.mindMap.off('scale', this.onScale)
-        this.$bus.$off('close_node_icon_toolbar', this.close)
-    },
-    methods: {
-        ...mapMutations(['setActiveSidebar']),
-
-        async ensureIconListLoaded() {
-            if (this.iconLoaded) return
-            const { default: icon } = await import('@/config/icon')
-            this.allIconList = [..._nodeIconList, ...icon]
-            this.iconLoaded = true
-        },
-
-        async show(node, icon) {
-            await this.ensureIconListLoaded()
-            this.node = node
-            this.iconType = icon.split('_')[0]
-            this.iconName = icon.split('_')[1]
-            this.nodeIconList = node.getData('icon') || []
-            this.iconList = [...this.allIconList.find((item) => {
-                return item.type === this.iconType
-            }).list]
-            this.updatePos()
-            this.showNodeIconToolbar = true
-            if (this.activeSidebar === 'nodeIconSidebar') {
-                this.setActiveSidebar(null)
-            }
-        },
-
-        close() {
-            this.showNodeIconToolbar = false
-            this.node = null
-            this.iconType = ''
-            this.iconName = ''
-            this.nodeIconList = []
-            this.iconList = []
-            this.style.left = 0
-            this.style.top = 0
-        },
-
-        updatePos() {
-            if (!this.node) return
-            const rect = this.node.getRect()
-            this.style.left = rect.x + 'px'
-            this.style.top = rect.y + rect.height + 'px'
-        },
-
-        onScale() {
-            this.updatePos()
-        },
-
-        onNodeActive(node) {
-            if (node === this.node) {
-                return
-            }
-            this.close()
-        },
-
-        deleteIcon() {
-            this.setIcon(this.iconName)
-            this.close()
-        },
-
-        // 获取图标渲染方式
-        getHtml(icon) {
-            return /^<svg/.test(icon) ? icon : `<img src="${icon}" />`
-        },
-
-        // 设置icon
-        setIcon(name) {
-            let key = this.iconType + '_' + name
-            let index = this.nodeIconList.findIndex(item => {
-                return item === key
-            })
-            // 删除icon
-            if (index !== -1) {
-                this.nodeIconList.splice(index, 1)
-            } else {
-                let typeIndex = this.nodeIconList.findIndex(item => {
-                    return item.split('_')[0] === this.iconType
-                })
-                // 替换icon
-                if (typeIndex !== -1) {
-                    this.nodeIconList.splice(typeIndex, 1, key)
-                    this.iconName = name
-                } else {
-                    // 增加icon
-                    this.nodeIconList.push(key)
-                }
-            }
-            this.node.setIcon([...this.nodeIconList])
-        },
+  props: {
+    mindMap: {
+      type: Object
     }
+  },
+  data() {
+    return {
+      showNodeIconToolbar: false,
+      style: {
+        left: 0,
+        top: 0
+      },
+      node: null,
+      iconType: '',
+      iconName: '',
+      nodeIconList: [],
+      iconList: [],
+      allIconList: [..._nodeIconList],
+      iconLoaded: false
+    }
+  },
+  computed: {
+    ...mapState(['activeSidebar'])
+  },
+  created() {
+    this.mindMap.on('node_icon_click', this.show)
+    this.mindMap.on('draw_click', this.close)
+    this.mindMap.on('svg_mousedown', this.close)
+    this.mindMap.on('node_dblclick', this.close)
+    this.mindMap.on('node_active', this.onNodeActive)
+    this.mindMap.on('scale', this.onScale)
+    this.$bus.$on('close_node_icon_toolbar', this.close)
+  },
+  mounted() {
+    document.body.append(this.$refs.nodeIconToolbar)
+  },
+  beforeUnmount() {
+    this.mindMap.off('node_icon_click', this.show)
+    this.mindMap.off('draw_click', this.close)
+    this.mindMap.off('svg_mousedown', this.close)
+    this.mindMap.off('node_dblclick', this.close)
+    this.mindMap.off('node_active', this.onNodeActive)
+    this.mindMap.off('scale', this.onScale)
+    this.$bus.$off('close_node_icon_toolbar', this.close)
+    if (this.$refs.nodeIconToolbar?.parentNode === document.body) {
+      document.body.removeChild(this.$refs.nodeIconToolbar)
+    }
+  },
+  methods: {
+    ...mapMutations(['setActiveSidebar']),
+
+    async ensureIconListLoaded() {
+      if (this.iconLoaded) return
+      const { default: icon } = await import('@/config/icon')
+      this.allIconList = [..._nodeIconList, ...(icon || [])]
+      this.iconLoaded = true
+    },
+
+    async show(node, icon = '') {
+      await this.ensureIconListLoaded()
+      const [iconType = '', iconName = ''] = icon.split('_')
+      const iconGroup = this.allIconList.find(item => item.type === iconType)
+      this.node = node
+      this.iconType = iconType
+      this.iconName = iconName
+      this.nodeIconList = [...(node.getData('icon') || [])]
+      this.iconList = Array.isArray(iconGroup?.list) ? [...iconGroup.list] : []
+      if (!this.iconType || this.iconList.length <= 0) {
+        this.close()
+        return
+      }
+      this.updatePos()
+      this.showNodeIconToolbar = true
+      if (this.activeSidebar === 'nodeIconSidebar') {
+        this.setActiveSidebar(null)
+      }
+    },
+
+    close() {
+      this.showNodeIconToolbar = false
+      this.node = null
+      this.iconType = ''
+      this.iconName = ''
+      this.nodeIconList = []
+      this.iconList = []
+      this.style.left = 0
+      this.style.top = 0
+    },
+
+    updatePos() {
+      if (!this.node) return
+      const rect = this.node.getRect()
+      this.style.left = rect.x + 'px'
+      this.style.top = rect.y + rect.height + 'px'
+    },
+
+    onScale() {
+      this.updatePos()
+    },
+
+    onNodeActive(...args) {
+      const activeNodes = Array.isArray(args[1])
+        ? args[1]
+        : args[0]
+          ? [args[0]]
+          : []
+      if (this.node && activeNodes.includes(this.node)) {
+        return
+      }
+      this.close()
+    },
+
+    deleteIcon() {
+      this.setIcon(this.iconName)
+      this.close()
+    },
+
+    // 获取图标渲染方式
+    getHtml(icon) {
+      return /^<svg/.test(icon) ? icon : `<img src="${icon}" />`
+    },
+
+    // 设置icon
+    setIcon(name) {
+      if (!this.node || !this.iconType) return
+      let key = this.iconType + '_' + name
+      let index = this.nodeIconList.findIndex(item => {
+        return item === key
+      })
+      // 删除icon
+      if (index !== -1) {
+        this.nodeIconList.splice(index, 1)
+      } else {
+        let typeIndex = this.nodeIconList.findIndex(item => {
+          return item.split('_')[0] === this.iconType
+        })
+        // 替换icon
+        if (typeIndex !== -1) {
+          this.nodeIconList.splice(typeIndex, 1, key)
+          this.iconName = name
+        } else {
+          // 增加icon
+          this.nodeIconList.push(key)
+        }
+      }
+      this.node.setIcon([...this.nodeIconList])
+    }
+  }
 }
 </script>
   
@@ -182,12 +195,12 @@ export default {
             position: relative;
             float: left;
 
-            /deep/ img {
+            :deep(img) {
                 width: 100%;
                 height: 100%;
             }
 
-            /deep/ svg {
+            :deep(svg) {
                 width: 100%;
                 height: 100%;
             }

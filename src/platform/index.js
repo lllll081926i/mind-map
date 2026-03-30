@@ -7,6 +7,16 @@ import {
   readLegacyLocalStorageSnapshot
 } from './shared/configMigration'
 import { upsertRecentFile } from './shared/recentFiles'
+import {
+  getCurrentFileRef,
+  getDocumentSession,
+  getLastDirectory,
+  hydrateDocumentSession,
+  markDocumentDirty,
+  setCurrentFileRef,
+  setLastDirectory,
+  updateCurrentFileRef
+} from '@/services/documentSession'
 
 const platform = isDesktopRuntime() ? desktopPlatform : webPlatform
 
@@ -15,6 +25,7 @@ let bootstrapState = createDefaultBootstrapState()
 export const bootstrapPlatformState = async () => {
   if (!isDesktopRuntime()) {
     bootstrapState = createDefaultBootstrapState()
+    hydrateDocumentSession()
     return bootstrapState
   }
   const storedState = await platform.readBootstrapState()
@@ -24,6 +35,7 @@ export const bootstrapPlatformState = async () => {
     return bootstrapState
   }
   bootstrapState = normalizeBootstrapState(storedState)
+  hydrateDocumentSession()
   return bootstrapState
 }
 
@@ -57,6 +69,20 @@ export const getRecentFiles = () => {
   return bootstrapState.recentFiles || []
 }
 
+export {
+  getCurrentFileRef,
+  getDocumentSession,
+  getLastDirectory,
+  markDocumentDirty,
+  setCurrentFileRef,
+  setLastDirectory,
+  updateCurrentFileRef
+}
+
 export const isDesktopApp = () => isDesktopRuntime()
+
+export const openExternalUrl = url => {
+  return platform.openExternalUrl(url)
+}
 
 export default platform

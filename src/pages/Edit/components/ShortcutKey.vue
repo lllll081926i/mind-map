@@ -43,11 +43,14 @@ export default {
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'shortcutKey') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'shortcutKey'
+          }
+        })
       }
     }
   }

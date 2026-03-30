@@ -3,15 +3,15 @@
     class="nodeTagDialog"
     :class="{ isDark: isDark }"
     :title="$t('nodeTag.title')"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :width="isMobile ? '90%' : '50%'"
     :top="isMobile ? '20px' : '15vh'"
   >
     <el-input
       v-model="tag"
-      @keyup.native.enter="add"
-      @keyup.native.stop
-      @keydown.native.stop
+      @keyup.enter="add"
+      @keyup.stop
+      @keydown.stop
       :disabled="tagArr.length >= max"
       :placeholder="$t('nodeTag.addTip')"
     >
@@ -31,12 +31,14 @@
         </div>
       </div>
     </div>
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
-      <el-button type="primary" @click="confirm">{{
-        $t('dialog.confirm')
-      }}</el-button>
-    </span>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{
+          $t('dialog.confirm')
+        }}</el-button>
+      </span>
+    </template>
   </el-dialog>
 </template>
 
@@ -46,6 +48,7 @@ import {
   isMobile
 } from 'simple-mind-map/src/utils/index'
 import { mapState } from 'vuex'
+import { onShowNodeTag } from '@/services/appEvents'
 
 // 节点标签内容设置
 export default {
@@ -73,27 +76,35 @@ export default {
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-    this.$bus.$on('showNodeTag', this.handleShowNodeTag)
+    this.removeShowNodeTagListener = onShowNodeTag(this.handleShowNodeTag)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
-    this.$bus.$off('showNodeTag', this.handleShowNodeTag)
+    this.removeShowNodeTagListener && this.removeShowNodeTagListener()
   },
   methods: {
     generateColorByContent,
 
-    handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+    syncTagInfoFromActiveNodes() {
       if (this.activeNodes.length > 0) {
-        let firstNode = this.activeNodes[0]
-        this.tagArr = firstNode.getData('tag') || []
-      } else {
-        this.tagArr = []
-        this.tag = ''
+        const firstNode = this.activeNodes[0]
+        this.tagArr = [...(firstNode.getData('tag') || [])]
+        return
       }
+      this.tagArr = []
+      this.tag = ''
     },
 
-    handleShowNodeTag() {
+    handleNodeActive(...args) {
+      this.activeNodes = [...(args[1] || [])]
+      this.syncTagInfoFromActiveNodes()
+    },
+
+    handleShowNodeTag(payload = {}) {
+      if (Array.isArray(payload.activeNodes)) {
+        this.activeNodes = [...payload.activeNodes]
+      }
+      this.syncTagInfoFromActiveNodes()
       this.$bus.$emit('startTextEdit')
       this.dialogVisible = true
     },

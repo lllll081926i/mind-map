@@ -8,7 +8,7 @@
           resize="none"
           type="textarea"
           :placeholder="$t('formulaSidebar.placeholder')"
-          @keydown.native.stop
+          @keydown.stop
         />
         <el-button
           size="small"
@@ -47,7 +47,8 @@ export default {
   data() {
     return {
       formulaText: '',
-      list: []
+      list: [],
+      activeNodes: []
     }
   },
   computed: {
@@ -58,22 +59,25 @@ export default {
     })
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'formulaSidebar') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (!this.$refs.sidebar) return
+        this.$refs.sidebar.show = val === 'formulaSidebar'
       }
     }
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
   },
   mounted() {
     this.init()
+    if (this.activeSidebar === 'formulaSidebar' && this.$refs.sidebar) {
+      this.$refs.sidebar.show = true
+    }
   },
   methods: {
     ...mapMutations(['setActiveSidebar']),
@@ -92,7 +96,7 @@ export default {
     },
 
     handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+      this.activeNodes = [...(args[1] || [])]
       if (
         this.activeNodes.length <= 0 &&
         this.activeSidebar === 'formulaSidebar'
@@ -140,7 +144,7 @@ export default {
       }
     }
 
-    /deep/ .el-textarea__inner {
+    :deep(.el-textarea__inner) {
       background-color: transparent;
       color: #fff;
     }

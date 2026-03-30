@@ -3,7 +3,7 @@
     class="nodeNoteDialog"
     :class="{ isDark: isDark }"
     :title="$t('nodeNote.title')"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :width="isMobile ? '90%' : '50%'"
     :top="isMobile ? '20px' : '15vh'"
   >
@@ -16,18 +16,21 @@
     </el-input> -->
     <div class="noteEditor" ref="noteEditor" @keyup.stop @keydown.stop></div>
     <!-- <div class="tip">换行请使用：Enter+Shift</div> -->
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
-      <el-button type="primary" @click="confirm">{{
-        $t('dialog.confirm')
-      }}</el-button>
-    </span>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{
+          $t('dialog.confirm')
+        }}</el-button>
+      </span>
+    </template>
   </el-dialog>
 </template>
 
 <script>
 import { isMobile } from 'simple-mind-map/src/utils/index'
 import { mapState } from 'vuex'
+import { onShowNodeNote } from '@/services/appEvents'
 
 let noteEditorLoader = null
 
@@ -68,15 +71,15 @@ export default {
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-    this.$bus.$on('showNodeNote', this.handleShowNodeNote)
+    this.removeShowNodeNoteListener = onShowNodeNote(this.handleShowNodeNote)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
-    this.$bus.$off('showNodeNote', this.handleShowNodeNote)
+    this.removeShowNodeNoteListener && this.removeShowNodeNoteListener()
   },
   methods: {
     handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+      this.activeNodes = [...(args[1] || [])]
       this.updateNoteInfo()
     },
 
@@ -89,11 +92,14 @@ export default {
       }
     },
 
-    async handleShowNodeNote(node) {
+    async handleShowNodeNote(payload = {}) {
       this.$bus.$emit('startTextEdit')
-      if (node) {
-        this.appointNode = node
-        this.note = node.getData('note') || ''
+      if (payload.node) {
+        this.appointNode = payload.node
+        this.note = payload.node.getData('note') || ''
+      } else if (Array.isArray(payload.activeNodes)) {
+        this.activeNodes = [...payload.activeNodes]
+        this.updateNoteInfo()
       }
       this.dialogVisible = true
       this.$nextTick(async () => {
@@ -141,23 +147,23 @@ export default {
 <style lang="less" scoped>
 .nodeNoteDialog {
   &.isDark {
-    /deep/ .toastui-editor-defaultUI {
+    :deep(.toastui-editor-defaultUI) {
       border-color: hsla(0, 0%, 100%, 0.1);
     }
 
-    /deep/ .toastui-editor-defaultUI-toolbar,
-    /deep/ .toastui-editor-main-container {
+    :deep(.toastui-editor-defaultUI-toolbar),
+    :deep(.toastui-editor-main-container) {
       background-color: #363b3f;
     }
 
-    /deep/ .toastui-editor-md-container,
-    /deep/ .toastui-editor-ww-container,
-    /deep/ .toastui-editor-md-tab-container {
+    :deep(.toastui-editor-md-container),
+    :deep(.toastui-editor-ww-container),
+    :deep(.toastui-editor-md-tab-container) {
       background-color: #363b3f;
       color: hsla(0, 0%, 100%, 0.85);
     }
 
-    /deep/ .toastui-editor-toolbar-icons {
+    :deep(.toastui-editor-toolbar-icons) {
       filter: invert(1) hue-rotate(180deg);
     }
   }

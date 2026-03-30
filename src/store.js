@@ -1,16 +1,40 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
-import { storeLocalConfig } from '@/api'
-import {
-  AI_CONFIG_KEYS,
-  getDefaultAiConfig,
-  normalizeAiConfig
-} from '@/utils/aiProviders.mjs'
+import { createStore } from 'vuex'
+import { getDefaultAiConfig } from '@/utils/aiProviders.mjs'
 import { DEFAULT_LOCAL_CONFIG } from '@/platform/shared/configSchema'
+import {
+  applyLocalConfigPatch,
+  getRuntimeStores,
+  setActiveSidebar,
+  setBgList,
+  setExtendThemeGroupList,
+  setExtraTextOnExport,
+  setIsDragOutlineTreeNode,
+  setIsHandleLocalFile,
+  setIsOutlineEdit,
+  setIsReadonly,
+  setIsSourceCodeEdit
+} from '@/stores/runtime'
 
-Vue.use(Vuex)
+const syncLegacyVuexState = state => {
+  const { appStore, settingsStore, themeStore, aiStore } = getRuntimeStores()
+  state.isHandleLocalFile = appStore.isHandleLocalFile
+  state.localConfig = {
+    ...settingsStore.localConfig
+  }
+  state.activeSidebar = appStore.activeSidebar
+  state.isOutlineEdit = appStore.isOutlineEdit
+  state.isReadonly = appStore.isReadonly
+  state.isSourceCodeEdit = appStore.isSourceCodeEdit
+  state.extraTextOnExport = appStore.extraTextOnExport
+  state.isDragOutlineTreeNode = appStore.isDragOutlineTreeNode
+  state.aiConfig = {
+    ...aiStore.config
+  }
+  state.extendThemeGroupList = [...themeStore.extendThemeGroupList]
+  state.bgList = [...themeStore.bgList]
+}
 
-const store = new Vuex.Store({
+const store = createStore({
   state: {
     isHandleLocalFile: false, // 是否操作的是本地文件
     localConfig: {
@@ -31,76 +55,78 @@ const store = new Vuex.Store({
   mutations: {
     // 设置操作本地文件标志位
     setIsHandleLocalFile(state, data) {
-      state.isHandleLocalFile = data
+      setIsHandleLocalFile(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置本地配置
     setLocalConfig(state, data) {
-      const nextAiConfig = {
-        ...state.aiConfig
-      }
-      Object.keys(data).forEach(key => {
-        if (AI_CONFIG_KEYS.includes(key)) {
-          nextAiConfig[key] = data[key]
-        } else {
-          state.localConfig[key] = data[key]
-        }
-      })
-      state.aiConfig = normalizeAiConfig(nextAiConfig)
-      if (!state.localConfig.enableAi && state.activeSidebar === 'ai') {
-        state.activeSidebar = ''
-      }
-      storeLocalConfig({
-        ...state.localConfig,
-        ...state.aiConfig
-      })
+      applyLocalConfigPatch(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置当前显示的侧边栏
     setActiveSidebar(state, data) {
-      if (data === 'ai' && !state.localConfig.enableAi) {
-        state.activeSidebar = ''
-        return
-      }
-      state.activeSidebar = data
+      setActiveSidebar(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置大纲编辑模式
     setIsOutlineEdit(state, data) {
-      state.isOutlineEdit = data
+      setIsOutlineEdit(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置是否只读
     setIsReadonly(state, data) {
-      state.isReadonly = data
+      setIsReadonly(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置源码编辑模式
     setIsSourceCodeEdit(state, data) {
-      state.isSourceCodeEdit = data
+      setIsSourceCodeEdit(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置导出时底部添加的文字
     setExtraTextOnExport(state, data) {
-      state.extraTextOnExport = data
+      setExtraTextOnExport(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置树节点拖拽
     setIsDragOutlineTreeNode(state, data) {
-      state.isDragOutlineTreeNode = data
+      setIsDragOutlineTreeNode(data)
+      syncLegacyVuexState(state)
     },
 
     // 扩展主题列表
     setExtendThemeGroupList(state, data) {
-      state.extendThemeGroupList = data
+      setExtendThemeGroupList(data)
+      syncLegacyVuexState(state)
     },
 
     // 设置背景图片列表
     setBgList(state, data) {
-      state.bgList = data
+      setBgList(data)
+      syncLegacyVuexState(state)
     }
   },
   actions: {}
 })
+
+const { appStore, settingsStore, themeStore, aiStore } = getRuntimeStores()
+;[appStore, settingsStore, themeStore, aiStore].forEach(target => {
+  target.$subscribe(
+    () => {
+      syncLegacyVuexState(store.state)
+    },
+    {
+      detached: true
+    }
+  )
+})
+syncLegacyVuexState(store.state)
 
 export default store

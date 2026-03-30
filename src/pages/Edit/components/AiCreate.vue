@@ -5,7 +5,7 @@
       class="clientTipDialog"
       :class="{ isDark: isDark }"
       :title="$t('ai.connectFailedTitle')"
-      :visible.sync="clientTipDialogVisible"
+      v-model="clientTipDialogVisible"
       width="400px"
       append-to-body
     >
@@ -21,18 +21,20 @@
           }}</el-button>
         </p>
       </div>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="clientTipDialogVisible = false">{{
-          $t('ai.close')
-        }}</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="clientTipDialogVisible = false">{{
+            $t('ai.close')
+          }}</el-button>
+        </div>
+      </template>
     </el-dialog>
     <!-- ai内容输入弹窗 -->
     <el-dialog
       class="createDialog"
       :class="{ isDark: isDark }"
       :title="$t('ai.createMindMapTitle')"
-      :visible.sync="createDialogVisible"
+      v-model="createDialogVisible"
       width="450px"
       append-to-body
     >
@@ -54,14 +56,16 @@
           }}</el-button>
         </div>
       </div>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="closeAiCreateDialog">{{
-          $t('ai.cancel')
-        }}</el-button>
-        <el-button type="primary" @click="doAiCreate">{{
-          $t('ai.confirm')
-        }}</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeAiCreateDialog">{{
+            $t('ai.cancel')
+          }}</el-button>
+          <el-button type="primary" @click="doAiCreate">{{
+            $t('ai.confirm')
+          }}</el-button>
+        </div>
+      </template>
     </el-dialog>
     <!-- ai生成中添加一个透明层，防止期间用户进行操作 -->
     <div
@@ -79,27 +83,28 @@
       class="createDialog"
       :class="{ isDark: isDark }"
       :title="$t('ai.aiCreatePart')"
-      :visible.sync="createPartDialogVisible"
+      v-model="createPartDialogVisible"
       width="450px"
       append-to-body
     >
       <div class="inputBox">
         <el-input type="textarea" :rows="5" v-model="aiPartInput"> </el-input>
       </div>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="closeAiCreatePartDialog">{{
-          $t('ai.cancel')
-        }}</el-button>
-        <el-button type="primary" @click="confirmAiCreatePart">{{
-          $t('ai.confirm')
-        }}</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeAiCreatePartDialog">{{
+            $t('ai.cancel')
+          }}</el-button>
+          <el-button type="primary" @click="confirmAiCreatePart">{{
+            $t('ai.confirm')
+          }}</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import Ai from '@/utils/ai'
 import { transformMarkdownTo } from 'simple-mind-map/src/parse/markdownTo'
 import {
   createUid,
@@ -107,14 +112,24 @@ import {
   checkNodeOuter,
   getStrWithBrFromHtml
 } from 'simple-mind-map/src/utils'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import AiConfigDialog from './AiConfigDialog.vue'
+import { useAiStore } from '@/stores/ai'
+import { useThemeStore } from '@/stores/theme'
 import {
-  normalizeAiConfig,
-  shouldUseLocalProxyHealthcheck,
-  validateAiConfig
-} from '@/utils/aiProviders.mjs'
-import { isDesktopApp } from '@/platform'
+  buildAiCreateAllMessages,
+  buildAiCreatePartMessages,
+  checkAiAvailability,
+  createAiClient,
+  normalizeAiMessages
+} from '@/services/aiService'
+import {
+  onAiChat,
+  onAiChatStop,
+  onAiCreateAll,
+  onAiCreatePart,
+  onShowAiConfigDialog
+} from '@/services/appEvents'
 
 export default {
   components: {
@@ -152,27 +167,32 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      aiConfig: state => state.aiConfig,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAiStore, {
+      aiConfig: 'config'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {
-    this.$bus.$on('ai_create_all', this.aiCrateAll)
-    this.$bus.$on('ai_create_part', this.showAiCreatePartDialog)
-    this.$bus.$on('ai_chat', this.aiChat)
-    this.$bus.$on('ai_chat_stop', this.aiChatStop)
-    this.$bus.$on('showAiConfigDialog', this.showAiConfigDialog)
+    this.removeAiCreateAllListener = onAiCreateAll(this.aiCrateAll)
+    this.removeAiCreatePartListener = onAiCreatePart(this.showAiCreatePartDialog)
+    this.removeAiChatListener = onAiChat(this.aiChat)
+    this.removeAiChatStopListener = onAiChatStop(this.aiChatStop)
+    this.removeShowAiConfigDialogListener = onShowAiConfigDialog(
+      this.showAiConfigDialog
+    )
   },
   mounted() {
     document.body.appendChild(this.$refs.aiCreatingMaskRef)
   },
-  beforeDestroy() {
-    this.$bus.$off('ai_create_all', this.aiCrateAll)
-    this.$bus.$off('ai_create_part', this.showAiCreatePartDialog)
-    this.$bus.$off('ai_chat', this.aiChat)
-    this.$bus.$off('ai_chat_stop', this.aiChatStop)
-    this.$bus.$off('showAiConfigDialog', this.showAiConfigDialog)
+  beforeUnmount() {
+    this.removeAiCreateAllListener && this.removeAiCreateAllListener()
+    this.removeAiCreatePartListener && this.removeAiCreatePartListener()
+    this.removeAiChatListener && this.removeAiChatListener()
+    this.removeAiChatStopListener && this.removeAiChatStopListener()
+    this.removeShowAiConfigDialogListener &&
+      this.removeShowAiConfigDialogListener()
     this.resetOnRenderEnd()
     this.resetAiRequestState({ abort: true })
     this.aiCreatingMaskVisible = false
@@ -218,12 +238,9 @@ export default {
     },
 
     createAiInstance() {
-      const config = normalizeAiConfig(this.aiConfig)
-      this.aiInstance = new Ai({
-        port: config.port
-      })
-      this.aiInstance.init(config)
-      return this.aiInstance
+      const { ai } = createAiClient(this.aiConfig)
+      this.aiInstance = ai
+      return ai
     },
 
     // 显示AI配置修改弹窗
@@ -233,16 +250,10 @@ export default {
 
     // 客户端连接检测
     async testConnect() {
-      const config = normalizeAiConfig(this.aiConfig)
-      if (!shouldUseLocalProxyHealthcheck(isDesktopApp())) {
-        this.$message.success(this.$t('ai.connectSuccessful'))
-        this.clientTipDialogVisible = false
-        this.createDialogVisible = true
-        return
-      }
       try {
-        await fetch(`http://localhost:${config.port}/ai/test`, {
-          method: 'GET'
+        await checkAiAvailability({
+          aiConfig: this.aiConfig,
+          t: this.$t
         })
         this.$message.success(this.$t('ai.connectSuccessful'))
         this.clientTipDialogVisible = false
@@ -255,27 +266,19 @@ export default {
 
     // 检测ai是否可用
     async aiTest() {
-      const validation = validateAiConfig(this.aiConfig)
-      if (!validation.valid) {
-        this.showAiConfigDialog()
-        throw new Error(this.$t(validation.messageKey || 'ai.configurationMissing'))
-      }
-      if (!shouldUseLocalProxyHealthcheck(isDesktopApp())) {
-        return
-      }
-      // 检查连接
-      let isConnect = false
       try {
-        await fetch(`http://localhost:${validation.config.port}/ai/test`, {
-          method: 'GET'
+        return await checkAiAvailability({
+          aiConfig: this.aiConfig,
+          t: this.$t
         })
-        isConnect = true
       } catch (error) {
-        console.log(error)
-        this.clientTipDialogVisible = true
-      }
-      if (!isConnect) {
-        throw new Error(this.$t('ai.connectFailed'))
+        if (error.code === 'AI_CONFIG_INVALID') {
+          this.showAiConfigDialog()
+        }
+        if (error.code === 'AI_PROXY_UNAVAILABLE') {
+          this.clientTipDialogVisible = true
+        }
+        throw error
       }
     },
 
@@ -311,14 +314,10 @@ export default {
       this.mindMap.setData(null)
       this.aiInstance.request(
         {
-          messages: [
-            {
-              role: 'user',
-              content: `${this.$t(
-                'ai.aiCreateMsgPrefix'
-              )}${aiInputText}${this.$t('ai.aiCreateMsgPostfix')}`
-            }
-          ]
+          messages: buildAiCreateAllMessages({
+            input: aiInputText,
+            t: this.$t
+          })
         },
         content => {
           if (content) {
@@ -506,13 +505,10 @@ export default {
         this.createAiInstance()
         this.aiInstance.request(
           {
-            messages: [
-              {
-                role: 'user',
-                content:
-                  this.aiPartInput.trim() + this.$t('ai.aiCreatePartMsgHelp')
-              }
-            ]
+            messages: buildAiCreatePartMessages({
+              input: this.aiPartInput,
+              t: this.$t
+            })
           },
           content => {
             if (content) {
@@ -620,18 +616,7 @@ export default {
         this.createAiInstance()
         this.aiInstance.request(
           {
-            messages: messageList.map(msg => {
-              if (typeof msg === 'string') {
-                return {
-                  role: 'user',
-                  content: msg
-                }
-              }
-              return {
-                role: msg.role || 'user',
-                content: msg.content || ''
-              }
-            })
+            messages: normalizeAiMessages(messageList)
           },
           content => {
             progress(content)
@@ -664,24 +649,24 @@ export default {
 .clientTipDialog,
 .createDialog {
   &.isDark {
-    /deep/ .el-dialog {
+    :deep(.el-dialog) {
       background-color: #262a2e;
     }
 
-    /deep/ .el-dialog__title,
-    /deep/ .el-dialog__close {
+    :deep(.el-dialog__title),
+    :deep(.el-dialog__close) {
       color: hsla(0, 0%, 100%, 0.9);
     }
 
-    /deep/ .el-textarea__inner,
-    /deep/ .el-input__inner {
+    :deep(.el-textarea__inner),
+    :deep(.el-input__inner) {
       background-color: #1f2327;
       border-color: #3f464d;
       color: hsla(0, 0%, 100%, 0.9);
     }
 
-    /deep/ .el-textarea__inner::placeholder,
-    /deep/ .el-input__inner::placeholder {
+    :deep(.el-textarea__inner::placeholder),
+    :deep(.el-input__inner::placeholder) {
       color: hsla(0, 0%, 100%, 0.45);
     }
 
@@ -691,7 +676,7 @@ export default {
     }
   }
 
-  /deep/ .el-dialog__body {
+  :deep(.el-dialog__body) {
     padding: 12px 20px;
   }
 }

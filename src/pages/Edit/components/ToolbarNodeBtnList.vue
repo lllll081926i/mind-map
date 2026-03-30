@@ -74,7 +74,7 @@
         :class="{
           disabled: activeNodes.length <= 0
         }"
-        @click="$bus.$emit('showNodeImage')"
+        @click="openNodeImage"
       >
         <span class="icon iconfont iconimage"></span>
         <span class="text">{{ $t('toolbar.image') }}</span>
@@ -96,7 +96,7 @@
         :class="{
           disabled: activeNodes.length <= 0
         }"
-        @click="$bus.$emit('showNodeLink')"
+        @click="openNodeLink"
       >
         <span class="icon iconfont iconchaolianjie"></span>
         <span class="text">{{ $t('toolbar.link') }}</span>
@@ -107,7 +107,7 @@
         :class="{
           disabled: activeNodes.length <= 0
         }"
-        @click="$bus.$emit('showNodeNote')"
+        @click="openNodeNote"
       >
         <span class="icon iconfont iconflow-Mark"></span>
         <span class="text">{{ $t('toolbar.note') }}</span>
@@ -118,7 +118,7 @@
         :class="{
           disabled: activeNodes.length <= 0
         }"
-        @click="$bus.$emit('showNodeTag')"
+        @click="openNodeTag"
       >
         <span class="icon iconfont iconbiaoqian"></span>
         <span class="text">{{ $t('toolbar.tag') }}</span>
@@ -195,6 +195,7 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex'
+import { emitAiCreateAll } from '@/services/appEvents'
 
 export default {
   props: {
@@ -252,7 +253,7 @@ export default {
     this.$bus.$on('painter_start', this.onPainterStart)
     this.$bus.$on('painter_end', this.onPainterEnd)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('mode_change', this.onModeChange)
     this.$bus.$off('node_active', this.onNodeActive)
     this.$bus.$off('back_forward', this.onBackForward)
@@ -269,7 +270,7 @@ export default {
 
     // 监听节点激活
     onNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+      this.activeNodes = [...(args[1] || [])]
     },
 
     // 监听前进后退
@@ -304,6 +305,22 @@ export default {
       this.$bus.$emit('selectAttachment', this.activeNodes)
     },
 
+    openNodeImage() {
+      this.$emit('show-node-image', this.activeNodes)
+    },
+
+    openNodeLink() {
+      this.$emit('show-node-link', this.activeNodes)
+    },
+
+    openNodeNote() {
+      this.$emit('show-node-note', this.activeNodes)
+    },
+
+    openNodeTag() {
+      this.$emit('show-node-tag', this.activeNodes)
+    },
+
     // 设置标记
     onSetAnnotation(...args) {
       this.$bus.$emit('execCommand', 'SET_NOTATION', this.activeNodes, ...args)
@@ -311,7 +328,7 @@ export default {
 
     // AI生成整体
     aiCrate() {
-      this.$bus.$emit('ai_create_all')
+      emitAiCreateAll()
     }
   }
 }

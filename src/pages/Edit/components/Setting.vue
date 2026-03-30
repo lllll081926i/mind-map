@@ -45,7 +45,7 @@
               v-model="watermarkConfig.text"
               size="small"
               @change="updateWatermarkConfig"
-              @keydown.native.stop
+              @keydown.stop
             ></el-input>
           </div>
         </div>
@@ -53,12 +53,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('setting.watermarkTextColor') }}</span>
-            <span
-              class="block"
-              v-popover:popover3
-              :style="{ backgroundColor: watermarkConfig.textStyle.color }"
-            ></span>
-            <el-popover ref="popover3" placement="bottom" trigger="click">
+            <el-popover placement="bottom" trigger="click">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: watermarkConfig.textStyle.color }"
+                ></span>
+              </template>
               <Color
                 :color="watermarkConfig.textStyle.color"
                 @change="
@@ -96,7 +97,7 @@
               :max="50"
               :step="1"
               @change="updateWatermarkConfig"
-              @keydown.native.stop
+              @keydown.stop
             ></el-input-number>
           </div>
         </div>
@@ -111,7 +112,7 @@
               :max="90"
               :step="10"
               @change="updateWatermarkConfig"
-              @keydown.native.stop
+              @keydown.stop
             ></el-input-number>
           </div>
         </div>
@@ -124,7 +125,7 @@
               size="small"
               :step="10"
               @change="updateWatermarkConfig"
-              @keydown.native.stop
+              @keydown.stop
             ></el-input-number>
           </div>
         </div>
@@ -137,7 +138,7 @@
               size="small"
               :step="10"
               @change="updateWatermarkConfig"
-              @keydown.native.stop
+              @keydown.stop
             ></el-input-number>
           </div>
         </div>
@@ -367,6 +368,36 @@
           ></el-slider>
         </div>
       </div>
+      <div class="title">应用信息</div>
+      <div class="row">
+        <div class="rowItem infoRow">
+          <span class="name">运行时</span>
+          <span class="value">{{ appRuntimeLabel }}</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="rowItem infoRow">
+          <span class="name">平台</span>
+          <span class="value">{{ appPlatformLabel }}</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="rowItem infoRow">
+          <span class="name">版本</span>
+          <span class="value">v{{ appVersion }}</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="rowItem">
+          <el-button
+            size="small"
+            :loading="checkingForUpdates"
+            @click="checkForUpdates"
+          >
+            检查更新
+          </el-button>
+        </div>
+      </div>
     </div>
   </Sidebar>
 </template>
@@ -376,6 +407,8 @@ import Sidebar from './Sidebar.vue'
 import { storeConfig } from '@/api'
 import { mapState, mapMutations } from 'vuex'
 import Color from './Color.vue'
+import { checkForUpdates as runUpdateCheck } from '@/services/updateService'
+import { openExternalUrl } from '@/platform'
 
 export default {
   components: {
@@ -421,6 +454,7 @@ export default {
       },
       updateWatermarkTimer: null,
       enableNodeRichText: true,
+      checkingForUpdates: false,
       localConfigs: {
         isShowScrollbar: false,
         enableDragImport: false,
@@ -433,16 +467,35 @@ export default {
       activeSidebar: state => state.activeSidebar,
       localConfig: state => state.localConfig,
       isDark: state => state.localConfig.isDark
-    })
+    }),
+    appVersion() {
+      return __APP_VERSION__
+    },
+    appRuntimeLabel() {
+      return __APP_RUNTIME__ === 'desktop' ? '桌面版' : 'Web 调试版'
+    },
+    appPlatformLabel() {
+      const platformMap = {
+        win32: 'Windows',
+        darwin: 'macOS',
+        linux: 'Linux'
+      }
+      return platformMap[__APP_PLATFORM__] || __APP_PLATFORM__
+    }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'setting') {
-        this.$refs.sidebar.show = true
-        this.initConfig()
-        this.initWatermark()
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (val === 'setting') {
+          this.initConfig()
+          this.initWatermark()
+        }
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'setting'
+          }
+        })
       }
     }
   },
@@ -450,7 +503,7 @@ export default {
     this.initLoacalConfig()
     this.$bus.$on('toggleOpenNodeRichText', this.onToggleOpenNodeRichText)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('toggleOpenNodeRichText', this.onToggleOpenNodeRichText)
   },
   methods: {
@@ -573,6 +626,57 @@ export default {
       this.setLocalConfig({
         [key]: value
       })
+    },
+
+    async checkForUpdates() {
+      if (this.checkingForUpdates) return
+      this.checkingForUpdates = true
+      try {
+        const result = await runUpdateCheck(this.appVersion)
+        if (result.status === 'update-available') {
+          const notes = result.notes ? `\n\n${result.notes}` : ''
+          if (result.url) {
+            this.$confirm(
+              `发现新版本 v${result.latestVersion}，是否打开下载页面？${notes}`,
+              '发现更新',
+              {
+                confirmButtonText: '打开下载页',
+                cancelButtonText: '稍后处理',
+                type: 'info'
+              }
+            )
+              .then(() => {
+                return openExternalUrl(result.url)
+              })
+              .catch(() => {})
+            return
+          }
+          this.$message.info(`发现新版本 v${result.latestVersion}`)
+          return
+        }
+        if (result.status === 'up-to-date') {
+          this.$message.success(`当前已是最新版本 v${result.latestVersion}`)
+          return
+        }
+        if (result.status === 'release-page-only') {
+          this.$confirm('当前未配置更新清单，是否打开发布页面手动检查？', '检查更新', {
+            confirmButtonText: '打开发布页',
+            cancelButtonText: '取消',
+            type: 'info'
+          })
+            .then(() => {
+              return openExternalUrl(result.url)
+            })
+            .catch(() => {})
+          return
+        }
+        this.$message.info('当前未配置更新源，请在构建环境中设置发布页或更新清单地址。')
+      } catch (error) {
+        console.log(error)
+        this.$message.error(error?.message || '检查更新失败')
+      } finally {
+        this.checkingForUpdates = false
+      }
     }
   }
 }
@@ -626,6 +730,11 @@ export default {
         white-space: nowrap;
       }
 
+      .value {
+        color: inherit;
+        opacity: 0.8;
+      }
+
       .block {
         display: inline-block;
         width: 30px;
@@ -633,6 +742,11 @@ export default {
         border: 1px solid #dcdfe6;
         border-radius: 4px;
         cursor: pointer;
+      }
+
+      &.infoRow {
+        min-width: 220px;
+        justify-content: space-between;
       }
     }
   }

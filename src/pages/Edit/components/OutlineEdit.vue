@@ -41,22 +41,20 @@
           @node-drop="onNodeDrop"
           @current-change="onCurrentChange"
         >
-          <span
-            class="customNode"
-            slot-scope="{ node, data }"
-            :data-id="data.uid"
-          >
-            <span
-              class="nodeEdit"
-              :contenteditable="!isReadonly"
-              :key="getKey()"
-              @blur="onBlur($event, node)"
-              @keydown.stop="onNodeInputKeydown($event, node)"
-              @keyup.stop
-              @paste="onPaste($event, node)"
-              v-html="node.label"
-            ></span>
-          </span>
+          <template #default="{ node, data }">
+            <span class="customNode" :data-id="data.uid">
+              <span
+                class="nodeEdit"
+                :contenteditable="!isReadonly"
+                :key="getKey()"
+                @blur="onBlur($event, node)"
+                @keydown.stop="onNodeInputKeydown($event, node)"
+                @keyup.stop
+                @paste="onPaste($event, node)"
+                v-html="node.label"
+              ></span>
+            </span>
+          </template>
         </el-tree>
       </div>
     </div>
@@ -112,8 +110,11 @@ export default {
   created() {
     window.addEventListener('keydown', this.onKeyDown)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     window.removeEventListener('keydown', this.onKeyDown)
+    if (this.$refs.outlineEditContainer?.parentNode === document.body) {
+      document.body.removeChild(this.$refs.outlineEditContainer)
+    }
   },
   methods: {
     ...mapMutations(['setIsOutlineEdit']),
@@ -342,7 +343,7 @@ export default {
       height: max-content;
       margin: 0 auto;
 
-      /deep/ .customNode {
+      :deep(.customNode) {
         .nodeEdit {
           max-width: 800px;
         }

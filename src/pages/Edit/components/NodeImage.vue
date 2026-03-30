@@ -3,7 +3,7 @@
     class="nodeImageDialog"
     :class="{ isDark: isDark }"
     :title="$t('nodeImage.title')"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :width="isMobile ? '90%' : '600px'"
     :top="isMobile ? '20px' : '15vh'"
   >
@@ -20,20 +20,22 @@
         v-model="imgUrl"
         size="mini"
         placeholder="http://xxx.com/xx.jpg"
-        @keydown.native.stop
+        @keydown.stop
       ></el-input>
     </div>
     <div class="title">可选</div>
     <div class="inputBox">
       <span class="label">{{ $t('nodeImage.imgTitle') }}</span>
-      <el-input v-model="imgTitle" size="mini" @keydown.native.stop></el-input>
+      <el-input v-model="imgTitle" size="mini" @keydown.stop></el-input>
     </div>
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
-      <el-button type="primary" @click="confirm">{{
-        $t('dialog.confirm')
-      }}</el-button>
-    </span>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{
+          $t('dialog.confirm')
+        }}</el-button>
+      </span>
+    </template>
   </el-dialog>
 </template>
 
@@ -41,6 +43,7 @@
 import ImgUpload from '@/components/ImgUpload/index.vue'
 import { getImageSize, isMobile } from 'simple-mind-map/src/utils/index'
 import { mapState } from 'vuex'
+import { onShowNodeImage } from '@/services/appEvents'
 
 // 节点图片内容设置
 export default {
@@ -53,7 +56,7 @@ export default {
       img: '',
       imgUrl: '',
       imgTitle: '',
-      activeNodes: null,
+      activeNodes: [],
       isMobile: isMobile()
     }
   },
@@ -64,18 +67,21 @@ export default {
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-    this.$bus.$on('showNodeImage', this.handleShowNodeImage)
+    this.removeShowNodeImageListener = onShowNodeImage(this.handleShowNodeImage)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
-    this.$bus.$off('showNodeImage', this.handleShowNodeImage)
+    this.removeShowNodeImageListener && this.removeShowNodeImageListener()
   },
   methods: {
     handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+      this.activeNodes = [...(args[1] || [])]
     },
 
-    handleShowNodeImage() {
+    handleShowNodeImage(payload = {}) {
+      if (Array.isArray(payload.activeNodes)) {
+        this.activeNodes = [...payload.activeNodes]
+      }
       this.reset()
       if (this.activeNodes.length > 0) {
         let firstNode = this.activeNodes[0]

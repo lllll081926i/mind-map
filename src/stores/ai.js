@@ -5,5 +5,11 @@ export const useAiStore = defineStore('ai', {
   state: () => ({
     config: getDefaultAiConfig('volcanoArk'),
     enabled: false
-  })
+  }),
+  actions: {
+    setConfig(nextConfig) {
+      this.config = nextConfig
+      this.enabled = !!(nextConfig && nextConfig.model && nextConfig.key)
+    }
+  }
 })

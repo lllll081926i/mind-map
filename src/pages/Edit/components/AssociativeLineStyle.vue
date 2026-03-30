@@ -5,12 +5,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.associativeLineColor') }}</span>
-          <span
-            class="block"
-            v-popover:popover4
-            :style="{ backgroundColor: style.associativeLineColor }"
-          ></span>
-          <el-popover ref="popover4" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineColor"
               @change="
@@ -55,12 +56,13 @@
           <span class="name">{{
             $t('baseStyle.associativeLineActiveColor')
           }}</span>
-          <span
-            class="block"
-            v-popover:popover5
-            :style="{ backgroundColor: style.associativeLineActiveColor }"
-          ></span>
-          <el-popover ref="popover5" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineActiveColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineActiveColor"
               @change="
@@ -168,12 +170,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.color') }}</span>
-          <span
-            class="block"
-            v-popover:popover6
-            :style="{ backgroundColor: style.associativeLineTextColor }"
-          ></span>
-          <el-popover ref="popover6" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineTextColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineTextColor"
               @change="
@@ -266,17 +269,29 @@ export default {
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'associativeLineStyle') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (!this.$refs.sidebar) return
+        this.$refs.sidebar.show = val === 'associativeLineStyle'
       }
     }
   },
   created() {
     this.mindMap.on('associative_line_click', this.onAssociativeLineClick)
     this.mindMap.on(
+      'associative_line_deactivate',
+      this.associativeLineDeactivate
+    )
+  },
+  mounted() {
+    if (this.activeSidebar === 'associativeLineStyle' && this.$refs.sidebar) {
+      this.$refs.sidebar.show = true
+    }
+  },
+  beforeUnmount() {
+    this.mindMap.off('associative_line_click', this.onAssociativeLineClick)
+    this.mindMap.off(
       'associative_line_deactivate',
       this.associativeLineDeactivate
     )

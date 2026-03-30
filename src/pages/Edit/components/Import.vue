@@ -4,7 +4,7 @@
       class="nodeImportDialog"
       :class="{ isDark: isDark }"
       :title="$t('import.title')"
-      :visible.sync="dialogVisible"
+      v-model="dialogVisible"
       width="350px"
     >
       <el-upload
@@ -19,25 +19,31 @@
         :limit="1"
         :on-exceed="onExceed"
       >
-        <el-button slot="trigger" size="small" type="primary">{{
-          $t('import.selectFile')
-        }}</el-button>
-        <div slot="tip" class="el-upload__tip">
-          {{ $t('import.support') }}{{ supportFileStr }}{{ $t('import.file') }}
-        </div>
+        <template #trigger>
+          <el-button size="small" type="primary">{{
+            $t('import.selectFile')
+          }}</el-button>
+        </template>
+        <template #tip>
+          <div class="el-upload__tip">
+            {{ $t('import.support') }}{{ supportFileStr }}{{ $t('import.file') }}
+          </div>
+        </template>
       </el-upload>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
-        <el-button type="primary" @click="confirm">{{
-          $t('dialog.confirm')
-        }}</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
+          <el-button type="primary" @click="confirm">{{
+            $t('dialog.confirm')
+          }}</el-button>
+        </span>
+      </template>
     </el-dialog>
     <el-dialog
       class="xmindCanvasSelectDialog"
       :class="{ isDark: isDark }"
       :title="$t('import.xmindCanvasSelectDialogTitle')"
-      :visible.sync="xmindCanvasSelectDialogVisible"
+      v-model="xmindCanvasSelectDialogVisible"
       width="300px"
       :show-close="false"
     >
@@ -49,11 +55,13 @@
           >{{ item.title }}</el-radio
         >
       </el-radio-group>
-      <span slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="confirmSelect">{{
-          $t('dialog.confirm')
-        }}</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button type="primary" @click="confirmSelect">{{
+            $t('dialog.confirm')
+          }}</el-button>
+        </span>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -62,6 +70,7 @@
 import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import { mapMutations, mapState } from 'vuex'
+import { onShowImport } from '@/services/appEvents'
 
 // 导入
 export default {
@@ -92,12 +101,12 @@ export default {
     }
   },
   created() {
-    this.$bus.$on('showImport', this.handleShowImport)
+    this.removeShowImportListener = onShowImport(this.handleShowImport)
     this.$bus.$on('handle_file_url', this.handleFileURL)
     this.$bus.$on('importFile', this.handleImportFile)
   },
-  beforeDestroy() {
-    this.$bus.$off('showImport', this.handleShowImport)
+  beforeUnmount() {
+    this.removeShowImportListener && this.removeShowImportListener()
     this.$bus.$off('handle_file_url', this.handleFileURL)
     this.$bus.$off('importFile', this.handleImportFile)
   },
@@ -270,7 +279,7 @@ export default {
 .nodeImportDialog,
 .xmindCanvasSelectDialog {
   &.isDark {
-    /deep/ .el-dialog__body {
+    :deep(.el-dialog__body) {
       color: hsla(0, 0%, 100%, 0.85);
     }
 
@@ -279,7 +288,7 @@ export default {
     }
 
     .canvasList {
-      /deep/ .el-radio {
+      :deep(.el-radio) {
         color: hsla(0, 0%, 100%, 0.85);
       }
     }
@@ -290,7 +299,7 @@ export default {
   display: flex;
   flex-direction: column;
 
-  /deep/ .el-radio {
+  :deep(.el-radio) {
     margin-bottom: 12px;
 
     &:last-of-type {

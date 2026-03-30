@@ -3,7 +3,7 @@
     class="nodeHyperlinkDialog"
     :class="{ isDark: isDark }"
     :title="$t('nodeHyperlink.title')"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :width="isMobile ? '90%' : '50%'"
     :top="isMobile ? '20px' : '15vh'"
   >
@@ -13,15 +13,17 @@
         v-model="link"
         size="mini"
         placeholder="http://xxxx.com/"
-        @keyup.native.stop
-        @keydown.native.stop
+        @keyup.stop
+        @keydown.stop
         @blur="handleUrl()"
       >
-        <el-select v-model="protocol" slot="prepend" style="width: 80px;">
-          <el-option label="https" value="https"></el-option>
-          <el-option label="http" value="http"></el-option>
-          <el-option label="无" value="none"></el-option>
-        </el-select>
+        <template #prepend>
+          <el-select v-model="protocol" style="width: 80px;">
+            <el-option label="https" value="https"></el-option>
+            <el-option label="http" value="http"></el-option>
+            <el-option label="无" value="none"></el-option>
+          </el-select>
+        </template>
       </el-input>
     </div>
     <div class="item">
@@ -29,22 +31,25 @@
       <el-input
         v-model="linkTitle"
         size="mini"
-        @keyup.native.stop
-        @keydown.native.stop
+        @keyup.stop
+        @keydown.stop
       ></el-input>
     </div>
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
-      <el-button type="primary" @click="confirm">{{
-        $t('dialog.confirm')
-      }}</el-button>
-    </span>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{
+          $t('dialog.confirm')
+        }}</el-button>
+      </span>
+    </template>
   </el-dialog>
 </template>
 
 <script>
 import { isMobile } from 'simple-mind-map/src/utils/index'
 import { mapState } from 'vuex'
+import { onShowNodeLink } from '@/services/appEvents'
 
 // 节点超链接内容设置
 export default {
@@ -65,24 +70,29 @@ export default {
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-    this.$bus.$on('showNodeLink', this.handleShowNodeLink)
+    this.removeShowNodeLinkListener = onShowNodeLink(this.handleShowNodeLink)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
-    this.$bus.$off('showNodeLink', this.handleShowNodeLink)
+    this.removeShowNodeLinkListener && this.removeShowNodeLinkListener()
   },
   methods: {
-    handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+    syncLinkInfoFromActiveNodes() {
       if (this.activeNodes.length > 0) {
         let firstNode = this.activeNodes[0]
         this.link = firstNode.getData('hyperlink') || ''
         this.handleUrl(true)
         this.linkTitle = firstNode.getData('hyperlinkTitle') || ''
-      } else {
-        this.link = ''
-        this.linkTitle = ''
+        return
       }
+      this.link = ''
+      this.linkTitle = ''
+      this.protocol = 'https'
+    },
+
+    handleNodeActive(...args) {
+      this.activeNodes = [...(args[1] || [])]
+      this.syncLinkInfoFromActiveNodes()
     },
 
     removeProtocol(url) {
@@ -101,7 +111,11 @@ export default {
       this.link = this.removeProtocol(this.link)
     },
 
-    handleShowNodeLink() {
+    handleShowNodeLink(payload = {}) {
+      if (Array.isArray(payload.activeNodes)) {
+        this.activeNodes = [...payload.activeNodes]
+      }
+      this.syncLinkInfoFromActiveNodes()
       this.dialogVisible = true
     },
 
@@ -115,8 +129,8 @@ export default {
           (this.protocol === 'none' ? '' : this.protocol + '://') + this.link,
           this.linkTitle
         )
-        this.cancel()
       })
+      this.cancel()
     }
   }
 }

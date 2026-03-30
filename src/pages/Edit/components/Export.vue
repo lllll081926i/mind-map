@@ -3,7 +3,7 @@
     class="nodeExportDialog"
     :class="{ isMobile: isMobile, isDark: isDark }"
     :title="$t('export.title')"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     v-loading.fullscreen.lock="loading"
     :element-loading-text="loadingText"
     element-loading-spinner="el-icon-loading"
@@ -40,7 +40,7 @@
                 style="max-width: 250px"
                 v-model="fileName"
                 size="mini"
-                @keydown.native.stop
+                @keydown.stop
               ></el-input>
             </div>
             <span class="closeBtn el-icon-close" @click="cancel"></span>
@@ -88,7 +88,7 @@
                       v-model="paddingX"
                       size="mini"
                       @change="onPaddingChange"
-                      @keydown.native.stop
+                      @keydown.stop
                     ></el-input>
                   </div>
                   <div class="valueSubItem">
@@ -98,7 +98,7 @@
                       v-model="paddingY"
                       size="mini"
                       @change="onPaddingChange"
-                      @keydown.native.stop
+                      @keydown.stop
                     ></el-input>
                   </div>
                   <div class="valueSubItem">
@@ -110,7 +110,7 @@
                       v-model="extraText"
                       size="mini"
                       :placeholder="$t('export.addFooterTextPlaceholder')"
-                      @keydown.native.stop
+                      @keydown.stop
                     ></el-input>
                   </div>
                   <div class="valueSubItem">
@@ -148,6 +148,7 @@
 import { mapState, mapMutations } from 'vuex'
 import { downTypeList } from '@/config'
 import { isMobile } from 'simple-mind-map/src/utils/index'
+import { onShowExport } from '@/services/appEvents'
 
 // 导出
 export default {
@@ -204,10 +205,10 @@ export default {
     }
   },
   created() {
-    this.$bus.$on('showExport', this.handleShowExport)
+    this.removeShowExportListener = onShowExport(this.handleShowExport)
   },
-  beforeDestroy() {
-    this.$bus.$off('showExport', this.handleShowExport)
+  beforeUnmount() {
+    this.removeShowExportListener && this.removeShowExportListener()
   },
   methods: {
     ...mapMutations(['setExtraTextOnExport']),
@@ -344,7 +345,7 @@ export default {
 
 .nodeExportDialog {
   &.isDark {
-    /deep/ .el-dialog__body {
+    :deep(.el-dialog__body) {
       .el-checkbox {
         .el-checkbox__label {
           color: hsla(0, 0%, 100%, 0.6);
@@ -353,7 +354,7 @@ export default {
     }
   }
 
-  /deep/ .el-dialog {
+  :deep(.el-dialog) {
     border-radius: 10px;
     overflow: hidden;
 
@@ -362,7 +363,7 @@ export default {
     }
   }
 
-  /deep/ .el-dialog__body {
+  :deep(.el-dialog__body) {
     padding: 0;
 
     .el-checkbox__input.is-checked + .el-checkbox__label {
@@ -667,7 +668,7 @@ export default {
           flex-shrink: 0;
           border-top: 1px solid #f2f4f7;
 
-          /deep/ .el-button--small {
+          :deep(.el-button--small) {
             height: 25px;
             padding: 0 30px;
             border-radius: 5px;

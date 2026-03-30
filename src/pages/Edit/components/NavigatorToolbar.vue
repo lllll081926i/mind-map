@@ -80,29 +80,31 @@
     <div class="item">
       <el-dropdown @command="handleCommand">
         <div class="btn el-icon-more"></div>
-        <el-dropdown-menu slot="dropdown">
-          <el-dropdown-item command="shortcutKey">
-            <span class="iconfont iconjianpan"></span>
-            {{ $t('navigatorToolbar.shortcutKeys') }}
-          </el-dropdown-item>
-          <el-dropdown-item v-if="enableAi" command="aiChat">
-            <span class="iconfont iconAIshengcheng"></span>
-            {{ $t('navigatorToolbar.ai') }}
-          </el-dropdown-item>
-          <el-dropdown-item command="github">
-            <span class="iconfont icongithub"></span>
-            Github
-          </el-dropdown-item>
-          <el-dropdown-item command="site">
-            <span class="iconfont iconwangzhan"></span>
-            {{ $t('navigatorToolbar.site') }}
-          </el-dropdown-item>
-          <el-dropdown-item disabled
-            >{{ $t('navigatorToolbar.current') }}v{{
-              version
-            }}</el-dropdown-item
-          >
-        </el-dropdown-menu>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="shortcutKey">
+              <span class="iconfont iconjianpan"></span>
+              {{ $t('navigatorToolbar.shortcutKeys') }}
+            </el-dropdown-item>
+            <el-dropdown-item v-if="enableAi" command="aiChat">
+              <span class="iconfont iconAIshengcheng"></span>
+              {{ $t('navigatorToolbar.ai') }}
+            </el-dropdown-item>
+            <el-dropdown-item command="github">
+              <span class="iconfont icongithub"></span>
+              Github
+            </el-dropdown-item>
+            <el-dropdown-item command="site">
+              <span class="iconfont iconwangzhan"></span>
+              {{ $t('navigatorToolbar.site') }}
+            </el-dropdown-item>
+            <el-dropdown-item disabled
+              >{{ $t('navigatorToolbar.current') }}v{{
+                version
+              }}</el-dropdown-item
+            >
+          </el-dropdown-menu>
+        </template>
       </el-dropdown>
     </div>
   </div>

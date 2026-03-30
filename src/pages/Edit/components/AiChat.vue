@@ -59,9 +59,16 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { mapState } from 'vuex'
 import { createUid } from 'simple-mind-map/src/utils'
 import MarkdownIt from 'markdown-it'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import {
+  emitAiChat,
+  emitAiChatStop,
+  emitShowAiConfigDialog
+} from '@/services/appEvents'
 
 let md = null
 
@@ -78,22 +85,27 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     })
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'ai') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (!this.$refs.sidebar) return
+        this.$refs.sidebar.show = val === 'ai'
       }
     }
   },
-  created() {},
-  beforeDestroy() {},
+  mounted() {
+    if (this.activeSidebar === 'ai' && this.$refs.sidebar) {
+      this.$refs.sidebar.show = true
+    }
+  },
   methods: {
     onKeydown(e) {
       if (e.keyCode === 13) {
@@ -139,8 +151,7 @@ export default {
           content: text
         }
       ]
-      this.$bus.$emit(
-        'ai_chat',
+      emitAiChat(
         messageList,
         res => {
           if (responseId !== this.activeResponseId) return
@@ -171,7 +182,7 @@ export default {
 
     stop() {
       this.activeResponseId += 1
-      this.$bus.$emit('ai_chat_stop')
+      emitAiChatStop()
       this.isCreating = false
       const currentItem = this.chatList[this.chatList.length - 1]
       if (currentItem && currentItem.type === 'ai' && !currentItem.rawContent) {
@@ -189,7 +200,7 @@ export default {
     },
 
     modifyAiConfig() {
-      this.$bus.$emit('showAiConfigDialog')
+      emitShowAiConfigDialog()
     }
   }
 }
@@ -286,7 +297,7 @@ export default {
           }
         }
 
-        /deep/ .content {
+        :deep(.content) {
           width: 100%;
           overflow: hidden;
           color: #3f4a54;

@@ -1,6 +1,7 @@
 const path = require('path')
+const pkg = require('./package.json')
 const { defineConfig } = require('vite')
-const vue = require('@vitejs/plugin-vue2')
+const vue = require('@vitejs/plugin-vue')
 
 const isPathMatch = (id, keyword) => {
   return id.includes(`/${keyword}/`) || id.includes(`\\${keyword}\\`)
@@ -12,12 +13,11 @@ const createManualChunks = id => {
       isPathMatch(id, 'vue') ||
       isPathMatch(id, 'vue-router') ||
       isPathMatch(id, 'vuex') ||
-      isPathMatch(id, 'vue-i18n')
+      isPathMatch(id, 'vue-i18n') ||
+      isPathMatch(id, 'pinia') ||
+      isPathMatch(id, 'element-plus')
     ) {
-      return 'vendor-vue'
-    }
-    if (isPathMatch(id, 'element-ui')) {
-      return 'vendor-element'
+      return 'vendor-framework'
     }
     if (
       isPathMatch(id, '@toast-ui') ||
@@ -60,12 +60,25 @@ const createManualChunks = id => {
 module.exports = defineConfig(({ command, mode }) => {
   const isBuild = command === 'build'
   const isDesktopBuild = mode === 'desktop'
+  const releaseUrl = process.env.APP_RELEASE_URL || ''
+  const updateManifestUrl = process.env.APP_UPDATE_MANIFEST_URL || ''
 
   return {
-    plugins: [vue()],
+    plugins: [
+      vue({
+        template: {
+          compilerOptions: {
+            compatConfig: {
+              MODE: 2
+            }
+          }
+        }
+      })
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
+        vue: '@vue/compat',
         buffer: require.resolve('buffer/'),
         events: require.resolve('events/'),
         punycode: require.resolve('punycode/'),
@@ -73,7 +86,14 @@ module.exports = defineConfig(({ command, mode }) => {
       }
     },
     define: {
-      global: 'globalThis'
+      global: 'globalThis',
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __APP_PLATFORM__: JSON.stringify(process.platform),
+      __APP_RUNTIME__: JSON.stringify(isDesktopBuild ? 'desktop' : 'web'),
+      __APP_RELEASE_URL__: JSON.stringify(releaseUrl),
+      __APP_UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl),
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false
     },
     optimizeDeps: {
       include: ['buffer', 'events', 'punycode', 'stream-browserify']

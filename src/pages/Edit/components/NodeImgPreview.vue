@@ -35,7 +35,7 @@ export default {
   mounted() {
     this.mindMap.on('node_img_dblclick', this.onNodeTmgDblclick)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.mindMap.off('node_img_dblclick', this.onNodeTmgDblclick)
     this.destroyViewer()
   },

@@ -3,7 +3,7 @@
     class="aiConfigDialog"
     :class="{ isDark: isDark }"
     :title="$t('ai.AIConfiguration')"
-    :visible.sync="aiConfigDialogVisible"
+    v-model="aiConfigDialogVisible"
     width="550px"
     append-to-body
   >
@@ -44,22 +44,27 @@
         </el-form-item>
       </el-form>
     </div>
-    <div slot="footer" class="dialog-footer">
-      <el-button @click="cancel">{{ $t('ai.cancel') }}</el-button>
-      <el-button type="primary" @click="confirm">{{
-        $t('ai.confirm')
-      }}</el-button>
-    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="cancel">{{ $t('ai.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{
+          $t('ai.confirm')
+        }}</el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import {
   AI_PROVIDER_LIST,
   getAiProviderMeta,
   normalizeAiConfig
 } from '@/utils/aiProviders.mjs'
+import { useAiStore } from '@/stores/ai'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 
 export default {
   model: {
@@ -133,9 +138,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      aiConfig: state => state.aiConfig,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAiStore, {
+      aiConfig: 'config'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
     providerOptions() {
       return AI_PROVIDER_LIST
@@ -158,8 +165,6 @@ export default {
     this.initFormData()
   },
   methods: {
-    ...mapMutations(['setLocalConfig']),
-
     close() {
       this.$emit('change', false)
     },
@@ -195,7 +200,7 @@ export default {
       this.$refs.ruleFormRef.validate(valid => {
         if (valid) {
           this.close()
-          this.setLocalConfig(normalizeAiConfig(this.ruleForm))
+          applyLocalConfigPatch(normalizeAiConfig(this.ruleForm))
           this.$message.success(this.$t('ai.configSaveSuccessTip'))
         }
       })
@@ -216,7 +221,7 @@ export default {
     }
   }
 
-  /deep/ .el-dialog__body {
+  :deep(.el-dialog__body) {
     padding: 12px 20px;
   }
 
@@ -239,11 +244,11 @@ export default {
     }
   }
 
-  /deep/ .el-form-item__label {
+  :deep(.el-form-item__label) {
     color: inherit;
   }
 
-  /deep/ .el-input__inner {
+  :deep(.el-input__inner) {
     color: inherit;
   }
 }

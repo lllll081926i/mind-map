@@ -215,9 +215,6 @@ export default {
     link: '链接',
     name: '名称'
   },
-  nodeIcon: {
-    title: '图标'
-  },
   nodeImage: {
     title: '图片',
     imgTitle: '图片标题'

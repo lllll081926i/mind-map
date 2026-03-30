@@ -52,7 +52,7 @@ pub async fn list_directory_entries(path: &str) -> Result<Vec<DirectoryEntry>, S
       mode: "desktop".into(),
       path: entry_path.to_string_lossy().to_string(),
       leaf: is_file,
-      enable_edit: is_file && name.ends_with(".smm"),
+      enable_edit: is_file && (name.ends_with(".smm") || name.ends_with(".json")),
     };
     if is_file {
       file_list.push(data);

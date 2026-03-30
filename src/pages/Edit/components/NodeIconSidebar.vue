@@ -98,7 +98,6 @@ export default {
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-    this.$bus.$on('showNodeIcon', this.handleShowNodeIcon)
   },
   mounted() {
     if (this.activeSidebar === 'nodeIconSidebar') {
@@ -106,9 +105,8 @@ export default {
       this.$refs.sidebar.show = true
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)
-    this.$bus.$off('showNodeIcon', this.handleShowNodeIcon)
   },
   methods: {
     async ensurePanelAssetsLoaded() {
@@ -136,25 +134,20 @@ export default {
     },
 
     handleNodeActive(...args) {
-      this.activeNodes = [...args[1]]
+      this.activeNodes = [...(args[1] || [])]
       if (this.activeNodes.length > 0) {
         if (this.activeNodes.length === 1) {
           let firstNode = this.activeNodes[0]
           this.nodeImage = firstNode.getData('image') || ''
           this.iconList = firstNode.getData('icon') || [] // 回显图标
         } else {
-          this.nodeImage = []
+          this.nodeImage = ''
           this.iconList = []
         }
       } else {
         this.iconList = []
         this.nodeImage = ''
       }
-    },
-
-    async handleShowNodeIcon() {
-      await this.ensurePanelAssetsLoaded()
-      this.dialogVisible = true
     },
 
     // 获取图标渲染方式
@@ -243,12 +236,12 @@ export default {
             cursor: pointer;
             position: relative;
 
-            /deep/ img {
+            :deep(img) {
               width: 100%;
               height: 100%;
             }
 
-            /deep/ svg {
+            :deep(svg) {
               width: 100%;
               height: 100%;
             }
@@ -290,7 +283,7 @@ export default {
           cursor: pointer;
           position: relative;
 
-          /deep/ img {
+          :deep(img) {
             width: 100%;
             height: 100%;
             object-fit: contain;

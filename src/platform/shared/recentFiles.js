@@ -8,10 +8,15 @@ export const normalizeRecentFiles = list => {
   list.forEach(item => {
     const path = normalizePath(item && item.path)
     if (!path) return
+    const updatedAt = Number(item.updatedAt || Date.now())
+    const current = map.get(path)
+    if (current && current.updatedAt > updatedAt) {
+      return
+    }
     map.set(path, {
       path,
       name: String(item.name || path.split(/[\\/]/).pop() || path),
-      updatedAt: Number(item.updatedAt || Date.now())
+      updatedAt
     })
   })
   return [...map.values()]

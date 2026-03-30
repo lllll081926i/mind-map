@@ -80,12 +80,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.boxColor') }}</span>
-            <span
-              class="block"
-              v-popover:popover
-              :style="{ backgroundColor: styleConfig.strokeColor }"
-            ></span>
-            <el-popover ref="popover" placement="bottom" trigger="click">
+            <el-popover placement="bottom" trigger="click">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: styleConfig.strokeColor }"
+                ></span>
+              </template>
               <Color
                 :color="styleConfig.strokeColor"
                 @change="
@@ -122,12 +123,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.fillColor') }}</span>
-            <span
-              class="block"
-              v-popover:popover2
-              :style="{ backgroundColor: styleConfig.fill }"
-            ></span>
-            <el-popover ref="popover2" placement="bottom" trigger="click">
+            <el-popover placement="bottom" trigger="click">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: styleConfig.fill }"
+                ></span>
+              </template>
               <Color
                 :color="styleConfig.fill"
                 @change="
@@ -178,13 +180,25 @@
               :content="$t('nodeOuterFrame.color')"
               placement="bottom"
             >
-              <div class="styleBtn" v-popover:popover3>
-                A
-                <span
-                  class="colorShow"
-                  :style="{ backgroundColor: styleConfig.color }"
-                ></span>
-              </div>
+              <el-popover placement="bottom" trigger="hover">
+                <template #reference>
+                  <div class="styleBtn">
+                    A
+                    <span
+                      class="colorShow"
+                      :style="{ backgroundColor: styleConfig.color }"
+                    ></span>
+                  </div>
+                </template>
+                <Color
+                  :color="styleConfig.color"
+                  @change="
+                    color => {
+                      updateOuterFrame('color', color)
+                    }
+                  "
+                ></Color>
+              </el-popover>
             </el-tooltip>
             <el-tooltip
               :content="$t('nodeOuterFrame.fontBold')"
@@ -215,16 +229,6 @@
               </div>
             </el-tooltip>
           </div>
-          <el-popover ref="popover3" placement="bottom" trigger="hover">
-            <Color
-              :color="styleConfig.color"
-              @change="
-                color => {
-                  updateOuterFrame('color', color)
-                }
-              "
-            ></Color>
-          </el-popover>
         </div>
         <div class="row">
           <div class="rowItem">
@@ -276,12 +280,13 @@
         <div class="row">
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.textFill') }}</span>
-            <span
-              class="block"
-              v-popover:popover4
-              :style="{ backgroundColor: styleConfig.textFill }"
-            ></span>
-            <el-popover ref="popover4" placement="bottom" trigger="click">
+            <el-popover placement="bottom" trigger="click">
+              <template #reference>
+                <span
+                  class="block"
+                  :style="{ backgroundColor: styleConfig.textFill }"
+                ></span>
+              </template>
               <Color
                 :color="styleConfig.textFill"
                 @change="
@@ -425,11 +430,11 @@ export default {
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'nodeOuterFrameStyle') {
-        this.$refs.sidebar.show = true
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (!this.$refs.sidebar) return
+        this.$refs.sidebar.show = val === 'nodeOuterFrameStyle'
       }
     }
   },
@@ -438,10 +443,15 @@ export default {
     this.mindMap.on('outer_frame_delete', this.hide)
     this.mindMap.on('outer_frame_deactivate', this.hide)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.mindMap.off('outer_frame_active', this.onOuterFrameActive)
     this.mindMap.off('outer_frame_delete', this.hide)
     this.mindMap.off('outer_frame_deactivate', this.hide)
+  },
+  mounted() {
+    if (this.activeSidebar === 'nodeOuterFrameStyle' && this.$refs.sidebar) {
+      this.$refs.sidebar.show = true
+    }
   },
   methods: {
     ...mapMutations(['setActiveSidebar']),

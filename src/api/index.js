@@ -1,15 +1,21 @@
 import exampleData from 'simple-mind-map/example/exampleData'
 import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
-import Vue from 'vue'
 import vuexStore from '@/store'
 import { getBootstrapState, isDesktopApp, saveBootstrapStatePatch } from '@/platform'
 import { separateAppAndAiConfig } from '@/utils/aiProviders.mjs'
+import {
+  emitLocalStorageExceeded,
+  emitWriteLocalFile
+} from '@/services/appEvents'
+import {
+  loadLocalConfig,
+  persistLocalConfig
+} from '@/services/localConfigStorage'
+import { getCurrentData } from '@/services/runtimeGlobals'
 
 const SIMPLE_MIND_MAP_DATA = 'SIMPLE_MIND_MAP_DATA'
 const SIMPLE_MIND_MAP_CONFIG = 'SIMPLE_MIND_MAP_CONFIG'
 const SIMPLE_MIND_MAP_LANG = 'SIMPLE_MIND_MAP_LANG'
-const SIMPLE_MIND_MAP_LOCAL_CONFIG = 'SIMPLE_MIND_MAP_LOCAL_CONFIG'
-
 let mindMapData = null
 
 const isQuotaExceededError = error => {
@@ -25,10 +31,11 @@ const isQuotaExceededError = error => {
 // 获取缓存的思维导图数据
 export const getData = () => {
   if (isDesktopApp()) {
-    const state = getBootstrapState()
-    if (vuexStore.state.isHandleLocalFile) {
-      return Vue.prototype.getCurrentData()
+    const currentData = vuexStore.state.isHandleLocalFile ? getCurrentData() : null
+    if (currentData) {
+      return currentData
     }
+    const state = getBootstrapState()
     return state.mindMapData || simpleDeepClone(exampleData)
   }
   // 接管模式
@@ -38,7 +45,10 @@ export const getData = () => {
   }
   // 操作本地文件模式
   if (vuexStore.state.isHandleLocalFile) {
-    return Vue.prototype.getCurrentData()
+    const currentData = getCurrentData()
+    if (currentData) {
+      return currentData
+    }
   }
   let store = localStorage.getItem(SIMPLE_MIND_MAP_DATA)
   if (store === null) {
@@ -74,7 +84,7 @@ export const storeData = data => {
       void saveBootstrapStatePatch({
         mindMapData: originData
       })
-      Vue.prototype.$bus.$emit('write_local_file', originData)
+      emitWriteLocalFile(originData)
       return
     }
     if (window.takeOverApp) {
@@ -82,7 +92,7 @@ export const storeData = data => {
       window.takeOverAppMethods.saveMindMapData(originData)
       return
     }
-    Vue.prototype.$bus.$emit('write_local_file', originData)
+    emitWriteLocalFile(originData)
     if (vuexStore.state.isHandleLocalFile) {
       return
     }
@@ -90,7 +100,7 @@ export const storeData = data => {
   } catch (error) {
     console.log(error)
     if (isQuotaExceededError(error)) {
-      Vue.prototype.$bus.$emit('localStorageExceeded')
+      emitLocalStorageExceeded()
     }
   }
 }
@@ -160,47 +170,10 @@ export const getLang = () => {
 
 // 存储本地配置
 export const storeLocalConfig = config => {
-  if (isDesktopApp()) {
-    const state = getBootstrapState()
-    const { localConfig, aiConfig } = separateAppAndAiConfig(config)
-    void saveBootstrapStatePatch({
-      localConfig: {
-        ...state.localConfig,
-        ...localConfig
-      },
-      aiConfig: {
-        ...state.aiConfig,
-        ...aiConfig
-      }
-    })
-    return
-  }
-  if (window.takeOverApp) {
-    return window.takeOverAppMethods.saveLocalConfig(config)
-  }
-  localStorage.setItem(SIMPLE_MIND_MAP_LOCAL_CONFIG, JSON.stringify(config))
+  persistLocalConfig(config)
 }
 
 // 获取本地配置
 export const getLocalConfig = () => {
-  if (isDesktopApp()) {
-    const state = getBootstrapState()
-    return {
-      ...state.localConfig,
-      ...state.aiConfig
-    }
-  }
-  if (window.takeOverApp) {
-    return window.takeOverAppMethods.getLocalConfig()
-  }
-  let config = localStorage.getItem(SIMPLE_MIND_MAP_LOCAL_CONFIG)
-  if (config) {
-    try {
-      return JSON.parse(config)
-    } catch (error) {
-      localStorage.removeItem(SIMPLE_MIND_MAP_LOCAL_CONFIG)
-      return null
-    }
-  }
-  return null
+  return loadLocalConfig()
 }

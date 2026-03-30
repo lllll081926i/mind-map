@@ -183,6 +183,7 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex'
+import { emitAiCreatePart } from '@/services/appEvents'
 import { getTextFromHtml, imgToDataUrl } from 'simple-mind-map/src/utils'
 import { transformToMarkdown } from 'simple-mind-map/src/parse/toMarkdown'
 import { transformToTxt } from 'simple-mind-map/src/parse/toTxt'
@@ -282,13 +283,13 @@ export default {
       return isLast
     },
     isGeneralization() {
-      return this.node.isGeneralization
+      return !!this.node?.isGeneralization
     },
     hasHyperlink() {
-      return !!this.node.getData('hyperlink')
+      return !!this.node?.getData('hyperlink')
     },
     hasNote() {
-      return !!this.node.getData('note')
+      return !!this.node?.getData('note')
     },
     numberTypeList() {
       return numberTypeList[this.$i18n.locale] || numberTypeList.zh
@@ -297,10 +298,10 @@ export default {
       return numberLevelList[this.$i18n.locale] || numberLevelList.zh
     },
     hasCheckbox() {
-      return !!this.node.getData('checkbox')
+      return !!this.node?.getData('checkbox')
     },
     hasNodeLink() {
-      return !!this.node.getData('nodeLink')
+      return !!this.node?.getData('nodeLink')
     }
   },
   created() {
@@ -313,7 +314,7 @@ export default {
     this.$bus.$on('translate', this.hide)
     this.$bus.$on('node_mousedown', this.onNodeMousedown)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('node_contextmenu', this.show)
     this.$bus.$off('node_click', this.hide)
     this.$bus.$off('draw_click', this.hide)
@@ -511,7 +512,7 @@ export default {
 
     // AI续写
     aiCreate() {
-      this.$bus.$emit('ai_create_part', this.node)
+      emitAiCreatePart(this.node)
       this.hide()
     }
   }

@@ -62,7 +62,7 @@ export default {
   mounted() {
     this.mindMap.el.appendChild(this.$refs.noteContentViewer)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('showNoteContent', this.onShowNoteContent)
     this.$bus.$off('hideNoteContent', this.hideNoteContent)
     document.body.removeEventListener('click', this.hideNoteContent)
@@ -71,10 +71,13 @@ export default {
     this.$bus.$off('translate', this.onScale)
     this.$bus.$off('svg_mousedown', this.hideNoteContent)
     this.$bus.$off('expand_btn_click', this.hideNoteContent)
+    if (this.$refs.noteContentViewer?.parentNode === this.mindMap.el) {
+      this.mindMap.el.removeChild(this.$refs.noteContentViewer)
+    }
   },
   methods: {
     onNodeActive(...args) {
-      const nodes = [...args[1]]
+      const nodes = [...(args[1] || [])]
       if (nodes.length > 0) {
         if (nodes[0] !== this.node) {
           this.hideNoteContent()

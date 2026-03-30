@@ -12,8 +12,8 @@
         :placeholder="$t('nodeTagStyle.placeholder')"
         size="mini"
         @blur="updateTagText"
-        @keydown.native.stop
-        @keyup.native.enter.stop="updateTagText"
+        @keydown.stop
+        @keyup.enter.stop="updateTagText"
       ></el-input>
       <div class="deleteBtn" @click.stop="deleteTag">
         <span class="iconfont iconshanchu"></span>
@@ -64,12 +64,15 @@ export default {
     this.mindMap.on('svg_mousedown', this.hide)
     this.mindMap.on('expand_btn_click', this.hide)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.mindMap.off('node_tag_click', this.onNodeTagClick)
     this.mindMap.off('scale', this.hide)
     this.mindMap.off('translate', this.hide)
     this.mindMap.off('svg_mousedown', this.hide)
     this.mindMap.off('expand_btn_click', this.hide)
+    if (this.$refs.elRef?.parentNode === document.body) {
+      document.body.removeChild(this.$refs.elRef)
+    }
   },
   mounted() {
     document.body.appendChild(this.$refs.elRef)

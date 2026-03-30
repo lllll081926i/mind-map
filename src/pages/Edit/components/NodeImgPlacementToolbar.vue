@@ -55,7 +55,7 @@ export default {
   mounted() {
     document.body.append(this.$refs.nodeImgPlacementToolbar)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.mindMap.off('node_img_click', this.show)
     this.mindMap.off('draw_click', this.close)
     this.mindMap.off('svg_mousedown', this.close)
@@ -65,6 +65,9 @@ export default {
     this.mindMap.off('node_img_adjust_btn_mousedown', this.close)
     this.mindMap.off('delete_node_img_from_delete_btn', this.close)
     this.mindMap.off('translate', this.close)
+    if (this.$refs.nodeImgPlacementToolbar?.parentNode === document.body) {
+      document.body.removeChild(this.$refs.nodeImgPlacementToolbar)
+    }
   },
   methods: {
     show(node, imgNode) {
@@ -101,8 +104,13 @@ export default {
       this.updatePos()
     },
 
-    onNodeActive(node) {
-      if (node === this.node) {
+    onNodeActive(...args) {
+      const activeNodes = Array.isArray(args[1])
+        ? args[1]
+        : args[0]
+          ? [args[0]]
+          : []
+      if (this.node && activeNodes.includes(this.node)) {
         return
       }
       this.close()

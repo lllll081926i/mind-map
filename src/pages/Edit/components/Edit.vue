@@ -14,9 +14,16 @@
     <Count :mindMap="mindMap" v-if="!isZenMode"></Count>
     <Navigator v-if="mindMap" :mindMap="mindMap"></Navigator>
     <NavigatorToolbar :mindMap="mindMap" v-if="!isZenMode"></NavigatorToolbar>
-    <OutlineSidebar :mindMap="mindMap"></OutlineSidebar>
-    <Style v-if="mindMap && !isZenMode" :mindMap="mindMap"></Style>
+    <OutlineSidebar
+      v-if="mindMap && activeSidebar === 'outline'"
+      :mindMap="mindMap"
+    ></OutlineSidebar>
+    <Style
+      v-if="mindMap && !isZenMode && activeSidebar === 'nodeStyle'"
+      :mindMap="mindMap"
+    ></Style>
     <BaseStyle
+      v-if="mindMap && activeSidebar === 'baseStyle'"
       :data="mindMapData"
       :configData="mindMapConfig"
       :mindMap="mindMap"
@@ -25,9 +32,16 @@
       v-if="mindMap"
       :mindMap="mindMap"
     ></AssociativeLineStyle>
-    <Theme v-if="mindMap" :data="mindMapData" :mindMap="mindMap"></Theme>
-    <Structure :mindMap="mindMap"></Structure>
-    <ShortcutKey></ShortcutKey>
+    <Theme
+      v-if="mindMap && activeSidebar === 'theme'"
+      :data="mindMapData"
+      :mindMap="mindMap"
+    ></Theme>
+    <Structure
+      v-if="mindMap && activeSidebar === 'structure'"
+      :mindMap="mindMap"
+    ></Structure>
+    <ShortcutKey v-if="activeSidebar === 'shortcutKey'"></ShortcutKey>
     <Contextmenu v-if="mindMap" :mindMap="mindMap"></Contextmenu>
     <RichTextToolbar v-if="mindMap" :mindMap="mindMap"></RichTextToolbar>
     <NodeNoteContentShow
@@ -50,7 +64,11 @@
     ></FormulaSidebar>
     <NodeOuterFrame v-if="mindMap" :mindMap="mindMap"></NodeOuterFrame>
     <NodeTagStyle v-if="mindMap" :mindMap="mindMap"></NodeTagStyle>
-    <Setting :configData="mindMapConfig" :mindMap="mindMap"></Setting>
+    <Setting
+      v-if="mindMap && activeSidebar === 'setting'"
+      :configData="mindMapConfig"
+      :mindMap="mindMap"
+    ></Setting>
     <NodeImgPlacementToolbar
       v-if="mindMap"
       :mindMap="mindMap"
@@ -99,14 +117,8 @@ import NodeBase64ImageStorage from 'simple-mind-map/src/plugins/NodeBase64ImageS
 import Themes from 'simple-mind-map-plugin-themes'
 // 协同编辑插件
 // import Cooperate from 'simple-mind-map/src/plugins/Cooperate.js'
-import OutlineSidebar from './OutlineSidebar.vue'
-import Style from './Style.vue'
-import BaseStyle from './BaseStyle.vue'
-import Theme from './Theme.vue'
-import Structure from './Structure.vue'
 import Count from './Count.vue'
 import NavigatorToolbar from './NavigatorToolbar.vue'
-import ShortcutKey from './ShortcutKey.vue'
 import Contextmenu from './Contextmenu.vue'
 import RichTextToolbar from './RichTextToolbar.vue'
 import { getData, getConfig, storeData } from '@/api'
@@ -114,7 +126,6 @@ import Navigator from './Navigator.vue'
 import NodeImgPreview from './NodeImgPreview.vue'
 import SidebarTrigger from './SidebarTrigger.vue'
 import { mapState } from 'vuex'
-import Vue from 'vue'
 import Search from './Search.vue'
 import NodeIconSidebar from './NodeIconSidebar.vue'
 import NodeIconToolbar from './NodeIconToolbar.vue'
@@ -123,14 +134,25 @@ import { showLoading, hideLoading } from '@/utils/loading'
 import handleClipboardText from '@/utils/handleClipboardText'
 import { getParentWithClass } from '@/utils'
 import Scrollbar from './Scrollbar.vue'
+import { onLocalStorageExceeded } from '@/services/appEvents'
+import {
+  clearCurrentDataGetter,
+  setCurrentDataGetter
+} from '@/services/runtimeGlobals'
 import exampleData from 'simple-mind-map/example/exampleData'
 import NodeOuterFrame from './NodeOuterFrame.vue'
 import NodeTagStyle from './NodeTagStyle.vue'
-import Setting from './Setting.vue'
 import AssociativeLineStyle from './AssociativeLineStyle.vue'
 import NodeImgPlacementToolbar from './NodeImgPlacementToolbar.vue'
 import defaultNodeImage from '../../../assets/img/图片加载失败.svg'
 
+const OutlineSidebar = () => import('./OutlineSidebar.vue')
+const Style = () => import('./Style.vue')
+const BaseStyle = () => import('./BaseStyle.vue')
+const Theme = () => import('./Theme.vue')
+const Structure = () => import('./Structure.vue')
+const ShortcutKey = () => import('./ShortcutKey.vue')
+const Setting = () => import('./Setting.vue')
 const AiCreate = () => import('./AiCreate.vue')
 const AiChat = () => import('./AiChat.vue')
 const NodeNoteContentShow = () => import('./NodeNoteContentShow.vue')
@@ -220,7 +242,8 @@ export default {
         state.localConfig.useLeftKeySelectionRightKeyDrag,
       extraTextOnExport: state => state.extraTextOnExport,
       isDragOutlineTreeNode: state => state.isDragOutlineTreeNode,
-      enableAi: state => state.localConfig.enableAi
+      enableAi: state => state.localConfig.enableAi,
+      activeSidebar: state => state.activeSidebar
     })
   },
   watch: {
@@ -253,10 +276,12 @@ export default {
     this.$bus.$on('startPainter', this.handleStartPainter)
     this.$bus.$on('node_tree_render_end', this.handleHideLoading)
     this.$bus.$on('showLoading', this.handleShowLoading)
-    this.$bus.$on('localStorageExceeded', this.onLocalStorageExceeded)
+    this.removeLocalStorageExceededListener = onLocalStorageExceeded(
+      this.onLocalStorageExceeded
+    )
     window.addEventListener('resize', this.handleResize)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('execCommand', this.execCommand)
     this.$bus.$off('paddingChange', this.onPaddingChange)
     this.$bus.$off('export', this.export)
@@ -267,7 +292,8 @@ export default {
     this.$bus.$off('startPainter', this.handleStartPainter)
     this.$bus.$off('node_tree_render_end', this.handleHideLoading)
     this.$bus.$off('showLoading', this.handleShowLoading)
-    this.$bus.$off('localStorageExceeded', this.onLocalStorageExceeded)
+    this.removeLocalStorageExceededListener &&
+      this.removeLocalStorageExceededListener()
     window.removeEventListener('resize', this.handleResize)
     if (this.onDataChange) {
       this.$bus.$off('data_change', this.onDataChange)
@@ -276,6 +302,7 @@ export default {
       this.$bus.$off('view_data_change', this.onViewDataChange)
     }
     clearTimeout(this.storeConfigTimer)
+    clearCurrentDataGetter()
     if (this.mindMap) {
       this.mindMap.destroy()
     }
@@ -521,10 +548,10 @@ export default {
       }
       // api/index.js文件使用
       // 当正在编辑本地文件时通过该方法获取最新数据
-      Vue.prototype.getCurrentData = () => {
+      setCurrentDataGetter(() => {
         const fullData = this.mindMap.getData(true)
         return { ...fullData }
-      }
+      })
       // 协同测试
       this.cooperateTest()
     },

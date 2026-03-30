@@ -27,12 +27,23 @@
   },
   "bundle": {
     "active": true,
-    "targets": "nsis",
+    "targets": "all",
+    "useLocalToolsDir": true,
     "icon": [
       "icons/icon.ico"
     ],
+    "shortDescription": "Desktop mind map editor",
+    "longDescription": "Mind map desktop application for Windows, macOS, and Linux.",
     "windows": {
       "digestAlgorithm": "sha256"
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
     }
   }
 }

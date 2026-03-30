@@ -130,12 +130,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.color') }}</span>
-          <span
-            class="block"
-            v-popover:popover
-            :style="{ backgroundColor: style.lineColor }"
-          ></span>
-          <el-popover ref="popover" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.lineColor }"
+              ></span>
+            </template>
             <Color
               :color="style.lineColor"
               @change="
@@ -332,16 +333,18 @@
                 }}</span>
               </div>
             </div>
-            <div slot="reference" class="curRainbowLine">
-              <div class="colorsBar" v-if="curRainbowLineColorList">
-                <span
-                  class="colorItem"
-                  v-for="color in curRainbowLineColorList"
-                  :style="{ backgroundColor: color }"
-                ></span>
+            <template #reference>
+              <div class="curRainbowLine">
+                <div class="colorsBar" v-if="curRainbowLineColorList">
+                  <span
+                    class="colorItem"
+                    v-for="color in curRainbowLineColorList"
+                    :style="{ backgroundColor: color }"
+                  ></span>
+                </div>
+                <span v-else>{{ $t('baseStyle.notUseRainbowLines') }}</span>
               </div>
-              <span v-else>{{ $t('baseStyle.notUseRainbowLines') }}</span>
-            </div>
+            </template>
           </el-popover>
         </div>
       </div>
@@ -350,12 +353,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.color') }}</span>
-          <span
-            class="block"
-            v-popover:popover2
-            :style="{ backgroundColor: style.generalizationLineColor }"
-          ></span>
-          <el-popover ref="popover2" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.generalizationLineColor }"
+              ></span>
+            </template>
             <Color
               :color="style.generalizationLineColor"
               @change="
@@ -400,12 +404,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.associativeLineColor') }}</span>
-          <span
-            class="block"
-            v-popover:popover4
-            :style="{ backgroundColor: style.associativeLineColor }"
-          ></span>
-          <el-popover ref="popover4" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineColor"
               @change="
@@ -450,12 +455,13 @@
           <span class="name">{{
             $t('baseStyle.associativeLineActiveColor')
           }}</span>
-          <span
-            class="block"
-            v-popover:popover5
-            :style="{ backgroundColor: style.associativeLineActiveColor }"
-          ></span>
-          <el-popover ref="popover5" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineActiveColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineActiveColor"
               @change="
@@ -563,12 +569,13 @@
       <div class="row">
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.color') }}</span>
-          <span
-            class="block"
-            v-popover:popover6
-            :style="{ backgroundColor: style.associativeLineTextColor }"
-          ></span>
-          <el-popover ref="popover6" placement="bottom" trigger="click">
+          <el-popover placement="bottom" trigger="click">
+            <template #reference>
+              <span
+                class="block"
+                :style="{ backgroundColor: style.associativeLineTextColor }"
+              ></span>
+            </template>
             <Color
               :color="style.associativeLineTextColor"
               @change="
@@ -934,15 +941,20 @@ export default {
     }
   },
   watch: {
-    activeSidebar(val) {
-      if (val === 'baseStyle') {
-        this.$refs.sidebar.show = true
-        this.initStyle()
-        this.initRainbowLines()
-        this.initOuterFramePadding()
-        this.currentLayout = this.mindMap.getLayout()
-      } else {
-        this.$refs.sidebar.show = false
+    activeSidebar: {
+      immediate: true,
+      handler(val) {
+        if (val === 'baseStyle') {
+          this.initStyle()
+          this.initRainbowLines()
+          this.initOuterFramePadding()
+          this.currentLayout = this.mindMap.getLayout()
+        }
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'baseStyle'
+          }
+        })
       }
     },
     lineStyleListShow: {
@@ -960,7 +972,7 @@ export default {
   created() {
     this.$bus.$on('setData', this.onSetData)
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.$bus.$off('setData', this.onSetData)
   },
   methods: {
