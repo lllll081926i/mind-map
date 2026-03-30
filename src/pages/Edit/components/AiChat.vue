@@ -73,7 +73,8 @@ export default {
     return {
       text: '',
       chatList: [],
-      isCreating: false
+      isCreating: false,
+      activeResponseId: 0
     }
   },
   computed: {
@@ -111,51 +112,79 @@ export default {
         return
       }
       this.text = ''
-      const historyUserMsgList = this.chatList
-        .filter(item => {
-          return item.type === 'user'
-        })
-        .map(item => {
-          return item.content
-        })
+      const historyMsgList = this.chatList.map(item => {
+        return {
+          role: item.type === 'ai' ? 'assistant' : 'user',
+          content: item.rawContent || item.content
+        }
+      })
       this.chatList.push({
         id: createUid(),
         type: 'user',
-        content: text
+        content: text,
+        rawContent: text
       })
       this.chatList.push({
         id: createUid(),
         type: 'ai',
-        content: ''
+        content: '',
+        rawContent: ''
       })
       this.isCreating = true
-      const textList = [...historyUserMsgList, text]
+      const responseId = ++this.activeResponseId
+      const messageList = [
+        ...historyMsgList,
+        {
+          role: 'user',
+          content: text
+        }
+      ]
       this.$bus.$emit(
         'ai_chat',
-        textList,
+        messageList,
         res => {
+          if (responseId !== this.activeResponseId) return
           if (!md) {
             md = new MarkdownIt()
           }
-          this.chatList[this.chatList.length - 1].content = md.render(res)
+          const currentItem = this.chatList[this.chatList.length - 1]
+          if (!currentItem || currentItem.type !== 'ai') return
+          currentItem.rawContent = res
+          currentItem.content = md.render(res)
           this.$refs.chatResBoxRef.scrollTop = this.$refs.chatResBoxRef.scrollHeight
         },
         () => {
+          if (responseId !== this.activeResponseId) return
           this.isCreating = false
         },
-        () => {
+        error => {
+          if (responseId !== this.activeResponseId) return
           this.isCreating = false
-          this.$message.error(this.$t('ai.generationFailed'))
+          const currentItem = this.chatList[this.chatList.length - 1]
+          if (currentItem && currentItem.type === 'ai' && !currentItem.rawContent) {
+            this.chatList.pop()
+          }
+          this.$message.error(error?.message || this.$t('ai.generationFailed'))
         }
       )
     },
 
     stop() {
+      this.activeResponseId += 1
       this.$bus.$emit('ai_chat_stop')
       this.isCreating = false
+      const currentItem = this.chatList[this.chatList.length - 1]
+      if (currentItem && currentItem.type === 'ai' && !currentItem.rawContent) {
+        this.chatList.pop()
+      }
     },
 
     clear() {
+      if (this.isCreating) {
+        this.stop()
+      } else {
+        this.activeResponseId += 1
+      }
       this.chatList = []
     },
 

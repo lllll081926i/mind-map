@@ -109,6 +109,12 @@ import {
 } from 'simple-mind-map/src/utils'
 import { mapState } from 'vuex'
 import AiConfigDialog from './AiConfigDialog.vue'
+import {
+  normalizeAiConfig,
+  shouldUseLocalProxyHealthcheck,
+  validateAiConfig
+} from '@/utils/aiProviders.mjs'
+import { isDesktopApp } from '@/platform'
 
 export default {
   components: {
@@ -140,7 +146,9 @@ export default {
 
       createPartDialogVisible: false,
       aiPartInput: '',
-      beingCreatePartNode: null
+      beingCreatePartNode: null,
+      renderEndHandler: null,
+      renderRetryTimer: null
     }
   },
   computed: {
@@ -165,8 +173,59 @@ export default {
     this.$bus.$off('ai_chat', this.aiChat)
     this.$bus.$off('ai_chat_stop', this.aiChatStop)
     this.$bus.$off('showAiConfigDialog', this.showAiConfigDialog)
+    this.resetOnRenderEnd()
+    this.resetAiRequestState({ abort: true })
+    this.aiCreatingMaskVisible = false
+    this.resetAiCreatePartDialog()
+    if (
+      this.$refs.aiCreatingMaskRef &&
+      this.$refs.aiCreatingMaskRef.parentNode === document.body
+    ) {
+      document.body.removeChild(this.$refs.aiCreatingMaskRef)
+    }
   },
   methods: {
+    clearRenderRetryTimer() {
+      if (this.renderRetryTimer) {
+        clearTimeout(this.renderRetryTimer)
+        this.renderRetryTimer = null
+      }
+    },
+
+    detachRenderEndListener() {
+      this.clearRenderRetryTimer()
+      if (this.renderEndHandler && this.mindMap) {
+        this.mindMap.off('node_tree_render_end', this.renderEndHandler)
+      }
+      this.renderEndHandler = null
+    },
+
+    scheduleRenderRetry(handler) {
+      this.clearRenderRetryTimer()
+      this.renderRetryTimer = setTimeout(() => {
+        this.renderRetryTimer = null
+        if (this.renderEndHandler !== handler) return
+        handler()
+      }, 500)
+    },
+
+    resetAiRequestState({ abort = false } = {}) {
+      if (abort && this.aiInstance) {
+        this.aiInstance.stop()
+      }
+      this.isAiCreating = false
+      this.aiInstance = null
+    },
+
+    createAiInstance() {
+      const config = normalizeAiConfig(this.aiConfig)
+      this.aiInstance = new Ai({
+        port: config.port
+      })
+      this.aiInstance.init(config)
+      return this.aiInstance
+    },
+
     // 显示AI配置修改弹窗
     showAiConfigDialog() {
       this.aiConfigDialogVisible = true
@@ -174,8 +233,15 @@ export default {
 
     // 客户端连接检测
     async testConnect() {
+      const config = normalizeAiConfig(this.aiConfig)
+      if (!shouldUseLocalProxyHealthcheck(isDesktopApp())) {
+        this.$message.success(this.$t('ai.connectSuccessful'))
+        this.clientTipDialogVisible = false
+        this.createDialogVisible = true
+        return
+      }
       try {
-        await fetch(`http://localhost:${this.aiConfig.port}/ai/test`, {
+        await fetch(`http://localhost:${config.port}/ai/test`, {
           method: 'GET'
         })
         this.$message.success(this.$t('ai.connectSuccessful'))
@@ -189,22 +255,18 @@ export default {
 
     // 检测ai是否可用
     async aiTest() {
-      // 检查配置
-      if (
-        !(
-          this.aiConfig.api &&
-          this.aiConfig.key &&
-          this.aiConfig.model &&
-          this.aiConfig.port
-        )
-      ) {
+      const validation = validateAiConfig(this.aiConfig)
+      if (!validation.valid) {
         this.showAiConfigDialog()
-        throw new Error(this.$t('ai.configurationMissing'))
+        throw new Error(this.$t(validation.messageKey || 'ai.configurationMissing'))
+      }
+      if (!shouldUseLocalProxyHealthcheck(isDesktopApp())) {
+        return
       }
       // 检查连接
       let isConnect = false
       try {
-        await fetch(`http://localhost:${this.aiConfig.port}/ai/test`, {
+        await fetch(`http://localhost:${validation.config.port}/ai/test`, {
           method: 'GET'
         })
         isConnect = true
@@ -244,10 +306,7 @@ export default {
       this.aiCreatingMaskVisible = true
       // 发起请求
       this.isAiCreating = true
-      this.aiInstance = new Ai({
-        port: this.aiConfig.port
-      })
-      this.aiInstance.init('huoshan', this.aiConfig)
+      this.createAiInstance()
       this.mindMap.renderer.setRootNodeCenter()
       this.mindMap.setData(null)
       this.aiInstance.request(
@@ -272,10 +331,10 @@ export default {
           this.aiCreatingContent = content
           this.resetOnAiCreatingStop()
         },
-        () => {
+        error => {
           this.resetOnAiCreatingStop()
           this.resetOnRenderEnd()
-          this.$message.error(this.$t('ai.generationFailed'))
+          this.$message.error(error?.message || this.$t('ai.generationFailed'))
         }
       )
     },
@@ -283,14 +342,15 @@ export default {
     // AI请求完成或出错后需要复位的数据
     resetOnAiCreatingStop() {
       this.aiCreatingMaskVisible = false
-      this.isAiCreating = false
-      this.aiInstance = null
+      this.resetAiRequestState()
     },
 
     // 渲染结束后需要复位的数据
     resetOnRenderEnd() {
+      this.detachRenderEndListener()
       this.isLoopRendering = false
       this.uidMap = {}
+      this.latestUid = ''
       this.aiCreatingContent = ''
       this.mindMapDataCache = ''
       this.beingAiCreateNodeUid = ''
@@ -298,9 +358,11 @@ export default {
 
     // 停止生成
     stopCreate() {
-      this.aiInstance.stop()
-      this.isAiCreating = false
+      this.aiCreatingContent = ''
+      this.resetOnRenderEnd()
+      this.resetAiRequestState({ abort: true })
       this.aiCreatingMaskVisible = false
+      this.resetAiCreatePartDialog()
       this.$message.success(this.$t('ai.stoppedGenerating'))
     },
 
@@ -319,8 +381,7 @@ export default {
 
         // 如果生成结束数据渲染完毕，那么解绑事件
         if (!this.isAiCreating && !this.aiCreatingContent) {
-          this.mindMap.off('node_tree_render_end', onRenderEnd)
-          this.latestUid = ''
+          this.resetOnRenderEnd()
           return
         }
 
@@ -331,9 +392,7 @@ export default {
           // 如果和上次数据一样则不触发重新渲染
           const curTreeData = JSON.stringify(treeData)
           if (curTreeData === lastTreeData) {
-            setTimeout(() => {
-              onRenderEnd()
-            }, 500)
+            this.scheduleRenderRetry(onRenderEnd)
             return
           }
           lastTreeData = curTreeData
@@ -346,6 +405,8 @@ export default {
           this.$message.success(this.$t('ai.aiGenerationSuccess'))
         }
       }
+      this.detachRenderEndListener()
+      this.renderEndHandler = onRenderEnd
       this.mindMap.on('node_tree_render_end', onRenderEnd)
 
       this.mindMap.setData(treeData)
@@ -442,10 +503,7 @@ export default {
         this.aiCreatingMaskVisible = true
         // 发起请求
         this.isAiCreating = true
-        this.aiInstance = new Ai({
-          port: this.aiConfig.port
-        })
-        this.aiInstance.init('huoshan', this.aiConfig)
+        this.createAiInstance()
         this.aiInstance.request(
           {
             messages: [
@@ -469,11 +527,11 @@ export default {
             this.resetOnAiCreatingStop()
             this.resetAiCreatePartDialog()
           },
-          () => {
+          error => {
             this.resetOnAiCreatingStop()
             this.resetAiCreatePartDialog()
             this.resetOnRenderEnd()
-            this.$message.error(this.$t('ai.generationFailed'))
+            this.$message.error(error?.message || this.$t('ai.generationFailed'))
           }
         )
       } catch (error) {
@@ -518,8 +576,7 @@ export default {
 
         // 如果生成结束数据渲染完毕，那么解绑事件
         if (!this.isAiCreating && !this.aiCreatingContent) {
-          this.mindMap.off('node_tree_render_end', onRenderEnd)
-          this.latestUid = ''
+          this.resetOnRenderEnd()
           return
         }
 
@@ -531,9 +588,7 @@ export default {
           // 如果和上次数据一样则不触发重新渲染
           const curPartData = JSON.stringify(partData)
           if (curPartData === lastPartData) {
-            setTimeout(() => {
-              onRenderEnd()
-            }, 500)
+            this.scheduleRenderRetry(onRenderEnd)
             return
           }
           lastPartData = curPartData
@@ -544,6 +599,8 @@ export default {
           this.$message.success(this.$t('ai.aiGenerationSuccess'))
         }
       }
+      this.detachRenderEndListener()
+      this.renderEndHandler = onRenderEnd
       this.mindMap.on('node_tree_render_end', onRenderEnd)
       // 因为是续写，所以首次也直接使用updateData方法渲染
       this.mindMap.updateData(treeData)
@@ -560,16 +617,19 @@ export default {
         await this.aiTest()
         // 发起请求
         this.isAiCreating = true
-        this.aiInstance = new Ai({
-          port: this.aiConfig.port
-        })
-        this.aiInstance.init('huoshan', this.aiConfig)
+        this.createAiInstance()
         this.aiInstance.request(
           {
             messages: messageList.map(msg => {
+              if (typeof msg === 'string') {
+                return {
+                  role: 'user',
+                  content: msg
+                }
+              }
               return {
-                role: 'user',
-                content: msg
+                role: msg.role || 'user',
+                content: msg.content || ''
               }
             })
           },
@@ -577,24 +637,24 @@ export default {
             progress(content)
           },
           content => {
+            this.resetAiRequestState()
             end(content)
           },
           error => {
+            this.resetAiRequestState()
             err(error)
           }
         )
       } catch (error) {
         console.log(error)
+        this.resetAiRequestState()
+        err(error)
       }
     },
 
     // AI对话停止
     aiChatStop() {
-      if (this.aiInstance) {
-        this.aiInstance.stop()
-        this.isAiCreating = false
-        this.aiInstance = null
-      }
+      this.resetAiRequestState({ abort: true })
     }
   }
 }

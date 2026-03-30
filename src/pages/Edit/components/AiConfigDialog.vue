@@ -14,30 +14,34 @@
         ref="ruleFormRef"
         label-width="100px"
       >
-        <p class="title">{{ $t('ai.VolcanoArkLargeModelConfiguration') }}</p>
-        <p class="desc">
-          {{ $t('ai.configTip') }}<a href="https://mp.weixin.qq.com/s/JNb7PH4sCjWzIZ9G8wStGQ" target="_blank">{{ $t('ai.course') }}</a
-          >。
-        </p>
+        <p class="title">{{ $t('ai.providerConfiguration') }}</p>
+        <p class="desc">{{ $t('ai.configTip') }}</p>
+        <el-form-item :label="$t('ai.provider')" prop="provider">
+          <el-select v-model="ruleForm.provider" @change="handleProviderChange">
+            <el-option
+              v-for="item in providerOptions"
+              :key="item.value"
+              :label="$t(item.labelKey)"
+              :value="item.value"
+            ></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('ai.baseUrl')" prop="baseUrl">
+          <el-input v-model="ruleForm.baseUrl"></el-input>
+        </el-form-item>
+        <el-form-item :label="$t('ai.apiPath')" prop="apiPath">
+          <el-input v-model="ruleForm.apiPath"></el-input>
+        </el-form-item>
         <el-form-item label="API Key" prop="key">
           <el-input v-model="ruleForm.key"></el-input>
         </el-form-item>
-        <el-form-item :label="$t('ai.inferenceAccessPoint')" prop="model">
+        <el-form-item :label="$t('ai.modelName')" prop="model">
           <el-input v-model="ruleForm.model"></el-input>
         </el-form-item>
-        <!-- <el-form-item label="接口" prop="api">
-          <el-input v-model="ruleForm.api"></el-input>
-        </el-form-item>
-        <el-form-item label="请求方式" prop="method">
-          <el-select v-model="ruleForm.method" placeholder="请选择">
-            <el-option key="POST" label="POST" value="POST"></el-option>
-            <el-option key="GET" label="GET" value="GET"></el-option>
-          </el-select>
-        </el-form-item> -->
-        <!-- <p class="title">{{ $t('ai.mindMappingClientConfiguration') }}</p>
+        <p class="title">{{ $t('ai.mindMappingClientConfiguration') }}</p>
         <el-form-item :label="$t('ai.port')" prop="port">
           <el-input v-model="ruleForm.port"></el-input>
-        </el-form-item> -->
+        </el-form-item>
       </el-form>
     </div>
     <div slot="footer" class="dialog-footer">
@@ -51,6 +55,11 @@
 
 <script>
 import { mapState, mapMutations } from 'vuex'
+import {
+  AI_PROVIDER_LIST,
+  getAiProviderMeta,
+  normalizeAiConfig
+} from '@/utils/aiProviders.mjs'
 
 export default {
   model: {
@@ -67,6 +76,10 @@ export default {
     return {
       aiConfigDialogVisible: false,
       ruleForm: {
+        provider: '',
+        protocol: '',
+        baseUrl: '',
+        apiPath: '',
         api: '',
         key: '',
         model: '',
@@ -74,10 +87,24 @@ export default {
         method: ''
       },
       rules: {
-        api: [
+        provider: [
           {
             required: true,
-            message: this.$t('ai.apiValidateTip'),
+            message: this.$t('ai.providerValidateTip'),
+            trigger: 'change'
+          }
+        ],
+        baseUrl: [
+          {
+            required: true,
+            message: this.$t('ai.baseUrlValidateTip'),
+            trigger: 'blur'
+          }
+        ],
+        apiPath: [
+          {
+            required: true,
+            message: this.$t('ai.apiPathValidateTip'),
             trigger: 'blur'
           }
         ],
@@ -101,13 +128,6 @@ export default {
             message: this.$t('ai.portValidateTip'),
             trigger: 'blur'
           }
-        ],
-        method: [
-          {
-            required: true,
-            message: this.$t('ai.methodValidateTip'),
-            trigger: 'blur'
-          }
         ]
       }
     }
@@ -116,11 +136,17 @@ export default {
     ...mapState({
       aiConfig: state => state.aiConfig,
       isDark: state => state.localConfig.isDark
-    })
+    }),
+    providerOptions() {
+      return AI_PROVIDER_LIST
+    }
   },
   watch: {
     visible(val) {
       this.aiConfigDialogVisible = val
+      if (val) {
+        this.initFormData()
+      }
     },
     aiConfigDialogVisible(val, oldVal) {
       if (!val && oldVal) {
@@ -139,8 +165,24 @@ export default {
     },
 
     initFormData() {
-      Object.keys(this.aiConfig).forEach(key => {
-        this.ruleForm[key] = this.aiConfig[key]
+      const config = normalizeAiConfig(this.aiConfig)
+      Object.keys(this.ruleForm).forEach(key => {
+        this.ruleForm[key] = config[key]
+      })
+    },
+
+    handleProviderChange(provider) {
+      const meta = getAiProviderMeta(provider)
+      const nextConfig = normalizeAiConfig({
+        ...this.ruleForm,
+        provider: meta.value,
+        protocol: meta.protocol,
+        baseUrl: meta.defaultBaseUrl,
+        apiPath: meta.defaultApiPath,
+        method: meta.defaultMethod
+      })
+      Object.keys(this.ruleForm).forEach(key => {
+        this.ruleForm[key] = nextConfig[key]
       })
     },
 
@@ -153,9 +195,7 @@ export default {
       this.$refs.ruleFormRef.validate(valid => {
         if (valid) {
           this.close()
-          this.setLocalConfig({
-            ...this.ruleForm
-          })
+          this.setLocalConfig(normalizeAiConfig(this.ruleForm))
           this.$message.success(this.$t('ai.configSaveSuccessTip'))
         }
       })

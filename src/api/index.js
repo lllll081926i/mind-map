@@ -2,6 +2,8 @@ import exampleData from 'simple-mind-map/example/exampleData'
 import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
 import Vue from 'vue'
 import vuexStore from '@/store'
+import { getBootstrapState, isDesktopApp, saveBootstrapStatePatch } from '@/platform'
+import { separateAppAndAiConfig } from '@/utils/aiProviders.mjs'
 
 const SIMPLE_MIND_MAP_DATA = 'SIMPLE_MIND_MAP_DATA'
 const SIMPLE_MIND_MAP_CONFIG = 'SIMPLE_MIND_MAP_CONFIG'
@@ -22,6 +24,13 @@ const isQuotaExceededError = error => {
 
 // 获取缓存的思维导图数据
 export const getData = () => {
+  if (isDesktopApp()) {
+    const state = getBootstrapState()
+    if (vuexStore.state.isHandleLocalFile) {
+      return Vue.prototype.getCurrentData()
+    }
+    return state.mindMapData || simpleDeepClone(exampleData)
+  }
   // 接管模式
   if (window.takeOverApp) {
     mindMapData = window.takeOverAppMethods.getMindMapData()
@@ -47,7 +56,9 @@ export const getData = () => {
 export const storeData = data => {
   try {
     let originData = null
-    if (window.takeOverApp) {
+    if (isDesktopApp()) {
+      originData = getData()
+    } else if (window.takeOverApp) {
       originData = mindMapData
     } else {
       originData = getData()
@@ -58,6 +69,13 @@ export const storeData = data => {
     originData = {
       ...originData,
       ...data
+    }
+    if (isDesktopApp()) {
+      void saveBootstrapStatePatch({
+        mindMapData: originData
+      })
+      Vue.prototype.$bus.$emit('write_local_file', originData)
+      return
     }
     if (window.takeOverApp) {
       mindMapData = originData
@@ -79,6 +97,9 @@ export const storeData = data => {
 
 // 获取思维导图配置数据
 export const getConfig = () => {
+  if (isDesktopApp()) {
+    return getBootstrapState().mindMapConfig || null
+  }
   if (window.takeOverApp) {
     return window.takeOverAppMethods.getMindMapConfig() || null
   }
@@ -97,6 +118,12 @@ export const getConfig = () => {
 // 存储思维导图配置数据
 export const storeConfig = config => {
   try {
+    if (isDesktopApp()) {
+      void saveBootstrapStatePatch({
+        mindMapConfig: config
+      })
+      return
+    }
     if (window.takeOverApp) {
       window.takeOverAppMethods.saveMindMapConfig(config)
       return
@@ -109,28 +136,45 @@ export const storeConfig = config => {
 
 // 存储语言
 export const storeLang = lang => {
-  if (window.takeOverApp) {
-    window.takeOverAppMethods.saveLanguage(lang)
+  const nextLang = 'zh'
+  if (isDesktopApp()) {
     return
   }
-  localStorage.setItem(SIMPLE_MIND_MAP_LANG, lang)
+  if (window.takeOverApp) {
+    window.takeOverAppMethods.saveLanguage(nextLang)
+    return
+  }
+  localStorage.setItem(SIMPLE_MIND_MAP_LANG, nextLang)
 }
 
 // 获取存储的语言
 export const getLang = () => {
+  if (isDesktopApp()) {
+    return 'zh'
+  }
   if (window.takeOverApp) {
-    return window.takeOverAppMethods.getLanguage() || 'zh'
+    return 'zh'
   }
-  let lang = localStorage.getItem(SIMPLE_MIND_MAP_LANG)
-  if (lang) {
-    return lang
-  }
-  storeLang('zh')
   return 'zh'
 }
 
 // 存储本地配置
 export const storeLocalConfig = config => {
+  if (isDesktopApp()) {
+    const state = getBootstrapState()
+    const { localConfig, aiConfig } = separateAppAndAiConfig(config)
+    void saveBootstrapStatePatch({
+      localConfig: {
+        ...state.localConfig,
+        ...localConfig
+      },
+      aiConfig: {
+        ...state.aiConfig,
+        ...aiConfig
+      }
+    })
+    return
+  }
   if (window.takeOverApp) {
     return window.takeOverAppMethods.saveLocalConfig(config)
   }
@@ -139,6 +183,13 @@ export const storeLocalConfig = config => {
 
 // 获取本地配置
 export const getLocalConfig = () => {
+  if (isDesktopApp()) {
+    const state = getBootstrapState()
+    return {
+      ...state.localConfig,
+      ...state.aiConfig
+    }
+  }
   if (window.takeOverApp) {
     return window.takeOverAppMethods.getLocalConfig()
   }

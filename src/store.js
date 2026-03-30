@@ -1,6 +1,12 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import { storeLocalConfig } from '@/api'
+import {
+  AI_CONFIG_KEYS,
+  getDefaultAiConfig,
+  normalizeAiConfig
+} from '@/utils/aiProviders.mjs'
+import { DEFAULT_LOCAL_CONFIG } from '@/platform/shared/configSchema'
 
 Vue.use(Vuex)
 
@@ -8,22 +14,7 @@ const store = new Vuex.Store({
   state: {
     isHandleLocalFile: false, // 是否操作的是本地文件
     localConfig: {
-      // 本地配置
-      isZenMode: false, // 是否是禅模式
-      // 是否开启节点富文本
-      openNodeRichText: true,
-      // 鼠标行为
-      useLeftKeySelectionRightKeyDrag: false,
-      // 是否显示滚动条
-      isShowScrollbar: false,
-      // 是否是暗黑模式
-      isDark: false,
-      // 最近一次使用的暗色主题
-      lastDarkTheme: 'dark4',
-      // 最近一次使用的亮色主题
-      lastLightTheme: 'default',
-      // 是否开启AI功能
-      enableAi: false
+      ...DEFAULT_LOCAL_CONFIG
     },
     activeSidebar: '', // 当前显示的侧边栏
     isOutlineEdit: false, // 是否是大纲编辑模式
@@ -31,13 +22,7 @@ const store = new Vuex.Store({
     isSourceCodeEdit: false, // 是否是源码编辑模式
     extraTextOnExport: '', // 导出时底部添加的文字
     isDragOutlineTreeNode: false, // 当前是否正在拖拽大纲树的节点
-    aiConfig: {
-      api: 'http://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      key: '',
-      model: '',
-      port: 3456,
-      method: 'POST'
-    },
+    aiConfig: getDefaultAiConfig('volcanoArk'),
     // 扩展主题列表
     extendThemeGroupList: [],
     // 内置背景图片
@@ -51,14 +36,20 @@ const store = new Vuex.Store({
 
     // 设置本地配置
     setLocalConfig(state, data) {
-      const aiConfigKeys = Object.keys(state.aiConfig)
+      const nextAiConfig = {
+        ...state.aiConfig
+      }
       Object.keys(data).forEach(key => {
-        if (aiConfigKeys.includes(key)) {
-          state.aiConfig[key] = data[key]
+        if (AI_CONFIG_KEYS.includes(key)) {
+          nextAiConfig[key] = data[key]
         } else {
           state.localConfig[key] = data[key]
         }
       })
+      state.aiConfig = normalizeAiConfig(nextAiConfig)
+      if (!state.localConfig.enableAi && state.activeSidebar === 'ai') {
+        state.activeSidebar = ''
+      }
       storeLocalConfig({
         ...state.localConfig,
         ...state.aiConfig
@@ -67,6 +58,10 @@ const store = new Vuex.Store({
 
     // 设置当前显示的侧边栏
     setActiveSidebar(state, data) {
+      if (data === 'ai' && !state.localConfig.enableAi) {
+        state.activeSidebar = ''
+        return
+      }
       state.activeSidebar = data
     },
 
