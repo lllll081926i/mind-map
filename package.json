@@ -1,0 +1,49 @@
+{
+  "name": "mind-map-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node ./scripts/copy-index.js",
+    "build:app": "vite build && node ./scripts/copy-index.js",
+    "build:library": "node ./scripts/updateVersion.js && vite build --config ./vite.lib.config.js && node ./scripts/build-library-min.js",
+    "buildLibrary": "npm run build:library",
+    "createNodeImageList": "node ./scripts/createNodeImageList.js",
+    "ai:serve": "node ./scripts/ai.js",
+    "format": "prettier --write src/* src/*/* src/*/*/* src/*/*/*/*",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@toast-ui/editor": "^3.1.5",
+    "axios": "^1.14.0",
+    "buffer": "^6.0.3",
+    "codemirror": "^5.65.21",
+    "core-js": "^3.49.0",
+    "element-ui": "^2.15.14",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.44",
+    "punycode": "^2.3.1",
+    "simple-mind-map": "file:./simple-mind-map",
+    "simple-mind-map-plugin-themes": "^1.0.1",
+    "viewerjs": "^1.11.7",
+    "vue": "^2.7.16",
+    "vue-i18n": "^8.28.2",
+    "vue-router": "^3.6.5",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue2": "^2.3.3",
+    "chokidar": "^3.5.3",
+    "esbuild": "^0.27.4",
+    "events": "^3.3.0",
+    "express": "^4.21.2",
+    "less": "^4.2.0",
+    "markdown-it": "^14.1.1",
+    "markdown-it-checkbox": "^1.1.0",
+    "prettier": "^3.5.3",
+    "stream-browserify": "^3.0.0",
+    "vconsole": "^3.15.1",
+    "vite": "^7.1.0",
+    "vue-template-compiler": "^2.7.16"
+  }
+}

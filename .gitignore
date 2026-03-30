@@ -3,6 +3,7 @@ node_modules
 dist_electron
 simple-mind-map/dist
 simple-mind-map/types
+simple-mind-map/node_modules
 utools/dist
-app/vite-dev.log
-app/vite-dev.err
+vite-dev.log
+vite-dev.err
