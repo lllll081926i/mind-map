@@ -15,6 +15,7 @@ permissions:
 
 env:
   NODE_VERSION: '25'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   verify:
@@ -122,23 +123,31 @@ jobs:
             os: windows-latest
             args: --bundles nsis
             upload_plain_binary: false
-            workflow_artifact_pattern: windows-[arch]-installer
+            artifact_name: windows-installer
+            artifact_path: src-tauri/target/release/bundle/nsis/*.exe
           - label: Windows Portable
             os: windows-latest
             args: --no-bundle
             upload_plain_binary: true
-            workflow_artifact_pattern: windows-[arch]-portable
+            artifact_name: windows-portable
+            artifact_path: src-tauri/target/release/mind-map-desktop.exe
           - label: macOS Bundle
             os: macos-latest
             args: --bundles app,dmg
             upload_plain_binary: false
-            workflow_artifact_pattern: macos-[arch]-[bundle]
             dmg_ignore_ci: 'true'
+            artifact_name: macos-bundle
+            artifact_path: |
+              src-tauri/target/release/bundle/macos/*.app
+              src-tauri/target/release/bundle/dmg/*.dmg
           - label: Linux Bundle
             os: ubuntu-22.04
             args: --bundles deb,appimage
             upload_plain_binary: false
-            workflow_artifact_pattern: linux-[arch]-[bundle]
+            artifact_name: linux-bundle
+            artifact_path: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
 
     steps:
       - name: Checkout
@@ -180,12 +189,9 @@ jobs:
           args: ${{ matrix.args }}
           releaseId: ${{ needs.create_release.outputs.release_id }}
           tagName: ${{ needs.create_release.outputs.tag_name }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: ${{ matrix.workflow_artifact_pattern }}
-          releaseAssetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
-          uploadUpdaterJson: false
-          uploadUpdaterSignatures: false
+          includeUpdaterJson: false
 
       - name: Build desktop bundles for workflow artifacts
         if: needs.create_release.outputs.release_id == ''
@@ -196,9 +202,15 @@ jobs:
         with:
           projectPath: .
           args: ${{ matrix.args }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: ${{ matrix.workflow_artifact_pattern }}
-          releaseAssetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
-          uploadUpdaterJson: false
-          uploadUpdaterSignatures: false
+          includeUpdaterJson: false
+
+      - name: Upload workflow artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          compression-level: 0
+          path: ${{ matrix.artifact_path }}

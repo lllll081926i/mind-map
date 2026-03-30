@@ -12,6 +12,7 @@
     "build:library": "node ./scripts/updateVersion.js && vite build --config ./vite.lib.config.js && node ./scripts/build-library-min.js",
     "buildLibrary": "npm run build:library",
     "createNodeImageList": "node ./scripts/createNodeImageList.js",
+    "tauri": "tauri",
     "ai:serve": "node ./scripts/ai.js",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build --bundles nsis",
