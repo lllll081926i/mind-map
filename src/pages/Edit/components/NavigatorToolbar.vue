@@ -1,21 +1,6 @@
 <template>
   <div class="navigatorContainer customScrollbar" :class="{ isDark: isDark }">
     <div class="item">
-      <el-select
-        v-model="lang"
-        size="small"
-        style="width: 100px"
-        @change="onLangChange"
-      >
-        <el-option
-          v-for="item in langList"
-          :key="item.value"
-          :label="item.name"
-          :value="item.value"
-        />
-      </el-select>
-    </div>
-    <div class="item">
       <el-tooltip
         effect="dark"
         :content="$t('navigatorToolbar.backToRoot')"
@@ -127,9 +112,7 @@
 import Scale from './Scale.vue'
 import Fullscreen from './Fullscreen.vue'
 import MouseAction from './MouseAction.vue'
-import { langList } from '@/config'
-import i18n from '@/i18n'
-import { storeData, storeLang, getLang } from '@/api'
+import { storeData } from '@/api'
 import { mapState, mapMutations } from 'vuex'
 import pkg from 'simple-mind-map/package.json'
 import Demonstrate from './Demonstrate.vue'
@@ -151,8 +134,6 @@ export default {
   data() {
     return {
       version: pkg.version,
-      langList,
-      lang: '',
       openMiniMap: false
     }
   },
@@ -164,9 +145,6 @@ export default {
       localConfig: state => state.localConfig,
       extendThemeGroupList: state => state.extendThemeGroupList
     })
-  },
-  created() {
-    this.lang = getLang()
   },
   methods: {
     ...mapMutations([
@@ -184,12 +162,6 @@ export default {
     toggleMiniMap() {
       this.openMiniMap = !this.openMiniMap
       this.$bus.$emit('toggle_mini_map', this.openMiniMap)
-    },
-
-    onLangChange(lang) {
-      i18n.locale = lang
-      storeLang(lang)
-      this.$bus.$emit('lang_change')
     },
 
     showSearch() {
