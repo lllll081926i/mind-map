@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Mind Map Desktop"
 authors = ["Codex"]
 edition = "2021"
+license = "MIT"
 
 [lib]
 name = "mind_map_desktop_lib"

@@ -499,7 +499,7 @@ export default {
     apiValidateTip: '请输入接口',
     keyValidateTip: '请输入API Key',
     modelValidateTip: '请输入模型 ID',
-    portValidateTip: '请输入端口',
+    portValidateTip: '请输入 1-65535 的端口号',
     methodValidateTip: '请选择请求方式',
     noInputTip: '请输入内容',
     connectSuccessful: '连接成功',

@@ -39,6 +39,33 @@ fn build_error_payload(request_id: &str, message: String, status: Option<u16>) -
   }
 }
 
+fn extract_error_message(body: &str, fallback: &str) -> String {
+  serde_json::from_str::<serde_json::Value>(body)
+    .ok()
+    .and_then(|value| {
+      value
+        .get("msg")
+        .and_then(|item| item.as_str())
+        .or_else(|| value.get("message").and_then(|item| item.as_str()))
+        .or_else(|| {
+          value
+            .get("error")
+            .and_then(|item| item.get("message"))
+            .and_then(|item| item.as_str())
+        })
+        .map(|value| value.to_string())
+    })
+    .or_else(|| {
+      let trimmed = body.trim();
+      if trimmed.is_empty() {
+        None
+      } else {
+        Some(trimmed.to_string())
+      }
+    })
+    .unwrap_or_else(|| fallback.to_string())
+}
+
 fn background_result_to_error_payload(
   request_id: &str,
   result: Result<Result<(), String>, futures_util::future::Aborted>,
@@ -115,7 +142,8 @@ pub async fn start_proxy_request(
 
       if !response.status().is_success() {
         let status = response.status().as_u16();
-        let message = response.text().await.unwrap_or_else(|_| "请求失败".into());
+        let body = response.text().await.unwrap_or_default();
+        let message = extract_error_message(&body, "请求失败");
         let _ = app_handle.emit(
           "ai-proxy://error",
           build_error_payload(&request_id_for_task, message, Some(status)),
@@ -195,5 +223,15 @@ mod tests {
       background_result_to_error_payload("req-2", Err(Aborted));
 
     assert!(payload.is_none());
+  }
+
+  #[test]
+  fn should_extract_message_from_json_error_body() {
+    let message = extract_error_message(
+      r#"{"error":{"message":"invalid api key"}}"#,
+      "请求失败",
+    );
+
+    assert_eq!(message, "invalid api key");
   }
 }

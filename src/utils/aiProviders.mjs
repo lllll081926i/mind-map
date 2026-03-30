@@ -91,6 +91,27 @@ const normalizeApiPath = value => {
   return path.startsWith('/') ? path : `/${path}`
 }
 
+const isBlankValue = value => {
+  return value === undefined || value === null || String(value).trim() === ''
+}
+
+export const parseAiPort = value => {
+  if (isBlankValue(value)) {
+    return {
+      empty: true,
+      valid: false,
+      value: null
+    }
+  }
+  const port = Number(String(value).trim())
+  const valid = Number.isInteger(port) && port >= 1 && port <= 65535
+  return {
+    empty: false,
+    valid,
+    value: valid ? port : null
+  }
+}
+
 export const buildApiUrl = (baseUrl, apiPath) => {
   const normalizedBaseUrl = trimTrailingSlash(baseUrl)
   const normalizedApiPath = normalizeApiPath(apiPath)
@@ -166,9 +187,12 @@ export const normalizeAiConfig = config => {
     normalizeApiPath(input.apiPath) ||
     normalizeApiPath(legacyApi.apiPath) ||
     defaults.apiPath
-  const portValue = Number(input.port)
-  const port =
-    Number.isFinite(portValue) && portValue > 0 ? portValue : defaults.port
+  const parsedPort = parseAiPort(input.port)
+  const port = parsedPort.empty
+    ? defaults.port
+    : parsedPort.valid
+      ? parsedPort.value
+      : String(input.port).trim()
   const method = String(input.method || defaults.method || DEFAULT_METHOD).toUpperCase()
 
   return {
@@ -185,6 +209,10 @@ export const normalizeAiConfig = config => {
 }
 
 export const validateAiConfig = config => {
+  const parsedPort = parseAiPort(config && config.port)
+  if (!parsedPort.empty && !parsedPort.valid) {
+    return { valid: false, messageKey: 'ai.portValidateTip' }
+  }
   const normalized = normalizeAiConfig(config)
   if (!normalized.provider) {
     return { valid: false, messageKey: 'ai.providerValidateTip' }
@@ -232,4 +260,45 @@ export const parseOpenAICompatibleStreamChunk = item => {
       return delta && typeof delta.content === 'string' ? delta.content : ''
     })
     .join('')
+}
+
+export const consumeOpenAICompatibleStreamText = (pending, chunk) => {
+  const source = `${String(pending || '')}${String(chunk || '')}`
+  if (!source) {
+    return {
+      items: [],
+      pending: '',
+      done: false
+    }
+  }
+
+  const hasTerminator = /(?:\r?\n){2}$/.test(source)
+  const segments = source.split(/\r?\n\r?\n/)
+  const nextPending = hasTerminator ? '' : segments.pop() || ''
+  const items = []
+  let done = false
+
+  for (const segment of segments) {
+    const lines = String(segment)
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+    if (!lines.length) continue
+    const data = lines
+      .filter(line => line.startsWith('data:'))
+      .map(line => line.slice(5).trimStart())
+      .join('\n')
+    if (!data) continue
+    if (data === '[DONE]') {
+      done = true
+      break
+    }
+    items.push(JSON.parse(data))
+  }
+
+  return {
+    items,
+    pending: done ? '' : nextPending,
+    done
+  }
 }

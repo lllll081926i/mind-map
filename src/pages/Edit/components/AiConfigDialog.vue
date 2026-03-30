@@ -60,7 +60,8 @@ import { mapState } from 'pinia'
 import {
   AI_PROVIDER_LIST,
   getAiProviderMeta,
-  normalizeAiConfig
+  normalizeAiConfig,
+  parseAiPort
 } from '@/utils/aiProviders.mjs'
 import { useAiStore } from '@/stores/ai'
 import { useThemeStore } from '@/stores/theme'
@@ -78,6 +79,13 @@ export default {
     }
   },
   data() {
+    const validatePort = (rule, value, callback) => {
+      if (!parseAiPort(value).valid) {
+        callback(new Error(this.$t('ai.portValidateTip')))
+        return
+      }
+      callback()
+    }
     return {
       aiConfigDialogVisible: false,
       ruleForm: {
@@ -132,6 +140,10 @@ export default {
             required: true,
             message: this.$t('ai.portValidateTip'),
             trigger: 'blur'
+          },
+          {
+            validator: validatePort,
+            trigger: ['blur', 'change']
           }
         ]
       }

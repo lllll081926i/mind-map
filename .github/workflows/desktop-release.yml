@@ -128,9 +128,9 @@ jobs:
           - label: Windows Portable
             os: windows-latest
             args: --no-bundle
-            upload_plain_binary: true
+            upload_plain_binary: false
             artifact_name: windows-portable
-            artifact_path: src-tauri/target/release/mind-map-desktop.exe
+            artifact_path: src-tauri/target/release/Mind.Map.Desktop_*.exe
           - label: macOS Bundle
             os: macos-latest
             args: --bundles app,dmg
@@ -206,11 +206,40 @@ jobs:
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
           includeUpdaterJson: false
 
+      - name: Normalize Windows portable asset name
+        id: portable_asset
+        if: matrix.label == 'Windows Portable'
+        shell: pwsh
+        run: |
+          $version = (Get-Content 'package.json' | ConvertFrom-Json).version
+          $source = 'src-tauri/target/release/mind-map-desktop.exe'
+          $target = "src-tauri/target/release/Mind.Map.Desktop_${version}_windows_x64.exe"
+          Copy-Item $source $target -Force
+          "path=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "name=$(Split-Path $target -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows portable release asset
+        if: matrix.label == 'Windows Portable' && needs.create_release.outputs.release_id != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.create_release.outputs.tag_name }}" "${{ steps.portable_asset.outputs.path }}" --clobber
+
       - name: Upload workflow artifact
-        if: success()
+        if: success() && matrix.label != 'Windows Portable'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           if-no-files-found: error
           compression-level: 0
           path: ${{ matrix.artifact_path }}
+
+      - name: Upload Windows portable workflow artifact
+        if: success() && matrix.label == 'Windows Portable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          compression-level: 0
+          path: ${{ steps.portable_asset.outputs.path }}

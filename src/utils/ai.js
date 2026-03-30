@@ -1,5 +1,6 @@
 import {
   buildAiRequestConfig,
+  consumeOpenAICompatibleStreamText,
   parseOpenAICompatibleStreamChunk
 } from './aiProviders.mjs'
 import platform, { isDesktopApp } from '@/platform'
@@ -38,34 +39,13 @@ class Ai {
       while (1) {
         const { done, value } = await res.read()
         if (done) {
-          if (this.content) {
-            end(this.content)
-          }
+          this.flushPendingChunk(progress)
+          end(this.content)
           return
         }
         // 拿到当前切片的数据
         const text = decoder.decode(value, { stream: true })
-        // 处理切片数据
-        let chunk = this.handleChunkData(text)
-        // 判断是否有不完整切片，如果有，合并下一次处理，没有则获取数据
-        if (this.currentChunk) continue
-        let isEnd = false
-        const list = chunk
-          .split('\n')
-          .filter(item => {
-            isEnd = item.includes('[DONE]')
-            return !!item && !isEnd
-          })
-          .map(item => {
-            return JSON.parse(item.replace(/^data:/, ''))
-          })
-        list.forEach(item => {
-          if (item && item.error) {
-            throw new Error(item.error.message || '请求失败')
-          }
-          this.content += parseOpenAICompatibleStreamChunk(item)
-        })
-        progress(this.content)
+        const isEnd = this.handleChunkData(text, progress)
         if (isEnd) {
           end(this.content)
           return
@@ -113,25 +93,7 @@ class Ai {
       this.desktopRequestReject = finishError
 
       const handleChunkText = text => {
-        const chunk = this.handleChunkData(text)
-        if (this.currentChunk) return
-        let isEnd = false
-        const list = chunk
-          .split('\n')
-          .filter(item => {
-            isEnd = item.includes('[DONE]')
-            return !!item && !isEnd
-          })
-          .map(item => {
-            return JSON.parse(item.replace(/^data:/, ''))
-          })
-        list.forEach(item => {
-          if (item && item.error) {
-            throw new Error(item.error.message || '请求失败')
-          }
-          this.content += parseOpenAICompatibleStreamChunk(item)
-        })
-        progress(this.content)
+        const isEnd = this.handleChunkData(text, progress)
         if (isEnd) {
           finishSuccess()
         }
@@ -150,6 +112,7 @@ class Ai {
       })
       const doneUnlisten = await platform.listen('ai-proxy://done', event => {
         if (!event.payload || event.payload.requestId !== this.requestId) return
+        this.flushPendingChunk(progress)
         finishSuccess()
       })
       const errorUnlisten = await platform.listen('ai-proxy://error', event => {
@@ -213,22 +176,29 @@ class Ai {
     return res.body.getReader()
   }
 
-  handleChunkData(chunk) {
-    chunk = chunk.trim()
-    // 如果存在上一个切片
-    if (this.currentChunk) {
-      chunk = this.currentChunk + chunk
-      this.currentChunk = ''
-    }
-    // 如果存在done,认为是完整切片且是最后一个切片
-    if (chunk.includes('[DONE]')) {
-      return chunk
-    }
-    // 最后一个字符串不为}，则默认切片不完整，保存与下次拼接使用（这种方法不严谨，但已经能解决大部分场景的问题）
-    if (chunk[chunk.length - 1] !== '}') {
-      this.currentChunk = chunk
-    }
-    return chunk
+  appendChunkContent(list) {
+    list.forEach(item => {
+      if (item && item.error) {
+        throw new Error(item.error.message || '请求失败')
+      }
+      this.content += parseOpenAICompatibleStreamChunk(item)
+    })
+  }
+
+  handleChunkData(chunk, progress = () => {}) {
+    const result = consumeOpenAICompatibleStreamText(this.currentChunk, chunk)
+    this.currentChunk = result.pending
+    this.appendChunkContent(result.items)
+    progress(this.content)
+    return result.done
+  }
+
+  flushPendingChunk(progress = () => {}) {
+    if (!this.currentChunk) return
+    const result = consumeOpenAICompatibleStreamText(this.currentChunk, '\n\n')
+    this.currentChunk = result.pending
+    this.appendChunkContent(result.items)
+    progress(this.content)
   }
 
   stop() {

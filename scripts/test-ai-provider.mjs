@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import {
   buildAiRequestConfig,
   buildApiUrl,
+  consumeOpenAICompatibleStreamText,
   getDefaultAiConfig,
   normalizeAiConfig,
+  parseOpenAICompatibleStreamChunk,
   separateAppAndAiConfig,
   shouldUseLocalProxyHealthcheck,
   validateAiConfig
@@ -61,6 +63,41 @@ const invalidConfig = validateAiConfig({
 assert.equal(invalidConfig.valid, false)
 assert.equal(invalidConfig.messageKey, 'ai.baseUrlValidateTip')
 
+const invalidPortConfig = validateAiConfig({
+  provider: 'openai',
+  baseUrl: 'https://api.openai.com',
+  apiPath: '/v1/chat/completions',
+  key: 'demo-key',
+  model: 'gpt-4.1-mini',
+  port: 'abc'
+})
+
+assert.equal(invalidPortConfig.valid, false)
+assert.equal(invalidPortConfig.messageKey, 'ai.portValidateTip')
+
+const outOfRangePortConfig = validateAiConfig({
+  provider: 'openai',
+  baseUrl: 'https://api.openai.com',
+  apiPath: '/v1/chat/completions',
+  key: 'demo-key',
+  model: 'gpt-4.1-mini',
+  port: 70000
+})
+
+assert.equal(outOfRangePortConfig.valid, false)
+assert.equal(outOfRangePortConfig.messageKey, 'ai.portValidateTip')
+
+const normalizedInvalidPortConfig = normalizeAiConfig({
+  provider: 'openai',
+  baseUrl: 'https://api.openai.com',
+  apiPath: '/v1/chat/completions',
+  key: 'demo-key',
+  model: 'gpt-4.1-mini',
+  port: 'abc'
+})
+
+assert.equal(normalizedInvalidPortConfig.port, 'abc')
+
 const defaultConfig = getDefaultAiConfig('deepseek')
 assert.equal(
   buildApiUrl(defaultConfig.baseUrl, defaultConfig.apiPath),
@@ -95,6 +132,29 @@ assert.deepEqual(separatedConfig.aiConfig, {
 
 assert.equal(shouldUseLocalProxyHealthcheck(true), false)
 assert.equal(shouldUseLocalProxyHealthcheck(false), true)
+
+const streamStep1 = consumeOpenAICompatibleStreamText(
+  '',
+  'data: {"choices":[{"delta":{"content":"你"}}]}\n\ndata: {"choices":[{"delta":{"content":"好'
+)
+
+assert.equal(streamStep1.done, false)
+assert.equal(streamStep1.items.length, 1)
+assert.equal(parseOpenAICompatibleStreamChunk(streamStep1.items[0]), '你')
+assert.equal(
+  streamStep1.pending,
+  'data: {"choices":[{"delta":{"content":"好'
+)
+
+const streamStep2 = consumeOpenAICompatibleStreamText(
+  streamStep1.pending,
+  '"}}]}\n\ndata: [DONE]\n\n'
+)
+
+assert.equal(streamStep2.done, true)
+assert.equal(streamStep2.pending, '')
+assert.equal(streamStep2.items.length, 1)
+assert.equal(parseOpenAICompatibleStreamChunk(streamStep2.items[0]), '好')
 
 assert.equal(DEFAULT_PORT, 3456)
 assert.equal(getProxyPort([], {}), 3456)

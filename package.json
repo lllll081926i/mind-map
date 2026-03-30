@@ -2,6 +2,7 @@
   "name": "mind-map-app",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "npm run web:dev",
     "web:dev": "vite",
