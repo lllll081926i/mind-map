@@ -1,0 +1,204 @@
+name: desktop-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '25'
+
+jobs:
+  verify:
+    name: Verify Build Inputs
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Check desktop backend
+        run: npm run desktop:check
+
+  create_release:
+    name: Prepare Release
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+    steps:
+      - name: Resolve release target
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isTagPush = context.eventName === 'push' && context.ref.startsWith('refs/tags/')
+            const tagName = isTagPush ? context.ref.replace('refs/tags/', '') : ''
+            core.setOutput('tag_name', tagName)
+
+            if (!isTagPush) {
+              core.setOutput('release_id', '')
+              return
+            }
+
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            try {
+              const release = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName
+              })
+              core.setOutput('release_id', String(release.data.id))
+              return
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error
+              }
+            }
+
+            const release = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tagName,
+              name: tagName,
+              draft: false,
+              prerelease: tagName.includes('-'),
+              generate_release_notes: true
+            })
+
+            core.setOutput('release_id', String(release.data.id))
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs:
+      - verify
+      - create_release
+    if: ${{ needs.verify.result == 'success' && needs.create_release.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows Installer
+            os: windows-latest
+            args: --bundles nsis
+            upload_plain_binary: false
+            workflow_artifact_pattern: windows-[arch]-installer
+          - label: Windows Portable
+            os: windows-latest
+            args: --no-bundle
+            upload_plain_binary: true
+            workflow_artifact_pattern: windows-[arch]-portable
+          - label: macOS Bundle
+            os: macos-latest
+            args: --bundles app,dmg
+            upload_plain_binary: false
+            workflow_artifact_pattern: macos-[arch]-[bundle]
+            dmg_ignore_ci: 'true'
+          - label: Linux Bundle
+            os: ubuntu-22.04
+            args: --bundles deb,appimage
+            upload_plain_binary: false
+            workflow_artifact_pattern: linux-[arch]-[bundle]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+
+      - name: Install Linux desktop dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build desktop bundles for release
+        if: needs.create_release.outputs.release_id != ''
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+          releaseId: ${{ needs.create_release.outputs.release_id }}
+          tagName: ${{ needs.create_release.outputs.tag_name }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: ${{ matrix.workflow_artifact_pattern }}
+          releaseAssetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          uploadPlainBinary: ${{ matrix.upload_plain_binary }}
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+
+      - name: Build desktop bundles for workflow artifacts
+        if: needs.create_release.outputs.release_id == ''
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: ${{ matrix.workflow_artifact_pattern }}
+          releaseAssetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          uploadPlainBinary: ${{ matrix.upload_plain_binary }}
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
