@@ -275,7 +275,10 @@ export default {
     if (this.onViewDataChange) {
       this.$bus.$off('view_data_change', this.onViewDataChange)
     }
-    this.mindMap.destroy()
+    clearTimeout(this.storeConfigTimer)
+    if (this.mindMap) {
+      this.mindMap.destroy()
+    }
   },
   methods: {
     onLocalStorageExceeded() {
@@ -613,7 +616,16 @@ export default {
 
     // 协同测试
     cooperateTest() {
-      if (this.mindMap.cooperate && this.$route.query.userName) {
+      const isLocalDebugHost = ['localhost', '127.0.0.1'].includes(
+        window.location.hostname
+      )
+      const enableCooperateDebug = this.$route.query.cooperateDebug === '1'
+      if (
+        this.mindMap.cooperate &&
+        this.$route.query.userName &&
+        enableCooperateDebug &&
+        isLocalDebugHost
+      ) {
         this.mindMap.cooperate.setProvider(null, {
           roomName: 'demo-room',
           signalingList: ['ws://localhost:4444']

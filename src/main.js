@@ -6,8 +6,9 @@ import ElementUI from 'element-ui'
 import 'element-ui/lib/theme-chalk/index.css'
 import '@/assets/icon-font/iconfont.css'
 import i18n from './i18n'
-import { getLang } from '@/api'
 import { Buffer } from 'buffer'
+import { bootstrapPlatformState } from '@/platform'
+import pinia from '@/stores'
 // import VConsole from 'vconsole'
 // const vConsole = new VConsole()
 
@@ -20,19 +21,24 @@ Vue.prototype.$bus = bus
 Vue.use(ElementUI)
 
 const initApp = () => {
-  i18n.locale = getLang()
   new Vue({
     render: h => h(App),
     router,
     store,
+    pinia,
     i18n
   }).$mount('#app')
 }
 
-// 是否处于接管应用模式
-if (window.takeOverApp) {
-  window.initApp = initApp
-  window.$bus = bus
-} else {
-  initApp()
+const bootstrapApp = async () => {
+  await bootstrapPlatformState()
+  // 是否处于接管应用模式
+  if (window.takeOverApp) {
+    window.initApp = initApp
+    window.$bus = bus
+  } else {
+    initApp()
+  }
 }
+
+bootstrapApp()

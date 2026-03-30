@@ -52,6 +52,28 @@
             <span class="text">{{ $t('toolbar.openFile') }}</span>
           </div>
         </el-tooltip>
+        <el-dropdown
+          v-if="!isMobile && isDesktopRuntime"
+          trigger="click"
+          @command="openRecentFile"
+        >
+          <div class="toolbarBtn">
+            <span class="icon iconfont iconwenjian"></span>
+            <span class="text">{{ $t('toolbar.recentFiles') }}</span>
+          </div>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item
+              v-for="item in recentFiles"
+              :key="item.path"
+              :command="item"
+            >
+              {{ item.name }}
+            </el-dropdown-item>
+            <el-dropdown-item v-if="recentFiles.length <= 0" disabled>
+              {{ $t('toolbar.noRecentFiles') }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
         <div class="toolbarBtn" @click="saveLocalFile" v-if="!isMobile">
           <span class="icon iconfont iconlingcunwei"></span>
           <span class="text">{{ $t('toolbar.saveAs') }}</span>
@@ -156,6 +178,11 @@ import exampleData from 'simple-mind-map/example/exampleData'
 import { getData } from '../../../api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
+import platform, {
+  getRecentFiles,
+  isDesktopApp,
+  recordRecentFile
+} from '@/platform'
 
 // 工具栏
 let fileHandle = null
@@ -203,6 +230,7 @@ export default {
         children: 'children',
         isLeaf: 'leaf'
       },
+      recentFiles: [],
       fileTreeVisible: false,
       rootDirName: '',
       fileTreeExpand: true,
@@ -216,6 +244,10 @@ export default {
       openNodeRichText: state => state.localConfig.openNodeRichText,
       enableAi: state => state.localConfig.enableAi
     }),
+
+    isDesktopRuntime() {
+      return isDesktopApp()
+    },
 
     btnLit() {
       let res = [...defaultBtnList]
@@ -249,21 +281,24 @@ export default {
     this.$bus.$on('write_local_file', this.onWriteLocalFile)
   },
   mounted() {
+    this.refreshRecentFiles()
     this.computeToolbarShow()
     this.computeToolbarShowThrottle = throttle(this.computeToolbarShow, 300)
     window.addEventListener('resize', this.computeToolbarShowThrottle)
-    this.$bus.$on('lang_change', this.computeToolbarShowThrottle)
     window.addEventListener('beforeunload', this.onUnload)
     this.$bus.$on('node_note_dblclick', this.onNodeNoteDblclick)
   },
   beforeDestroy() {
     this.$bus.$off('write_local_file', this.onWriteLocalFile)
     window.removeEventListener('resize', this.computeToolbarShowThrottle)
-    this.$bus.$off('lang_change', this.computeToolbarShowThrottle)
     window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
   },
   methods: {
+    refreshRecentFiles() {
+      this.recentFiles = this.isDesktopRuntime ? getRecentFiles() : []
+    },
+
     // 计算工具按钮如何显示
     computeToolbarShow() {
       if (!this.$refs.toolbarRef) return
@@ -314,36 +349,19 @@ export default {
     // 加载本地文件树
     async loadFileTreeNode(node, resolve) {
       try {
-        let dirHandle
+        let directoryRef = null
         if (node.level === 0) {
-          dirHandle = await window.showDirectoryPicker()
-          this.rootDirName = dirHandle.name
+          directoryRef = await platform.pickDirectory()
+          if (!directoryRef) {
+            this.fileTreeVisible = false
+            resolve([])
+            return
+          }
+          this.rootDirName = directoryRef.name
         } else {
-          dirHandle = node.data.handle
+          directoryRef = node.data
         }
-        const dirList = []
-        const fileList = []
-        for await (const [key, value] of dirHandle.entries()) {
-          const isFile = value.kind === 'file'
-          if (isFile && !/\.(smm|xmind|md|json)$/.test(value.name)) {
-            continue
-          }
-          const enableEdit = isFile && /\.smm$/.test(value.name)
-          const data = {
-            id: key,
-            name: value.name,
-            type: value.kind,
-            handle: value,
-            leaf: isFile,
-            enableEdit
-          }
-          if (isFile) {
-            fileList.push(data)
-          } else {
-            dirList.push(data)
-          }
-        }
-        resolve([...dirList, ...fileList])
+        resolve(await platform.listDirectoryEntries(directoryRef))
       } catch (error) {
         console.log(error)
         this.fileTreeVisible = false
@@ -367,8 +385,8 @@ export default {
 
     // 编辑指定文件
     editLocalFile(data) {
-      if (data.handle) {
-        fileHandle = data.handle
+      if (data.mode === 'desktop' || data.handle) {
+        fileHandle = data.mode === 'desktop' ? data : data.handle
         this.readFile()
       }
     },
@@ -376,7 +394,15 @@ export default {
     // 导入指定文件
     async importLocalFile(data) {
       try {
-        const file = await data.handle.getFile()
+        let file = null
+        if (data.mode === 'desktop') {
+          const result = await platform.readMindMapFile(data)
+          file = new File([result.content], result.name, {
+            type: 'application/json'
+          })
+        } else {
+          file = await data.handle.getFile()
+        }
         this.$refs.ImportRef.onChange({
           raw: file,
           name: file.name
@@ -387,29 +413,20 @@ export default {
       }
     },
 
+    openRecentFile(item) {
+      if (!item || !item.path) return
+      fileHandle = item
+      this.readFile()
+    },
+
     // 打开本地文件
     async openLocalFile() {
       try {
-        let [_fileHandle] = await window.showOpenFilePicker({
-          types: [
-            {
-              description: '',
-              accept: {
-                'application/json': ['.smm']
-              }
-            }
-          ],
-          excludeAcceptAllOption: true,
-          multiple: false
-        })
-        if (!_fileHandle) {
+        const nextFileHandle = await platform.openMindMapFile()
+        if (!nextFileHandle) {
           return
         }
-        fileHandle = _fileHandle
-        if (fileHandle.kind === 'directory') {
-          this.$message.warning(this.$t('toolbar.selectFileTip'))
-          return
-        }
+        fileHandle = nextFileHandle
         this.readFile()
       } catch (error) {
         console.log(error)
@@ -422,22 +439,48 @@ export default {
 
     // 读取本地文件
     async readFile() {
-      let file = await fileHandle.getFile()
-      let fileReader = new FileReader()
-      fileReader.onload = async () => {
-        this.$store.commit('setIsHandleLocalFile', true)
-        this.setData(fileReader.result)
-        Notification.closeAll()
-        Notification({
-          title: this.$t('toolbar.tip'),
-          message: `${this.$t('toolbar.editingLocalFileTipFront')}${
-            file.name
-          }${this.$t('toolbar.editingLocalFileTipEnd')}`,
-          duration: 0,
-          showClose: true
-        })
+      try {
+        if (isDesktopApp()) {
+          const result = await platform.readMindMapFile(fileHandle)
+          this.$store.commit('setIsHandleLocalFile', true)
+          this.setData(result.content)
+          fileHandle = {
+            ...fileHandle,
+            ...result
+          }
+          await recordRecentFile(fileHandle)
+          this.refreshRecentFiles()
+          Notification.closeAll()
+          Notification({
+            title: this.$t('toolbar.tip'),
+            message: `${this.$t('toolbar.editingLocalFileTipFront')}${
+              result.name
+            }${this.$t('toolbar.editingLocalFileTipEnd')}`,
+            duration: 0,
+            showClose: true
+          })
+          return
+        }
+        let file = await fileHandle.getFile()
+        let fileReader = new FileReader()
+        fileReader.onload = async () => {
+          this.$store.commit('setIsHandleLocalFile', true)
+          this.setData(fileReader.result)
+          Notification.closeAll()
+          Notification({
+            title: this.$t('toolbar.tip'),
+            message: `${this.$t('toolbar.editingLocalFileTipFront')}${
+              file.name
+            }${this.$t('toolbar.editingLocalFileTipEnd')}`,
+            duration: 0,
+            showClose: true
+          })
+        }
+        fileReader.readAsText(file)
+      } catch (error) {
+        console.log(error)
+        this.$message.error(this.$t('toolbar.fileOpenFailed'))
       }
-      fileReader.readAsText(file)
     },
 
     // 渲染读取的数据
@@ -469,14 +512,26 @@ export default {
         this.waitingWriteToLocalFile = false
         return
       }
-      if (!this.isFullDataFile) {
-        content = content.root
+      try {
+        if (!this.isFullDataFile) {
+          content = content.root
+        }
+        let string = JSON.stringify(content)
+        if (isDesktopApp()) {
+          await platform.writeMindMapFile(fileHandle, string)
+          await recordRecentFile(fileHandle)
+          this.refreshRecentFiles()
+          return
+        }
+        const writable = await fileHandle.createWritable()
+        await writable.write(string)
+        await writable.close()
+      } catch (error) {
+        console.log(error)
+        this.$message.error(this.$t('toolbar.fileOpenFailed'))
+      } finally {
+        this.waitingWriteToLocalFile = false
       }
-      let string = JSON.stringify(content)
-      const writable = await fileHandle.createWritable()
-      await writable.write(string)
-      await writable.close()
-      this.waitingWriteToLocalFile = false
     },
 
     // 创建本地文件
@@ -493,16 +548,11 @@ export default {
     // 创建本地文件
     async createLocalFile(content) {
       try {
-        let _fileHandle = await window.showSaveFilePicker({
-          types: [
-            {
-              description: '',
-              accept: { 'application/json': ['.smm'] }
-            }
-          ],
-          suggestedName: this.$t('toolbar.defaultFileName')
+        const nextFileHandle = await platform.saveMindMapFileAs({
+          suggestedName: this.$t('toolbar.defaultFileName'),
+          content: JSON.stringify(content)
         })
-        if (!_fileHandle) {
+        if (!nextFileHandle) {
           return
         }
         const loading = this.$loading({
@@ -511,12 +561,16 @@ export default {
           spinner: 'el-icon-loading',
           background: 'rgba(0, 0, 0, 0.7)'
         })
-        fileHandle = _fileHandle
-        this.$store.commit('setIsHandleLocalFile', true)
-        this.isFullDataFile = true
-        await this.writeLocalFile(content)
-        await this.readFile()
-        loading.close()
+        try {
+          fileHandle = nextFileHandle
+          this.$store.commit('setIsHandleLocalFile', true)
+          this.isFullDataFile = true
+          await recordRecentFile(fileHandle)
+          this.refreshRecentFiles()
+          await this.readFile()
+        } finally {
+          loading.close()
+        }
       } catch (error) {
         console.log(error)
         if (error.toString().includes('aborted')) {

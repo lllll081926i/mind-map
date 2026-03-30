@@ -57,8 +57,9 @@ const createManualChunks = id => {
   return undefined
 }
 
-module.exports = defineConfig(({ command }) => {
+module.exports = defineConfig(({ command, mode }) => {
   const isBuild = command === 'build'
+  const isDesktopBuild = mode === 'desktop'
 
   return {
     plugins: [vue()],
@@ -87,7 +88,7 @@ module.exports = defineConfig(({ command }) => {
       }
     },
     build: {
-      outDir: '../dist',
+      outDir: isDesktopBuild ? 'dist-desktop' : '../dist',
       emptyOutDir: true,
       chunkSizeWarningLimit: 4000,
       rollupOptions: {

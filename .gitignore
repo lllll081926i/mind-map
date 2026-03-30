@@ -1,6 +1,9 @@
 node_modules
 .DS_Store
 dist_electron
+dist-desktop
+src-tauri/target
+src-tauri/gen
 simple-mind-map/dist
 simple-mind-map/types
 simple-mind-map/node_modules
