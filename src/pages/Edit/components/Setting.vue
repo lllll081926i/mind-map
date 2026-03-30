@@ -391,10 +391,10 @@
         <div class="rowItem">
           <el-button
             size="small"
-            :loading="checkingForUpdates"
+            :loading="checkingForUpdates || installingUpdate"
             @click="checkForUpdates"
           >
-            检查更新
+            {{ $t('setting.checkUpdate') }}
           </el-button>
         </div>
       </div>
@@ -407,7 +407,12 @@ import Sidebar from './Sidebar.vue'
 import { storeConfig } from '@/api'
 import { mapState, mapMutations } from 'vuex'
 import Color from './Color.vue'
-import { checkForUpdates as runUpdateCheck } from '@/services/updateService'
+import {
+  checkForUpdates as runUpdateCheck,
+  canUseDesktopUpdater,
+  downloadAndInstallUpdate,
+  relaunchAfterUpdate
+} from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
 
 export default {
@@ -455,6 +460,7 @@ export default {
       updateWatermarkTimer: null,
       enableNodeRichText: true,
       checkingForUpdates: false,
+      installingUpdate: false,
       localConfigs: {
         isShowScrollbar: false,
         enableDragImport: false,
@@ -629,19 +635,37 @@ export default {
     },
 
     async checkForUpdates() {
-      if (this.checkingForUpdates) return
+      if (this.checkingForUpdates || this.installingUpdate) return
       this.checkingForUpdates = true
       try {
         const result = await runUpdateCheck(this.appVersion)
         if (result.status === 'update-available') {
           const notes = result.notes ? `\n\n${result.notes}` : ''
+          if (canUseDesktopUpdater()) {
+            this.$confirm(
+              `${this.$t('setting.updateAvailableMessage', {
+                version: result.latestVersion
+              })}${notes}`,
+              this.$t('setting.updateAvailableTitle'),
+              {
+                confirmButtonText: this.$t('setting.updateInstallNow'),
+                cancelButtonText: this.$t('setting.updateLater'),
+                type: 'info'
+              }
+            )
+              .then(() => this.installUpdate(result.latestVersion))
+              .catch(() => {})
+            return
+          }
           if (result.url) {
             this.$confirm(
-              `发现新版本 v${result.latestVersion}，是否打开下载页面？${notes}`,
-              '发现更新',
+              `${this.$t('setting.updateAvailableMessage', {
+                version: result.latestVersion
+              })}${notes}`,
+              this.$t('setting.updateAvailableTitle'),
               {
-                confirmButtonText: '打开下载页',
-                cancelButtonText: '稍后处理',
+                confirmButtonText: this.$t('setting.openReleasePage'),
+                cancelButtonText: this.$t('setting.updateLater'),
                 type: 'info'
               }
             )
@@ -651,31 +675,114 @@ export default {
               .catch(() => {})
             return
           }
-          this.$message.info(`发现新版本 v${result.latestVersion}`)
+          this.$message.info(
+            this.$t('setting.updateFoundWithoutUrl', {
+              version: result.latestVersion
+            })
+          )
           return
         }
         if (result.status === 'up-to-date') {
-          this.$message.success(`当前已是最新版本 v${result.latestVersion}`)
+          this.$message.success(
+            this.$t('setting.updateAlreadyLatest', {
+              version: result.latestVersion
+            })
+          )
           return
         }
         if (result.status === 'release-page-only') {
-          this.$confirm('当前未配置更新清单，是否打开发布页面手动检查？', '检查更新', {
-            confirmButtonText: '打开发布页',
-            cancelButtonText: '取消',
-            type: 'info'
-          })
+          this.$confirm(
+            this.$t('setting.updateReleasePageOnly'),
+            this.$t('setting.checkUpdate'),
+            {
+              confirmButtonText: this.$t('setting.openReleasePage'),
+              cancelButtonText: this.$t('setting.cancel'),
+              type: 'info'
+            }
+          )
             .then(() => {
               return openExternalUrl(result.url)
             })
             .catch(() => {})
           return
         }
-        this.$message.info('当前未配置更新源，请在构建环境中设置发布页或更新清单地址。')
+        this.$message.info(this.$t('setting.updateSourceNotConfigured'))
       } catch (error) {
         console.log(error)
-        this.$message.error(error?.message || '检查更新失败')
+        this.$message.error(
+          error?.message || this.$t('setting.updateCheckFailed')
+        )
       } finally {
         this.checkingForUpdates = false
+      }
+    },
+
+    async installUpdate(latestVersion) {
+      this.installingUpdate = true
+      const loading = this.$loading({
+        lock: true,
+        text: this.$t('setting.updatePreparing'),
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.35)'
+      })
+      try {
+        let downloadedBytes = 0
+        const result = await downloadAndInstallUpdate(event => {
+          if (event.event === 'Started') {
+            const totalBytes = Number(event.data.contentLength || 0)
+            if (totalBytes > 0) {
+              loading.setText?.(
+                this.$t('setting.updateDownloadingWithSize', {
+                  current: '0.0',
+                  total: (totalBytes / 1024 / 1024).toFixed(1)
+                })
+              )
+            } else {
+              loading.setText?.(this.$t('setting.updateDownloading'))
+            }
+            return
+          }
+          if (event.event === 'Progress') {
+            downloadedBytes += Number(event.data.chunkLength || 0)
+            loading.setText?.(
+              this.$t('setting.updateDownloadingProgress', {
+                current: (downloadedBytes / 1024 / 1024).toFixed(1)
+              })
+            )
+            return
+          }
+          if (event.event === 'Finished') {
+            loading.setText?.(this.$t('setting.updateInstalling'))
+          }
+        })
+        loading.close()
+        if (result.shouldRelaunch) {
+          this.$confirm(
+            this.$t('setting.updateInstallCompleted', {
+              version: latestVersion
+            }),
+            this.$t('setting.updateRestartTitle'),
+            {
+              confirmButtonText: this.$t('setting.updateRestartNow'),
+              cancelButtonText: this.$t('setting.updateRestartLater'),
+              type: 'success'
+            }
+          )
+            .then(async () => {
+              await relaunchAfterUpdate()
+            })
+            .catch(() => {})
+          return
+        }
+        this.$message.success(this.$t('setting.updateWindowsInstalling'))
+      } catch (error) {
+        console.log(error)
+        loading.close()
+        this.$message.error(
+          error?.message || this.$t('setting.updateInstallFailed')
+        )
+      } finally {
+        this.installingUpdate = false
       }
     }
   }

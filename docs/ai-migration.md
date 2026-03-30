@@ -103,8 +103,14 @@ npm run ai:serve -- --port=4567
 - 支持 `stream: true`
 - 返回 OpenAI Compatible 的 SSE 数据格式
 
-## 当前限制
+## 当前边界
 
-- 本轮只完成 OpenAI Compatible 协议层的统一。
-- 非 OpenAI Compatible Provider 不在当前项目主线范围内。
-- 前端仍依赖本地代理，不直接在浏览器向模型服务发请求。
+- 当前主线只保留 OpenAI Compatible 协议
+- 非 OpenAI Compatible Provider 不进入当前主线
+- 前端仍依赖本地代理，不直接在浏览器向模型服务发请求
+
+## 说明
+
+AI 相关的后续增强规划，例如模板化、节点工作流、结果预览、差异比对、Provider 诊断等，已统一收口到：
+
+- `docs/project-roadmap.md`

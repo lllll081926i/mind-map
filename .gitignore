@@ -13,3 +13,4 @@ vite-dev.err
 .tmp-build*.log
 .tmp-desktop*.log
 docs/plans/
+.keys/

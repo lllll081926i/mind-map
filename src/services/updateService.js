@@ -1,32 +1,19 @@
-const normalizeVersion = version => {
-  return String(version || '')
-    .trim()
-    .replace(/^v/i, '')
-}
+import { isDesktopRuntime } from '@/platform/runtime'
+import {
+  createManualUpdateResult,
+  parseUpdateManifest
+} from './updateServiceCore.mjs'
 
-const toVersionParts = version => {
-  return normalizeVersion(version)
-    .split('.')
-    .map(part => Number.parseInt(part, 10) || 0)
-}
-
-export const compareVersions = (currentVersion, targetVersion) => {
-  const left = toVersionParts(currentVersion)
-  const right = toVersionParts(targetVersion)
-  const maxLength = Math.max(left.length, right.length)
-  for (let index = 0; index < maxLength; index += 1) {
-    const current = left[index] || 0
-    const target = right[index] || 0
-    if (current === target) continue
-    return current > target ? 1 : -1
-  }
-  return 0
-}
+let pendingDesktopUpdate = null
 
 export const getReleasePageUrl = () => String(__APP_RELEASE_URL__ || '').trim()
 
 export const getUpdateManifestUrl = () =>
   String(__APP_UPDATE_MANIFEST_URL__ || '').trim()
+
+export const canUseDesktopUpdater = () => {
+  return __APP_RUNTIME__ === 'desktop' && isDesktopRuntime()
+}
 
 export const fetchUpdateManifest = async () => {
   const manifestUrl = getUpdateManifestUrl()
@@ -38,33 +25,39 @@ export const fetchUpdateManifest = async () => {
     throw new Error(`更新清单请求失败：${response.status}`)
   }
   const data = await response.json()
-  if (!data || typeof data !== 'object' || !data.version) {
-    throw new Error('更新清单格式无效')
+  return parseUpdateManifest(data, getReleasePageUrl())
+}
+
+const runDesktopUpdateCheck = async () => {
+  const { check } = await import('@tauri-apps/plugin-updater')
+  const update = await check()
+  pendingDesktopUpdate = update || null
+  if (!update) {
+    return {
+      status: 'up-to-date',
+      latestVersion: String(__APP_VERSION__ || '').trim()
+    }
   }
   return {
-    version: normalizeVersion(data.version),
-    notes: String(data.notes || ''),
-    url: String(data.url || getReleasePageUrl() || '').trim()
+    status: 'update-available',
+    latestVersion: String(update.version || '').trim(),
+    notes: String(update.body || ''),
+    currentVersion: String(update.currentVersion || '').trim(),
+    releaseDate: update.date || '',
+    url: getReleasePageUrl()
   }
 }
 
 export const checkForUpdates = async currentVersion => {
+  if (canUseDesktopUpdater()) {
+    return runDesktopUpdateCheck()
+  }
+
   const manifest = await fetchUpdateManifest()
   if (manifest) {
-    const comparison = compareVersions(currentVersion, manifest.version)
-    if (comparison < 0) {
-      return {
-        status: 'update-available',
-        latestVersion: manifest.version,
-        notes: manifest.notes,
-        url: manifest.url
-      }
-    }
-    return {
-      status: 'up-to-date',
-      latestVersion: manifest.version
-    }
+    return createManualUpdateResult(currentVersion, manifest)
   }
+
   const releaseUrl = getReleasePageUrl()
   if (releaseUrl) {
     return {
@@ -72,7 +65,24 @@ export const checkForUpdates = async currentVersion => {
       url: releaseUrl
     }
   }
+
   return {
     status: 'not-configured'
   }
+}
+
+export const downloadAndInstallUpdate = async onEvent => {
+  if (!pendingDesktopUpdate) {
+    throw new Error('当前没有可安装的更新')
+  }
+  await pendingDesktopUpdate.downloadAndInstall(onEvent)
+  pendingDesktopUpdate = null
+  return {
+    shouldRelaunch: __APP_PLATFORM__ !== 'win32'
+  }
+}
+
+export const relaunchAfterUpdate = async () => {
+  const { relaunch } = await import('@tauri-apps/plugin-process')
+  await relaunch()
 }

@@ -60,8 +60,12 @@ const createManualChunks = id => {
 module.exports = defineConfig(({ command, mode }) => {
   const isBuild = command === 'build'
   const isDesktopBuild = mode === 'desktop'
-  const releaseUrl = process.env.APP_RELEASE_URL || ''
-  const updateManifestUrl = process.env.APP_UPDATE_MANIFEST_URL || ''
+  const defaultReleaseUrl = 'https://github.com/lllll081926i/mind-map/releases'
+  const defaultUpdateManifestUrl =
+    'https://github.com/lllll081926i/mind-map/releases/latest/download/latest.json'
+  const releaseUrl = process.env.APP_RELEASE_URL || defaultReleaseUrl
+  const updateManifestUrl =
+    process.env.APP_UPDATE_MANIFEST_URL || defaultUpdateManifestUrl
 
   return {
     plugins: [

@@ -16,6 +16,7 @@ permissions:
 env:
   NODE_VERSION: '25'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  RELEASE_CONFIG_PATH: src-tauri/tauri.release.conf.json
 
 jobs:
   verify:
@@ -122,18 +123,24 @@ jobs:
           - label: Windows Installer
             os: windows-latest
             args: --bundles nsis
+            release_args: --bundles nsis --config src-tauri/tauri.release.conf.json
+            include_updater_json: true
             upload_plain_binary: false
             artifact_name: windows-installer
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
           - label: Windows Portable
             os: windows-latest
             args: --no-bundle
+            release_args: --no-bundle
+            include_updater_json: false
             upload_plain_binary: false
             artifact_name: windows-portable
             artifact_path: src-tauri/target/release/Mind.Map.Desktop_*.exe
           - label: macOS Bundle
             os: macos-latest
             args: --bundles app,dmg
+            release_args: --bundles app,dmg --config src-tauri/tauri.release.conf.json
+            include_updater_json: true
             upload_plain_binary: false
             dmg_ignore_ci: 'true'
             artifact_name: macos-bundle
@@ -143,6 +150,8 @@ jobs:
           - label: Linux Bundle
             os: ubuntu-22.04
             args: --bundles deb,appimage
+            release_args: --bundles deb,appimage --config src-tauri/tauri.release.conf.json
+            include_updater_json: true
             upload_plain_binary: false
             artifact_name: linux-bundle
             artifact_path: |
@@ -178,20 +187,31 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Validate updater signing secrets
+        if: needs.create_release.outputs.release_id != '' && matrix.include_updater_json
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "Missing TAURI_SIGNING_PRIVATE_KEY secret"
+            exit 1
+          fi
+
       - name: Build desktop bundles for release
         if: needs.create_release.outputs.release_id != ''
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: .
-          args: ${{ matrix.args }}
+          args: ${{ matrix.release_args }}
           releaseId: ${{ needs.create_release.outputs.release_id }}
           tagName: ${{ needs.create_release.outputs.tag_name }}
           assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
-          includeUpdaterJson: false
+          includeUpdaterJson: ${{ matrix.include_updater_json }}
 
       - name: Build desktop bundles for workflow artifacts
         if: needs.create_release.outputs.release_id == ''
