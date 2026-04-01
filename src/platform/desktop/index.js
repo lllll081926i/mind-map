@@ -1,18 +1,171 @@
+import { isDesktopRuntime } from '../runtime.mjs'
+
 const getFileName = filePath => {
   return String(filePath || '')
     .split(/[\\/]/)
     .pop()
 }
 
+const browserFileStore = new Map()
+
+const readBrowserFileText = file => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => {
+      reject(reader.error || new Error('read browser file failed'))
+    }
+    reader.readAsText(file)
+  })
+}
+
+const createBrowserFilePath = name => {
+  const safeName = String(name || 'mind-map.smm').trim() || 'mind-map.smm'
+  return `memory://${Date.now()}-${Math.random().toString(36).slice(2)}/${safeName}`
+}
+
+const normalizeSaveName = suggestedName => {
+  const baseName = String(suggestedName || '思维导图').trim() || '思维导图'
+  return /\.smm$/i.test(baseName) ? baseName : `${baseName}.smm`
+}
+
+const pickBrowserFile = ({ accept = '' } = {}) => {
+  return new Promise(resolve => {
+    if (typeof document === 'undefined') {
+      resolve(null)
+      return
+    }
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.style.display = 'none'
+    input.addEventListener(
+      'change',
+      () => {
+        const file = input.files && input.files[0] ? input.files[0] : null
+        input.remove()
+        resolve(file)
+      },
+      {
+        once: true
+      }
+    )
+    document.body.appendChild(input)
+    input.click()
+  })
+}
+
+const downloadBrowserFile = ({ name, content }) => {
+  if (typeof document === 'undefined') return
+  const blob = new Blob([content], {
+    type: 'application/json;charset=utf-8'
+  })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.href = url
+  link.download = name
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 0)
+}
+
+const createBrowserTauriModules = () => {
+  return {
+    invoke: async (command, payload = {}) => {
+      switch (command) {
+        case 'read_text_file': {
+          const entry = browserFileStore.get(payload.path)
+          if (!entry) {
+            throw new Error('当前环境不支持读取未缓存的本地文件')
+          }
+          return entry.content
+        }
+        case 'write_text_file': {
+          const path = payload.path
+          const currentEntry = browserFileStore.get(path) || {
+            name: getFileName(path),
+            content: ''
+          }
+          const nextEntry = {
+            ...currentEntry,
+            content: String(payload.content || ''),
+            pendingDownload: false
+          }
+          browserFileStore.set(path, nextEntry)
+          if (currentEntry.pendingDownload) {
+            downloadBrowserFile({
+              name: currentEntry.name,
+              content: nextEntry.content
+            })
+          }
+          return null
+        }
+        case 'open_external_url': {
+          if (typeof window !== 'undefined' && payload.url) {
+            window.open(payload.url, '_blank', 'noopener,noreferrer')
+          }
+          return null
+        }
+        default:
+          throw new Error(`当前环境不支持命令：${command}`)
+      }
+    },
+    listen: async () => {
+      return () => {}
+    },
+    open: async options => {
+      if (options?.directory) {
+        throw new Error('当前环境不支持选择文件夹')
+      }
+      const file = await pickBrowserFile({
+        accept: '.smm,.json,application/json'
+      })
+      if (!file) return null
+      const path = createBrowserFilePath(file.name)
+      browserFileStore.set(path, {
+        name: file.name,
+        content: await readBrowserFileText(file),
+        pendingDownload: false
+      })
+      return path
+    },
+    save: async options => {
+      const name = normalizeSaveName(options?.defaultPath)
+      const path = createBrowserFilePath(name)
+      browserFileStore.set(path, {
+        name,
+        content: '',
+        pendingDownload: true
+      })
+      return path
+    }
+  }
+}
+
 let tauriModulesPromise = null
 
 const loadTauriModules = async () => {
   if (!tauriModulesPromise) {
+    if (!isDesktopRuntime()) {
+      tauriModulesPromise = Promise.resolve(createBrowserTauriModules())
+      return tauriModulesPromise
+    }
     tauriModulesPromise = Promise.all([
       import('@tauri-apps/api/core'),
       import('@tauri-apps/api/event'),
       import('@tauri-apps/plugin-dialog')
     ]).then(([core, event, dialog]) => {
+      if (
+        typeof core?.invoke !== 'function' ||
+        typeof dialog?.open !== 'function' ||
+        typeof dialog?.save !== 'function'
+      ) {
+        return createBrowserTauriModules()
+      }
       return {
         invoke: core.invoke,
         listen: event.listen,
