@@ -1,180 +1,197 @@
 <template>
   <div class="exportPage" :class="{ isDark: isDark }">
-    <header class="exportHeader">
-      <div>
-        <div class="headerEyebrow">{{ $t('exportPage.eyebrow') }}</div>
-        <h1>{{ $t('exportPage.title') }}</h1>
-        <p>{{ $t('exportPage.description') }}</p>
-      </div>
-      <div class="headerActions">
-        <button
-          type="button"
-          class="ghostBtn"
-          :aria-label="$t('exportPage.backHome')"
-          @click="goHome"
-        >
-          {{ $t('exportPage.backHome') }}
-        </button>
-        <button
-          type="button"
-          class="primaryBtn"
-          :aria-label="$t('exportPage.backEdit')"
-          @click="goEdit"
-        >
-          {{ $t('exportPage.backEdit') }}
-        </button>
-      </div>
-    </header>
-
-    <div class="exportBody">
-      <aside class="formatRail">
-        <button
-          v-for="item in exportFormats"
-          :key="item.type"
-          type="button"
-          class="formatCard"
-          :aria-pressed="exportState.exportType === item.type"
-          :aria-label="item.displayName"
-          :class="{
-            active: exportState.exportType === item.type,
-            disabled: item.disabled
-          }"
-          @click="selectFormat(item)"
-        >
-          <div class="formatCardTop">
-            <strong>{{ item.displayName }}</strong>
-            <span v-if="item.disabled" class="formatBadge">{{
-              $t('exportPage.upcoming')
-            }}</span>
+    <div class="exportOverlay" @click.self="onMaskClick">
+      <section class="exportDialog">
+        <header class="dialogHeader">
+          <div class="dialogHeaderMain">
+            <div class="dialogEyebrow">{{ $t('exportPage.eyebrow') }}</div>
+            <h1>{{ $t('exportPage.title') }}</h1>
+            <p>{{ $t('exportPage.description') }}</p>
           </div>
-          <span class="formatCardDesc">{{ item.desc }}</span>
-        </button>
-      </aside>
-
-      <main class="exportPanel">
-        <section class="infoPanel">
-          <div class="panelTitleRow">
-            <h2>{{ currentFormat.displayName }}</h2>
-            <span class="formatExt">.{{ currentFileExtension }}</span>
+          <div class="dialogHeaderActions">
+            <button
+              type="button"
+              class="headerActionBtn"
+              :aria-label="$t('exportPage.backHome')"
+              @click="goHome"
+            >
+              {{ $t('exportPage.backHome') }}
+            </button>
+            <button
+              type="button"
+              class="headerActionBtn primary"
+              :aria-label="$t('exportPage.backEdit')"
+              @click="goEdit"
+            >
+              {{ $t('exportPage.backEdit') }}
+            </button>
           </div>
+          <button
+            type="button"
+            class="dialogCloseBtn"
+            :aria-label="$t('dialog.close')"
+            @click="closeDialog"
+          >
+            ×
+          </button>
+        </header>
 
-          <div class="settingGroup">
-            <div class="settingBlock">
-              <label class="settingLabel" for="exportFileName">{{
-                $t('exportPage.fileName')
-              }}</label>
-              <el-input
-                id="exportFileName"
-                v-model="exportState.fileName"
-                maxlength="80"
-                @keydown.stop
-              />
-            </div>
+        <div class="dialogBody">
+          <aside class="formatRail">
+            <button
+              v-for="item in exportFormats"
+              :key="item.type"
+              type="button"
+              class="formatNavItem"
+              :aria-pressed="exportState.exportType === item.type"
+              :aria-label="item.displayName"
+              :class="{
+                active: exportState.exportType === item.type,
+                disabled: item.disabled
+              }"
+              @click="selectFormat(item)"
+            >
+              <span class="formatMarker">{{ item.displayName.slice(0, 2) }}</span>
+              <span class="formatNavLabel">{{ item.displayName }}</span>
+              <span
+                v-if="exportState.exportType === item.type && !item.disabled"
+                class="formatSelected"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+              <span v-if="item.disabled" class="formatHint">{{
+                $t('exportPage.upcoming')
+              }}</span>
+            </button>
+          </aside>
 
-            <div class="settingBlock">
-              <span class="settingLabel">{{ $t('exportPage.descriptionLabel') }}</span>
-              <div class="plainCard">
-                {{ currentFormat.desc }}
-              </div>
-            </div>
-
-            <div class="settingBlock">
-              <span class="settingLabel">{{ $t('exportPage.optionsLabel') }}</span>
-              <div class="optionsCard">
-                <div v-if="isDisabledFormat" class="emptyOption">
-                  {{ $t('exportPage.disabledTip') }}
+          <main class="dialogContent" v-loading="previewLoading">
+            <div class="contentShell">
+              <section class="contentMain">
+                <div class="contentHeader">
+                  <strong>{{ currentFormat.displayName }}</strong>
+                  <span class="contentExt">.{{ currentFileExtension }}</span>
                 </div>
-
-                <template v-else>
-                  <div class="optionRow" v-if="showConfigOption">
-                    <span>{{ $t('exportPage.includeConfig') }}</span>
-                    <el-switch v-model="exportState.withConfig" />
-                  </div>
-
-                  <div class="optionRow" v-if="showImageOptions">
-                    <span>{{ $t('exportPage.imageFormat') }}</span>
-                    <el-radio-group v-model="exportState.imageFormat">
-                      <el-radio value="png">PNG</el-radio>
-                      <el-radio value="jpg">JPG</el-radio>
-                    </el-radio-group>
-                  </div>
-
-                  <div class="optionRow" v-if="showPaddingOptions">
-                    <span>{{ $t('exportPage.paddingX') }}</span>
-                    <el-input-number
-                      v-model="exportState.paddingX"
-                      :min="0"
-                      :max="500"
-                    />
-                  </div>
-
-                  <div class="optionRow" v-if="showPaddingOptions">
-                    <span>{{ $t('exportPage.paddingY') }}</span>
-                    <el-input-number
-                      v-model="exportState.paddingY"
-                      :min="0"
-                      :max="500"
-                    />
-                  </div>
-
-                  <div class="optionRow" v-if="showFooterOption">
-                    <span>{{ $t('exportPage.extraText') }}</span>
+                <div class="formRow">
+                  <label class="formLabel" for="exportFileName">{{
+                    $t('exportPage.fileName')
+                  }}</label>
+                  <div class="formValue">
                     <el-input
-                      v-model="exportState.extraText"
-                      :placeholder="$t('exportPage.extraTextPlaceholder')"
+                      id="exportFileName"
+                      v-model="exportState.fileName"
+                      maxlength="80"
                       @keydown.stop
                     />
+                    <div class="fileSuffix">.{{ currentFileExtension }}</div>
                   </div>
+                </div>
 
-                  <div class="optionRow" v-if="showTransparentOption">
-                    <span>{{ $t('exportPage.transparentBg') }}</span>
-                    <el-switch v-model="exportState.isTransparent" />
+                <div class="formRow">
+                  <span class="formLabel">{{ $t('exportPage.descriptionLabel') }}</span>
+                  <div class="formValue">
+                    <div class="descBadge">{{ currentFormat.desc }}</div>
                   </div>
+                </div>
 
-                  <div class="optionRow" v-if="showFitBgOption">
-                    <span>{{ $t('exportPage.fitBg') }}</span>
-                    <el-switch v-model="exportState.isFitBg" />
-                  </div>
+                <div class="formRow optionGroupRow">
+                  <span class="formLabel">{{ $t('exportPage.optionsLabel') }}</span>
+                  <div class="formValue optionGroup">
+                    <div v-if="isDisabledFormat" class="emptyOption">
+                      {{ $t('exportPage.disabledTip') }}
+                    </div>
 
-                  <div v-if="!hasVisibleOptions" class="emptyOption">
-                    {{ $t('exportPage.noExtraOptions') }}
+                    <template v-else>
+                      <div class="optionInlineRow" v-if="showConfigOption">
+                        <span class="optionName">{{ $t('exportPage.includeConfig') }}</span>
+                        <el-switch v-model="exportState.withConfig" />
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showImageOptions">
+                        <span class="optionName">{{ $t('exportPage.imageFormat') }}</span>
+                        <el-radio-group v-model="exportState.imageFormat">
+                          <el-radio value="png">PNG</el-radio>
+                          <el-radio value="jpg">JPG</el-radio>
+                        </el-radio-group>
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showPaddingOptions">
+                        <span class="optionName">{{ $t('exportPage.paddingX') }}</span>
+                        <el-input-number
+                          v-model="exportState.paddingX"
+                          :min="0"
+                          :max="500"
+                        />
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showPaddingOptions">
+                        <span class="optionName">{{ $t('exportPage.paddingY') }}</span>
+                        <el-input-number
+                          v-model="exportState.paddingY"
+                          :min="0"
+                          :max="500"
+                        />
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showFooterOption">
+                        <span class="optionName">{{ $t('exportPage.extraText') }}</span>
+                        <el-input
+                          v-model="exportState.extraText"
+                          :placeholder="$t('exportPage.extraTextPlaceholder')"
+                          @keydown.stop
+                        />
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showTransparentOption">
+                        <span class="optionName">{{ $t('exportPage.transparentBg') }}</span>
+                        <el-switch v-model="exportState.isTransparent" />
+                      </div>
+
+                      <div class="optionInlineRow" v-if="showFitBgOption">
+                        <span class="optionName">{{ $t('exportPage.fitBg') }}</span>
+                        <el-switch v-model="exportState.isFitBg" />
+                      </div>
+
+                      <div v-if="!hasVisibleOptions" class="emptyOption">
+                        {{ $t('exportPage.noExtraOptions') }}
+                      </div>
+                    </template>
                   </div>
-                </template>
-              </div>
+                </div>
+              </section>
+
+              <aside class="previewPanel">
+                <div class="previewPanelHeader">
+                  <strong>{{ $t('exportPage.preview') }}</strong>
+                  <span>{{ $t('exportPage.previewDesc') }}</span>
+                </div>
+                <div class="previewSurface">
+                  <div ref="previewRef" class="previewCanvas"></div>
+                </div>
+              </aside>
             </div>
-          </div>
+          </main>
+        </div>
 
-          <div class="actionBar">
-            <div class="statusText">
-              {{ statusText }}
-            </div>
-            <el-button :disabled="exporting" @click="goEdit">{{
-              $t('exportPage.backEdit')
-            }}</el-button>
-            <el-button
-              type="primary"
-              :loading="exporting"
-              :disabled="isDisabledFormat || !mindMap"
-              @click="handleExport"
-            >
-              {{ $t('exportPage.export') }}
-            </el-button>
+        <footer class="dialogFooter">
+          <div class="statusText">
+            {{ statusText }}
           </div>
-        </section>
-
-        <section class="previewPanel">
-          <div class="previewHeader">
-            <h3>{{ $t('exportPage.preview') }}</h3>
-            <span>{{ $t('exportPage.previewDesc') }}</span>
-          </div>
-          <div
-            v-loading="previewLoading"
-            class="previewCanvasWrap"
+          <el-button :disabled="exporting" @click="goEdit">{{
+            $t('search.cancel')
+          }}</el-button>
+          <el-button
+            type="primary"
+            :loading="exporting"
+            :disabled="isDisabledFormat || !mindMap"
+            @click="handleExport"
           >
-            <div ref="previewRef" class="previewCanvas"></div>
-          </div>
-        </section>
-      </main>
+            {{ $t('exportPage.export') }}
+          </el-button>
+        </footer>
+      </section>
+
     </div>
   </div>
 </template>
@@ -349,7 +366,9 @@ export default {
       exportPluginsInstalled: false,
       extendedIconList: [],
       exportState: createDefaultExportState(baseName),
-      exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat]
+      exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat],
+      boundExportKeydown: null,
+      boundPreviewResize: null
     }
   },
   computed: {
@@ -419,15 +438,93 @@ export default {
     }
   },
   async mounted() {
+    this.bindExportKeydown()
+    this.bindPreviewResize()
     await ensureBootstrapDocumentState()
     await this.initPreview()
   },
   beforeUnmount() {
+    this.unbindExportKeydown()
+    this.unbindPreviewResize()
     if (this.mindMap) {
       this.mindMap.destroy()
     }
   },
   methods: {
+    onMaskClick() {
+      if (this.exporting) {
+        return
+      }
+      this.closeDialog()
+    },
+
+    async closeDialog() {
+      if (this.exporting) {
+        return
+      }
+      await this.goEdit()
+    },
+
+    onKeydown(event) {
+      if (this.exporting) {
+        return
+      }
+      if (event.key !== 'Escape') {
+        return
+      }
+      event.preventDefault()
+      this.closeDialog()
+    },
+
+    bindExportKeydown() {
+      if (typeof window === 'undefined' || this.boundExportKeydown) {
+        return
+      }
+      this.boundExportKeydown = event => this.onKeydown(event)
+      window.addEventListener('keydown', this.boundExportKeydown)
+    },
+
+    unbindExportKeydown() {
+      if (typeof window === 'undefined' || !this.boundExportKeydown) {
+        return
+      }
+      window.removeEventListener('keydown', this.boundExportKeydown)
+      this.boundExportKeydown = null
+    },
+
+    bindPreviewResize() {
+      if (typeof window === 'undefined' || this.boundPreviewResize) {
+        return
+      }
+      this.boundPreviewResize = () => this.syncPreviewViewport()
+      window.addEventListener('resize', this.boundPreviewResize)
+    },
+
+    unbindPreviewResize() {
+      if (typeof window === 'undefined' || !this.boundPreviewResize) {
+        return
+      }
+      window.removeEventListener('resize', this.boundPreviewResize)
+      this.boundPreviewResize = null
+    },
+
+    syncPreviewViewport() {
+      if (!this.mindMap) {
+        return
+      }
+      this.$nextTick(() => {
+        if (!this.mindMap) {
+          return
+        }
+        if (typeof this.mindMap.emit === 'function') {
+          this.mindMap.emit('resize')
+        }
+        if (this.mindMap.view && typeof this.mindMap.view.fit === 'function') {
+          this.mindMap.view.fit()
+        }
+      })
+    },
+
     selectFormat(item) {
       this.exportState.exportType = item.type
     },
@@ -498,6 +595,7 @@ export default {
           this.mindMap.addPlugin(RichText)
           this.mindMap.addPlugin(Formula)
         }
+        this.syncPreviewViewport()
       } catch (error) {
         console.error('init export preview failed', error)
         this.$message.error(this.$t('exportPage.previewInitFailed'))
@@ -590,301 +688,528 @@ export default {
 
 <style lang="less" scoped>
 .exportPage {
-  min-height: 100vh;
-  padding: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 28%),
-    linear-gradient(180deg, #f6f8fb 0%, #edf2f7 100%);
-  color: #0f172a;
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: transparent;
+  color: rgba(26, 26, 26, 0.88);
 
   &.isDark {
-    background:
-      radial-gradient(circle at top left, rgba(59, 130, 246, 0.22), transparent 28%),
-      linear-gradient(180deg, #0f172a 0%, #111827 100%);
-    color: #e5eefc;
+    color: hsla(0, 0%, 100%, 0.86);
 
+    .exportDialog,
     .formatRail,
-    .infoPanel,
-    .previewPanel,
-    .formatCard,
-    .plainCard,
-    .optionsCard,
-    .previewCanvasWrap {
-      background: rgba(15, 23, 42, 0.82);
-      border-color: rgba(255, 255, 255, 0.08);
+    .dialogContent,
+    .formatNavItem,
+    .descBadge,
+    .optionGroup,
+    .dialogFooter {
+      background: #2b2f36;
+      border-color: hsla(0, 0%, 100%, 0.08);
       color: inherit;
     }
 
-    .ghostBtn {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.12);
+    .dialogHeader p,
+    .optionName,
+    .statusText,
+    .emptyOption,
+    .formLabel {
+      color: hsla(0, 0%, 100%, 0.56);
+    }
+
+    .headerActionBtn {
+      background: #363b3f;
+      border-color: hsla(0, 0%, 100%, 0.1);
       color: inherit;
+    }
+
+    .formatNavItem.active {
+      background: rgba(64, 158, 255, 0.14);
+      border-color: rgba(64, 158, 255, 0.32);
+    }
+
+    .contentExt,
+    .formatMarker,
+    .descBadge {
+      background: rgba(64, 158, 255, 0.14);
+      border-color: rgba(64, 158, 255, 0.28);
+    }
+
+    .contentMain,
+    .previewPanel,
+    .previewSurface {
+      background: #23272e;
+      border-color: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .previewPanelHeader span {
+      color: hsla(0, 0%, 100%, 0.56);
+    }
+
+    .fileSuffix {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: hsla(0, 0%, 100%, 0.08);
+      color: hsla(0, 0%, 100%, 0.56);
     }
   }
 }
 
-.exportHeader {
+.exportOverlay {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(12px);
+}
+
+.exportDialog {
+  width: min(1020px, calc(100% - 120px));
+  min-height: min(660px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.dialogHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 20px;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.dialogHeaderMain {
+  min-width: 0;
 
   h1 {
-    margin: 6px 0 10px;
-    font-size: 34px;
-    line-height: 1.1;
+    margin: 2px 0 4px;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 700;
   }
 
   p {
-    max-width: 720px;
-    font-size: 14px;
-    line-height: 1.7;
-    color: rgba(15, 23, 42, 0.62);
+    max-width: 620px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgba(26, 26, 26, 0.56);
   }
 }
 
-.headerEyebrow {
-  font-size: 13px;
+.dialogEyebrow {
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
+  color: #409eff;
   text-transform: uppercase;
-  color: #2563eb;
 }
 
-.headerActions {
+.dialogHeaderActions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.ghostBtn,
-.primaryBtn {
-  border-radius: 14px;
-  padding: 10px 16px;
+.dialogCloseBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: inherit;
+  padding: 0;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 
-.ghostBtn {
-  background: rgba(255, 255, 255, 0.82);
+.headerActionBtn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  cursor: pointer;
+  color: inherit;
+
+  &.primary {
+    background: #409eff;
+    border-color: #409eff;
+    color: #fff;
+  }
 }
 
-.primaryBtn {
-  background: #2563eb;
-  color: #fff;
-  border-color: transparent;
-}
-
-.exportBody {
+.dialogBody {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 20px;
-  min-height: calc(100vh - 138px);
-}
-
-.formatRail,
-.infoPanel,
-.previewPanel {
-  border-radius: 24px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: rgba(255, 255, 255, 0.82);
+  grid-template-columns: 198px minmax(0, 1fr);
 }
 
 .formatRail {
-  padding: 18px;
+  padding: 10px 8px 10px 10px;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  background: #f7f8fa;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
-.formatCard {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
-  border-radius: 18px;
-  padding: 16px;
+.formatNavItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 
   &.active {
-    border-color: rgba(37, 99, 235, 0.36);
-    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.12);
+    background: #fff;
+    border-color: rgba(64, 158, 255, 0.2);
   }
 
   &.disabled {
-    opacity: 0.72;
+    opacity: 0.64;
   }
 }
 
-.formatCardTop {
-  display: flex;
+.formatMarker {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.formatBadge {
-  border-radius: 999px;
-  padding: 4px 8px;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(64, 158, 255, 0.12);
+  color: #409eff;
   font-size: 12px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
+  font-weight: 700;
 }
 
-.formatCardDesc {
-  font-size: 13px;
-  line-height: 1.7;
-  color: rgba(15, 23, 42, 0.6);
+.formatNavLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.exportPanel {
+.formatSelected {
+  font-size: 16px;
+  line-height: 1;
+  color: #409eff;
+}
+
+.formatHint {
+  font-size: 12px;
+  color: #409eff;
+}
+
+.dialogContent {
+  min-width: 0;
+  padding: 14px 24px 18px;
+  overflow-y: auto;
+}
+
+.contentShell {
+  min-height: 100%;
   display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 18px;
 }
 
-.infoPanel,
+.contentMain,
 .previewPanel {
-  padding: 22px;
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  background: #fbfcfe;
 }
 
-.panelTitleRow,
-.previewHeader {
+.contentMain {
+  padding: 18px 18px 8px;
+}
+
+.contentHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 
-  h2,
-  h3 {
-    font-size: 24px;
+  strong {
+    font-size: 16px;
+    font-weight: 700;
   }
 }
 
-.formatExt {
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
+.contentExt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(64, 158, 255, 0.08);
+  border: 1px solid rgba(64, 158, 255, 0.18);
+  color: #409eff;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.settingGroup {
+.formRow {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.settingBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.optionGroupRow {
+  align-items: flex-start;
 }
 
-.settingLabel {
+.formLabel {
+  width: 120px;
+  flex-shrink: 0;
+  padding-top: 6px;
   font-size: 13px;
-  font-weight: 700;
-  color: rgba(15, 23, 42, 0.62);
+  font-weight: 600;
+  color: rgba(26, 26, 26, 0.68);
 }
 
-.plainCard,
-.optionsCard {
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: #fff;
-  padding: 16px;
+.formValue {
+  flex: 1;
+  min-width: 0;
 }
 
-.plainCard {
-  line-height: 1.7;
+.descBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(64, 158, 255, 0.28);
+  background: rgba(64, 158, 255, 0.08);
+  color: #409eff;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.optionsCard {
+.formValue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileSuffix {
+  flex-shrink: 0;
+  min-width: 58px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #f5f7fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: rgba(26, 26, 26, 0.56);
+  font-size: 13px;
+}
+
+.optionGroup {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
-.optionRow {
+.optionInlineRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
+  min-height: 36px;
+}
+
+.optionName {
+  font-size: 13px;
+  color: rgba(26, 26, 26, 0.68);
 }
 
 .emptyOption {
   font-size: 13px;
-  color: rgba(15, 23, 42, 0.52);
+  color: rgba(26, 26, 26, 0.48);
 }
 
-.actionBar {
-  margin-top: 20px;
+.dialogFooter {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
+  padding: 12px 22px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
 }
 
 .statusText {
   margin-right: auto;
   font-size: 13px;
-  color: rgba(15, 23, 42, 0.56);
+  color: rgba(26, 26, 26, 0.56);
 }
 
-.previewHeader span {
-  font-size: 13px;
-  color: rgba(15, 23, 42, 0.56);
+.previewPanel {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  gap: 12px;
 }
 
-.previewCanvasWrap {
-  height: calc(100% - 54px);
-  min-height: 540px;
-  border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: #fff;
+.previewPanelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  span {
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgba(26, 26, 26, 0.56);
+  }
+}
+
+.previewSurface {
+  flex: 1;
+  min-height: 420px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .previewCanvas {
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
-@media (max-width: 1200px) {
-  .exportBody,
-  .exportPanel {
+:deep(.el-input-number) {
+  width: 220px;
+}
+
+@media (max-width: 960px) {
+  .exportOverlay {
+    padding: 12px;
+  }
+
+  .exportDialog {
+    width: 100%;
+    min-height: calc(100vh - 24px);
+  }
+
+  .dialogHeader,
+  .dialogFooter {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .dialogBody {
     grid-template-columns: 1fr;
   }
 
-  .previewCanvasWrap {
-    min-height: 420px;
+  .formatRail {
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .dialogContent {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .contentShell {
+    grid-template-columns: 1fr;
+  }
+
+  .previewSurface {
+    min-height: 320px;
   }
 }
 
-@media (max-width: 768px) {
-  .exportPage {
-    padding: 16px;
-  }
-
-  .exportHeader,
-  .panelTitleRow,
-  .previewHeader,
-  .optionRow,
-  .actionBar {
+@media (max-width: 720px) {
+  .dialogHeader,
+  .formRow,
+  .optionInlineRow,
+  .dialogFooter {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .headerActions {
+  .dialogHeaderActions {
     width: 100%;
   }
 
-  .ghostBtn,
-  .primaryBtn {
+  .headerActionBtn {
     flex: 1;
   }
+
+  .formLabel {
+    width: auto;
+    padding-top: 0;
+  }
+
+  .statusText {
+    margin-right: 0;
+  }
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner),
+:deep(.el-input-number .el-input__wrapper),
+:deep(.el-radio-group),
+:deep(.el-switch) {
+  font-size: 14px;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner),
+:deep(.el-input-number .el-input__wrapper) {
+  border-radius: 6px;
+}
+
+:deep(.el-radio-group) {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 </style>

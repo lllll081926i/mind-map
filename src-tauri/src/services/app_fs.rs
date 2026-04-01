@@ -32,8 +32,14 @@ fn is_path_safe(path: &str) -> bool {
 }
 
 fn has_allowed_extension(path: &str) -> bool {
-  let lower_path = path.to_lowercase();
-  ALLOWED_EXTENSIONS.iter().any(|ext| lower_path.ends_with(ext))
+  let extension = Path::new(path)
+    .extension()
+    .and_then(|value| value.to_str())
+    .map(|value| format!(".{}", value.to_lowercase()));
+  match extension {
+    Some(ext) => ALLOWED_EXTENSIONS.iter().any(|allowed| *allowed == ext),
+    None => false,
+  }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -103,8 +109,10 @@ pub async fn list_directory_entries(path: &str) -> Result<Vec<DirectoryEntry>, S
       path: entry_path.to_string_lossy().to_string(),
       leaf: is_file,
       enable_edit: is_file && {
-        let lower_name = name.to_lowercase();
-        lower_name.ends_with(".smm") || lower_name.ends_with(".json")
+        matches!(
+          entry_path.extension().and_then(|value| value.to_str()),
+          Some("smm") | Some("SMM") | Some("json") | Some("JSON")
+        )
       },
     };
     if is_file {

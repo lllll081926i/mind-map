@@ -32,7 +32,6 @@
     </div>
     <Outline
       :mindMap="mindMap"
-      v-if="activeSidebar === 'outline'"
       @scrollTo="onScrollTo"
       ref="outlineRef"
     ></Outline>

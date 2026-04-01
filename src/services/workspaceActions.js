@@ -9,6 +9,7 @@ import {
   markDocumentDirty,
   setCurrentFileRef
 } from '@/services/documentSession'
+import { parseExternalJsonSafely } from '@/utils'
 import {
   saveBootstrapStatePatch,
   setLastDirectory
@@ -35,7 +36,7 @@ export const normalizeWorkspaceMindMapData = data => {
 }
 
 const parseMindMapContent = content => {
-  const data = JSON.parse(content)
+  const data = parseExternalJsonSafely(content)
   if (!data || typeof data !== 'object') {
     throw new Error('文件内容不是有效的思维导图数据')
   }

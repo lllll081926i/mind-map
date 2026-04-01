@@ -18,7 +18,7 @@ const routes = [
   {
     path: '/export',
     name: 'Export',
-    component: () => import(`./pages/Export/Index.vue`)
+    component: () => import(`./pages/Edit/Index.vue`)
   },
   {
     path: '/index',

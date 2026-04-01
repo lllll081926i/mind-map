@@ -208,7 +208,8 @@ export default {
   },
   dialog: {
     cancel: '取消',
-    confirm: '确定'
+    confirm: '确定',
+    close: '关闭'
   },
   export: {
     title: '导出',

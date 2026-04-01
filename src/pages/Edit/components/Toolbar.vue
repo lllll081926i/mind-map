@@ -285,6 +285,7 @@ import { mapState } from 'pinia'
 import { ElNotification as Notification } from 'element-plus'
 import { getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
+import { parseExternalJsonSafely } from '@/utils'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
   getCurrentFileRef,
@@ -818,7 +819,7 @@ export default {
     // 渲染读取的数据
     setData(str) {
       try {
-        let data = JSON.parse(str)
+        let data = parseExternalJsonSafely(str)
         if (typeof data !== 'object') {
           throw new Error(this.$t('toolbar.fileContentError'))
         }

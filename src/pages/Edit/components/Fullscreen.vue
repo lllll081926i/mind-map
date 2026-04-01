@@ -33,17 +33,38 @@ export default {
     }
   },
   data() {
-    return {}
-  },
-  created() {
-    document[fullscreenEvent] = () => {
-      setTimeout(() => {
-        this.mindMap.resize()
-      }, 1000)
+    return {
+      resizeTimer: null,
+      fullscreenListenerName: fullscreenEvent
+        ? fullscreenEvent.replace(/^on/, '')
+        : '',
+      handleFullscreenChange: null
     }
   },
+  created() {
+    if (!this.fullscreenListenerName) {
+      return
+    }
+    this.handleFullscreenChange = () => {
+      clearTimeout(this.resizeTimer)
+      this.resizeTimer = setTimeout(() => {
+        this.mindMap?.resize()
+      }, 1000)
+    }
+    document.addEventListener(
+      this.fullscreenListenerName,
+      this.handleFullscreenChange
+    )
+  },
   beforeUnmount() {
-    document[fullscreenEvent] = null
+    clearTimeout(this.resizeTimer)
+    if (!this.fullscreenListenerName || !this.handleFullscreenChange) {
+      return
+    }
+    document.removeEventListener(
+      this.fullscreenListenerName,
+      this.handleFullscreenChange
+    )
   },
   methods: {
     // 全屏查看

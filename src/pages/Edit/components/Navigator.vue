@@ -80,6 +80,8 @@ export default {
     )
   },
   beforeUnmount() {
+    clearTimeout(this.timer)
+    clearTimeout(this.setSizeTimer)
     window.removeEventListener('resize', this.setSize)
     this.removeToggleMiniMapListener && this.removeToggleMiniMapListener()
     this.$bus.$off('data_change', this.data_change)

@@ -6,6 +6,7 @@
     <template v-if="show">
       <Toolbar v-if="!isZenMode"></Toolbar>
       <Edit></Edit>
+      <ExportDialog v-if="isExportRoute"></ExportDialog>
     </template>
   </div>
 </template>
@@ -19,11 +20,13 @@ import { useThemeStore } from '@/stores/theme'
 
 const Toolbar = defineAsyncComponent(() => import('./components/Toolbar.vue'))
 const Edit = defineAsyncComponent(() => import('./components/Edit.vue'))
+const ExportDialog = defineAsyncComponent(() => import('../Export/Index.vue'))
 
 export default {
   components: {
     Toolbar,
-    Edit
+    Edit,
+    ExportDialog
   },
   data() {
     return {
@@ -42,6 +45,9 @@ export default {
     }),
     isZenMode() {
       return this.localConfig.isZenMode
+    },
+    isExportRoute() {
+      return this.$route.path === '/export'
     }
   },
   watch: {

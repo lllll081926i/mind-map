@@ -198,9 +198,10 @@ export default {
     },
 
     showSearch() {
-      this.$bus.$emit('closeSideBar')
       this.show = true
-      this.$refs.searchInputRef.focus()
+      this.$nextTick(() => {
+        this.$refs.searchInputRef?.focus()
+      })
     },
 
     hideReplaceInput() {

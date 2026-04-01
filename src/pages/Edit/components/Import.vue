@@ -70,6 +70,7 @@
 import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import { mapState } from 'pinia'
+import { parseExternalJsonSafely } from '@/utils'
 import { onShowImport } from '@/services/appEvents'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar, setIsHandleLocalFile } from '@/stores/runtime'
@@ -264,9 +265,12 @@ export default {
     handleSmm(file) {
       let fileReader = new FileReader()
       fileReader.readAsText(file.raw)
+      fileReader.onerror = () => {
+        this.$message.error(this.$t('import.fileParsingFailed'))
+      }
       fileReader.onload = evt => {
         try {
-          let data = JSON.parse(evt.target.result)
+          let data = parseExternalJsonSafely(evt.target.result)
           if (!data || typeof data !== 'object') {
             throw new Error(this.$t('import.fileContentError'))
           }
@@ -315,6 +319,9 @@ export default {
     async handleMd(file) {
       let fileReader = new FileReader()
       fileReader.readAsText(file.raw)
+      fileReader.onerror = () => {
+        this.$message.error(this.$t('import.fileParsingFailed'))
+      }
       fileReader.onload = async evt => {
         try {
           let data = markdown.transformMarkdownTo(evt.target.result)

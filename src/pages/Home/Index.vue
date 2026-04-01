@@ -278,17 +278,13 @@ export default {
 <style lang="less" scoped>
 .workspacePage {
   min-height: 100vh;
-  padding: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.2), transparent 28%),
-    linear-gradient(180deg, #f5f9ff 0%, #eef3f8 100%);
-  color: #0f172a;
+  padding: 18px;
+  background: #f5f5f5;
+  color: rgba(26, 26, 26, 0.88);
 
   &.isDark {
-    background:
-      radial-gradient(circle at top left, rgba(59, 130, 246, 0.22), transparent 28%),
-      linear-gradient(180deg, #0f172a 0%, #111827 100%);
-    color: #e5eefc;
+    background: #1f2329;
+    color: hsla(0, 0%, 100%, 0.88);
 
     .workspaceSidebar,
     .workspacePanel,
@@ -296,22 +292,29 @@ export default {
     .sideAction,
     .folderItem,
     .tableHead,
-    .tableRow {
-      background: rgba(15, 23, 42, 0.82);
-      border-color: rgba(255, 255, 255, 0.08);
+    .tableRow,
+    .sidebarSection {
+      background: #2b2f36;
+      border-color: hsla(0, 0%, 100%, 0.08);
       color: inherit;
     }
 
     .ghostBtn,
     .iconBtn,
     .rowAction {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.08);
+      background: #363b3f;
+      border-color: hsla(0, 0%, 100%, 0.1);
       color: inherit;
     }
 
     .secondaryAction {
-      background: #65a30d;
+      background: #3c8c4a;
+    }
+
+    .brandMeta,
+    .panelHeader p,
+    .emptyState {
+      color: hsla(0, 0%, 100%, 0.54);
     }
   }
 }
@@ -364,31 +367,35 @@ export default {
 
 .workspaceBody {
   display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 20px;
-  min-height: calc(100vh - 110px);
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  min-height: calc(100vh - 96px);
 }
 
 .workspaceSidebar {
-  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
 .quickActionsCard,
 .sidebarSection {
-  padding: 16px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+  margin-bottom: 0;
 }
 
 .primaryAction,
 .secondaryAction {
   width: 100%;
   border: none;
-  border-radius: 16px;
-  padding: 14px 16px;
-  font-size: 15px;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -410,20 +417,21 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   background: #fff;
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: 6px;
+  padding: 11px 12px;
   cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 
   & + & {
-    margin-top: 10px;
+    margin-top: 8px;
   }
 }
 
 .folderItem.active {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.26);
+  background: rgba(64, 158, 255, 0.08);
+  border-color: rgba(64, 158, 255, 0.24);
 }
 
 .folderName {
@@ -437,11 +445,12 @@ export default {
 }
 
 .workspacePanel {
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   min-height: 100%;
-  padding: 24px;
+  padding: 18px;
 }
 
 .panelHeader {
@@ -452,13 +461,13 @@ export default {
   margin-bottom: 18px;
 
   h2 {
-    font-size: 30px;
+    font-size: 24px;
     margin-bottom: 6px;
   }
 
   p {
-    font-size: 14px;
-    color: rgba(15, 23, 42, 0.56);
+    font-size: 13px;
+    color: rgba(26, 26, 26, 0.56);
   }
 }
 
@@ -469,9 +478,9 @@ export default {
 }
 
 .workspaceTable {
-  border-radius: 18px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .tableHead,
@@ -480,19 +489,19 @@ export default {
   grid-template-columns: 44px minmax(160px, 1fr) minmax(260px, 2fr) 120px;
   align-items: center;
   gap: 16px;
-  padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.82);
+  padding: 14px 16px;
+  background: #fff;
 }
 
 .tableHead {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(15, 23, 42, 0.56);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  color: rgba(26, 26, 26, 0.56);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .tableRow {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 
   &:last-child {
     border-bottom: none;
@@ -516,7 +525,7 @@ export default {
 .emptyState {
   padding: 56px 24px;
   text-align: center;
-  color: rgba(15, 23, 42, 0.48);
+  color: rgba(26, 26, 26, 0.48);
 }
 
 .templateGrid {
@@ -526,9 +535,9 @@ export default {
 }
 
 .templateCard {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #f8fafc;
-  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f8f8f8;
+  border-radius: 8px;
   padding: 18px;
   text-align: left;
   cursor: pointer;
@@ -542,7 +551,19 @@ export default {
   span {
     font-size: 13px;
     line-height: 1.7;
-    color: rgba(15, 23, 42, 0.56);
+    color: rgba(26, 26, 26, 0.56);
+  }
+}
+
+@media (max-width: 1080px) {
+  .workspaceBody {
+    grid-template-columns: 260px 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .workspaceBody {
+    grid-template-columns: 1fr;
   }
 }
 </style>

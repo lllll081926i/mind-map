@@ -1,95 +1,162 @@
 # 依赖与构建审查报告
 
-## 1. 依赖版本问题
+## 项目概况
 
-| 依赖 | 当前版本 | 问题 | 建议 |
-|------|----------|------|------|
-| `typescript` | ^6.0.2 | 6.x 尚不存在（当前稳定版 5.x） | 降级为 ^5.4.0 |
-| `vite` | ^8.0.3 | 极新版本，生态可能未完全兼容 | 降级为 ^6.0.0 |
-| `eslint` | ^10.1.0 | 极新版本，插件可能未适配 | 验证兼容性或降级到 ^9.x |
-| `simple-mind-map` eslint | ^8.25.0 | ESLint 8 已 EOL | 统一为 ESLint 9+ |
-| `simple-mind-map` prettier | ^2.7.1 | Prettier 2 已过时 | 统一为 Prettier 3+ |
-
----
-
-## 2. 未使用的依赖
-
-| 依赖 | 位置 | 问题 | 建议 |
-|------|------|------|------|
-| `core-js` | dependencies | 全项目无任何引用 | **直接删除** |
-| `chokidar` | devDependencies | 无任何引用 | **直接删除** |
-| `markdown-it-checkbox` | devDependencies | 无任何引用 | **直接删除** |
-| `vconsole` | devDependencies | Tauri 桌面应用有 DevTools | **直接删除** |
+| 项目 | 值 |
+|------|-----|
+| 根包名 | `mind-map-app` v0.1.0 |
+| 工作区 | `simple-mind-map` v0.14.0-fix.2, `simple-mind-map-plugin-themes` v1.0.1-local.0 |
+| 构建工具 | Vite 8.0.3 + Tauri CLI 2.10.1 |
+| Node.js 要求 | >=22.0.0 |
 
 ---
 
-## 3. manualChunks 死配置
+## 1. 依赖版本稳定性分析
 
-| 文件 | 问题 | 建议 |
-|------|------|------|
-| `vite.config.js:33-35` | `xlsx` chunk 但无 xlsx 依赖 | 删除 |
-| `vite.config.js:30` | `v-viewer` chunk 但项目未使用 | 删除 |
+| 文件:行号 | 依赖 | 当前版本 | 问题 | 建议 |
+|-----------|------|----------|------|------|
+| `package.json:83` | `typescript` | `^6.0.2` | TS 6.x 为极新版本 | 降级至 `^5.4.x` |
+| `package.json:85` | `vite` | `^8.0.3` | Vite 8 为极新版本 | 确认插件兼容性 |
+| `package.json:65` | `@eslint/js` | `^10.0.1` | ESLint 10.x 为极新版本 | 确认所有插件兼容 |
+| `package.json:71` | `eslint` | `^10.1.0` | 同上 | 同上 |
+
+---
+
+## 2. devDependencies / dependencies 分类问题
+
+### 2.1 应移至 dependencies 的包
+
+| 文件:行号 | 包 | 当前分类 | 原因 |
+|-----------|-----|----------|------|
+| `package.json:79` | `markdown-it` | devDependencies | 在 `AiChat.vue:64` 中被运行时引用 |
+
+### 2.2 应移至 devDependencies 的包
+
+| 文件:行号 | 包 | 当前分类 | 原因 |
+|-----------|-----|----------|------|
+| `package.json:54` | `punycode` | dependencies | 仅用于构建时 resolve alias |
+| `package.json:46` | `buffer` | dependencies | 仅用于构建时别名 |
+| `package.json:82` | `stream-browserify` | dependencies | 仅用于构建时别名 |
+
+### 2.3 疑似未使用的依赖
+
+| 文件:行号 | 包 | 分类 | 证据 |
+|-----------|-----|------|------|
+| `package.json:48` | `core-js` | dependencies | 在 `src/` 中零引用 |
+| `package.json:84` | `vconsole` | devDependencies | 在 `main.js:73` 中被注释掉 |
+| `package.json:69` | `chokidar` | devDependencies | 在 `src/` 和 `scripts/` 中零引用 |
+| `package.json:80` | `markdown-it-checkbox` | devDependencies | 在 `src/` 和 `scripts/` 中零引用 |
+
+---
+
+## 3. 重复功能依赖
+
+| 包 | 根包 | simple-mind-map | 问题 |
+|----|------|-----------------|------|
+| `eslint` | `^10.1.0` | `^8.25.0` | **版本冲突** |
+| `prettier` | `^3.8.1` | `^2.7.1` | **版本冲突** |
+| `katex` | `^0.16.44` | `^0.16.44` | 版本相同但分别安装 |
 
 ---
 
 ## 4. Vite 构建配置优化
 
-| 文件 | 问题 | 建议 |
+### 4.1 vite.config.js 问题
+
+| 行号 | 问题 | 严重度 | 建议 |
+|------|------|--------|------|
+| 30 | `v-viewer` 出现在 manualChunks 但项目未安装 | 中 | 删除该行 |
+| 33 | `xlsx` 出现在 manualChunks 但项目未安装 | 中 | 删除该行 |
+| 105-114 | 生产构建未配置 `sourcemap` | 低 | 添加 `sourcemap: 'hidden'` |
+| 73-81 | 大量 Node.js polyfill 别名 | 中 | 评估是否真的需要 |
+
+### 4.2 manualChunks 策略评估
+
+| Chunk | 包含 | 评估 |
+|-------|------|------|
+| `vendor-framework` | vue, vue-router, vue-i18n, pinia, element-plus | **合理** |
+| `vendor-editor` | @toast-ui/editor, codemirror, highlight.js, katex | **合理** |
+| `vendor-viewer` | viewerjs, v-viewer | **需修正** — v-viewer 不存在 |
+| `vendor-xlsx` | xlsx | **需删除** — xlsx 不在依赖中 |
+| `vendor-network` | axios | **可合并** — 体积小 |
+| `mind-map-core` | simple-mind-map | **合理** |
+| `mind-map-themes` | simple-mind-map-plugin-themes | **合理** |
+| `mind-map-icons` | icon.js | **可质疑** — 过度分割 |
+| `mind-map-images` | image.js | **可质疑** — 过度分割 |
+
+### 4.3 vite.lib.config.js 问题
+
+| 行号 | 问题 | 建议 |
 |------|------|------|
-| `vite.config.js:105-114` | 生产构建未启用 sourcemap | 添加 `sourcemap: 'hidden'` |
-| `vite.config.js:105-114` | 使用默认 esbuild 压缩，未自定义选项 | 添加 terserOptions 去除 console |
-| `vite.config.js:76-80` | Node polyfill（buffer, events, punycode, stream）对 Tauri 不必要 | 逐一验证后移除 |
-| `vite.config.js:90` | `__VUE_OPTIONS_API__: true` 保留 Options API | 如未使用设为 false |
+| 27 | `minify: false` | 使用 Vite 内置压缩 |
+| 20 | 仅输出 `umd` 和 `es` 格式 | 增加 `cjs` 格式 |
+| 28 | `chunkSizeWarningLimit: 4000` | 降低至 1000 |
+| 无 | 未生成 sourcemap | 库构建应生成 sourcemap |
 
 ---
 
-## 5. 库构建配置 (vite.lib.config.js)
+## 5. 构建脚本分析
 
-| 问题 | 建议 |
-|------|------|
-| `minify: false` | 直接在 Vite 中启用 `minify: 'esbuild'` |
-| 缺少 sourcemap | 添加 `sourcemap: true` |
-| 缺少 `external` 配置 | 将 katex、yjs、pdf-lib 等大型依赖标记为外部 |
-| 缺少 CSS 压缩 | 添加 CSS 压缩配置 |
+### 5.1 冗余脚本
+
+| 脚本 | 行号 | 问题 | 建议 |
+|------|------|------|------|
+| `buildLibrary` | 26 | 是 `build:library` 的别名 | 删除 |
+| `desktop:build:windows` | 32 | 与 `desktop:build` 完全相同 | 删除或改为有实质区别 |
+| `frontend:build` | 24 | 使用 `--mode desktop` 但无对应 `.env.desktop` | 确认模式文件是否存在 |
+
+### 5.2 库构建流程
+
+`build:library` 串联三个步骤：
+1. `updateVersion.js` — 版本号写入 `full.js`
+2. `vite build --config vite.lib.config.js` — 构建未压缩版本
+3. `build-library-min.js` — esbuild 压缩
+
+**问题**: 使用 esbuild 二次压缩增加复杂度。建议直接在 `vite.lib.config.js` 中设置 `minify: 'esbuild'`。
 
 ---
 
-## 6. simple-mind-map 子包问题
+## 6. Node.js 版本要求
 
-| 依赖 | 问题 | 建议 |
+`package.json:10`: `"node": ">=22.0.0"`
+
+| 评估项 | 结论 |
+|--------|------|
+| 版本要求 | 22.x 是当前 LTS，但要求过高 |
+| 实际最低需求 | Vite 8 要求 Node 18+ |
+| 建议 | 降级至 `>=18.0.0` 或 `>=20.0.0` |
+
+---
+
+## 7. 库构建配置 (simple-mind-map/package.json)
+
+| 行号 | 问题 | 建议 |
 |------|------|------|
-| `ws` ^7.5.10 | 纯 Node.js WebSocket 库，不能运行在浏览器中 | 移至 devDependencies |
-| `y-webrtc`, `yjs` | 协作编辑非核心功能必需 | 移至 peerDependencies |
-| 缺少 `exports` 字段 | 不利于 tree-shaking | 添加 exports 字段 |
+| 15-16 | `types` 和 `typings` 重复 | 删除 `typings` |
+| 28 | `module` 指向 `index.js`（源码入口） | 指向构建产物 |
+| 无 | 缺少 `exports` 字段 | 添加条件导出 |
+| 41 | `ws` 依赖 | 浏览器环境不可用，移至 peerDependencies |
 
 ---
 
-## 7. Node.js 版本要求
+## 8. 优化建议优先级汇总
 
-| 文件 | 问题 | 建议 |
-|------|------|------|
-| `package.json:10` | `"node": ">=22.0.0"` 要求过高 | 降级为 `>=18.0.0` 或 `>=20.0.0` |
+### 高优先级
 
----
+1. **修复依赖分类**: `markdown-it` 移至 dependencies，`buffer`/`punycode`/`stream-browserify` 移至 devDependencies
+2. **清理未使用依赖**: 移除 `core-js`、`vconsole`、`chokidar`、`markdown-it-checkbox`
+3. **修复 manualChunks 死引用**: 删除 `v-viewer` 和 `xlsx` 的 chunk 配置
+4. **解决工作区依赖版本冲突**: 统一 `eslint` 和 `prettier` 版本
 
-## 8. 构建脚本冗余
+### 中优先级
 
-| 文件 | 问题 | 建议 |
-|------|------|------|
-| `package.json:25-26` | `build:library` 和 `buildLibrary` 等价 | 删除 `buildLibrary` |
-| `scripts/copy-index.js` | 未被任何 npm script 引用 | 确认用途后删除 |
+5. **删除冗余脚本**: `buildLibrary`、`desktop:build:windows`
+6. **简化库构建流程**: 使用 Vite 内置压缩
+7. **添加库的 exports 字段**
+8. **降低 Node.js 版本要求**
 
----
+### 低优先级
 
-## 优先级排序
-
-| 优先级 | 问题 | 影响 |
-|--------|------|------|
-| P0 | 删除 `core-js`（未使用 + 不必要） | 减少安装体积 |
-| P0 | 修复 TypeScript 版本（6.x 不存在） | 构建可能失败 |
-| P1 | 删除 `chokidar`、`markdown-it-checkbox`、`vconsole` | 减少无用依赖 |
-| P1 | 库构建添加 `external` 配置 | 防止产物过大 |
-| P1 | `ws` 从 simple-mind-map dependencies 移除 | 浏览器兼容性 |
-| P2 | Node.js 引擎要求降至 18+ | 扩大兼容性 |
-| P2 | 添加 sourcemap 配置 | 调试能力 |
-| P3 | 清理 manualChunks 死配置 | 配置整洁性 |
+9. **添加生产 sourcemap**
+10. **优化 manualChunks 策略**: 合并小 chunk
+11. **清理 overrides**: 移除与 dependencies 重复的覆盖

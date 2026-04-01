@@ -1,5 +1,7 @@
 import DOMPurify from 'dompurify'
 
+const UNSAFE_JSON_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 // 全屏事件检测
 const getOnFullscreenEvent = () => {
   if (document.documentElement.requestFullScreen) {
@@ -62,6 +64,26 @@ export const sanitizeRichTextFragment = html => {
   })
 }
 
+export const sanitizeExternalJsonValue = value => {
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeExternalJsonValue(item))
+  }
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+  return Object.keys(value).reduce((result, key) => {
+    if (UNSAFE_JSON_KEYS.has(key)) {
+      return result
+    }
+    result[key] = sanitizeExternalJsonValue(value[key])
+    return result
+  }, {})
+}
+
+export const parseExternalJsonSafely = input => {
+  return sanitizeExternalJsonValue(JSON.parse(input))
+}
+
 // 复制文本到剪贴板
 export const copy = text => {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -105,20 +127,31 @@ export const setImgToClipboard = img => {
 
 // 打印大纲
 export const printOutline = el => {
-  const printContent = el.outerHTML
+  const printContent = DOMPurify.sanitize(el.outerHTML, {
+    ADD_TAGS: ['style'],
+    ADD_ATTR: ['class']
+  })
   const iframe = document.createElement('iframe')
   iframe.setAttribute('style', 'position: absolute; width: 0; height: 0;')
   document.body.appendChild(iframe)
   const iframeDoc = iframe.contentWindow.document
+  iframeDoc.open()
+  iframeDoc.write('<!doctype html><html><head></head><body></body></html>')
+  iframeDoc.close()
   // 将当前页面的所有样式添加到iframe中
   const styleList = document.querySelectorAll('style')
   Array.from(styleList).forEach(el => {
-    iframeDoc.write(el.outerHTML)
+    iframeDoc.head.insertAdjacentHTML('beforeend', el.outerHTML)
   })
   // 设置打印展示方式 - 纵向展示
-  iframeDoc.write('<style media="print">@page {size: portrait;}</style>')
+  iframeDoc.head.insertAdjacentHTML(
+    'beforeend',
+    '<style media="print">@page {size: portrait;}</style>'
+  )
   // 写入内容
-  iframeDoc.write('<div>' + printContent + '</div>')
+  const wrapper = iframeDoc.createElement('div')
+  wrapper.innerHTML = printContent
+  iframeDoc.body.appendChild(wrapper)
   setTimeout(function () {
     iframe.contentWindow?.print()
     document.body.removeChild(iframe)

@@ -1,4 +1,5 @@
 import { imgToDataUrl } from 'simple-mind-map/src/utils/index'
+import { parseExternalJsonSafely } from '@/utils'
 
 // 处理知犀
 const handleZHIXI = async data => {
@@ -6,7 +7,7 @@ const handleZHIXI = async data => {
     try {
       if (!Array.isArray(data)) {
         data = String(data).replace('￿﻿', '')
-        data = JSON.parse(data)
+        data = parseExternalJsonSafely(data)
       }
     } catch (error) {
       console.error('handleZHIXI parse failed', error)
@@ -79,7 +80,7 @@ const handleClipboardText = async text => {
   // 知犀数据格式1
   const parsedData = (() => {
     try {
-      return JSON.parse(text)
+      return parseExternalJsonSafely(text)
     } catch (error) {
       console.error('handleClipboardText parse failed', error)
       return undefined

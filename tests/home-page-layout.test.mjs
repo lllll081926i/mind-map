@@ -35,3 +35,10 @@ test('桌面工作台首页核心文案接入国际化', () => {
   assert.match(source, /\$t\('home\.openLocalFile'\)/)
   assert.match(source, /\$t\('home\.recentTitle'\)/)
 })
+
+test('桌面工作台首页左侧栏宽度加宽并延续编辑页扁平化面板样式', () => {
+  const source = fs.readFileSync(homePagePath, 'utf8')
+  assert.match(source, /grid-template-columns:\s*320px 1fr;/)
+  assert.match(source, /border-radius:\s*8px;/)
+  assert.match(source, /box-shadow:\s*0 2px 16px 0 rgba\(0, 0, 0, 0\.06\);/)
+})

@@ -54,7 +54,9 @@ export default {
   data() {
     return {
       formulaText: '',
-      list: []
+      list: [],
+      katexRetryTimer: null,
+      katexRetryCount: 0
     }
   },
   computed: {
@@ -68,12 +70,48 @@ export default {
       localConfig: 'localConfig'
     })
   },
+  watch: {
+    activeSidebar(value) {
+      if (value === 'formulaSidebar') {
+        this.init()
+      } else {
+        this.clearKatexRetry()
+      }
+    }
+  },
   mounted() {
     this.init()
   },
+  beforeUnmount() {
+    this.clearKatexRetry()
+  },
   methods: {
+    clearKatexRetry() {
+      if (!this.katexRetryTimer) {
+        return
+      }
+      clearTimeout(this.katexRetryTimer)
+      this.katexRetryTimer = null
+    },
+
+    scheduleKatexRetry() {
+      if (this.katexRetryCount >= 20 || this.katexRetryTimer) {
+        return
+      }
+      this.katexRetryTimer = setTimeout(() => {
+        this.katexRetryTimer = null
+        this.katexRetryCount += 1
+        this.init()
+      }, 150)
+    },
+
     init() {
-      if (!window.katex) return
+      if (!window.katex) {
+        this.scheduleKatexRetry()
+        return
+      }
+      this.clearKatexRetry()
+      this.katexRetryCount = 0
       this.list = formulaList.map(item => {
         return {
           overview: window.katex.renderToString(

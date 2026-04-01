@@ -4,10 +4,10 @@
 
 | 文件 | 行号 | 问题 | 建议 |
 |------|------|------|------|
-| `index.js` | 39 | 构造函数无运行时类型校验 | 对 `el` 和 `data` 做类型断言 |
-| `index.js` | 804-847 | `MindMap.pluginList` 是公开可变数组 | 使用 `Object.freeze()` 保护 |
-| `index.js` | 全文件 | 方法命名不一致（`delete` vs `remove`） | 统一使用 `remove` |
-| `index.js` | 456-476 | `setData` 和 `updateData` 语义混淆 | 重命名为 `replaceData`/`patchData` |
+| `index.js:39` | 构造函数无运行时类型校验 | 对 `el` 和 `data` 做类型断言 |
+| `index.js:804-847` | `MindMap.pluginList` 是公开可变数组 | 使用 `Object.freeze()` 保护 |
+| `index.js` | 方法命名不一致（`delete` vs `remove`） | 统一使用 `remove` |
+| `index.js:456-476` | `setData` 和 `updateData` 语义混淆 | 重命名为 `replaceData`/`patchData` |
 
 ---
 
@@ -51,7 +51,8 @@
 |------|------|------|
 | `MindMapNode.js:705-719` | `destroy()` 未显式调用 `group.off()` 和 `group.clear()` | 显式清理事件和子节点 |
 | `utils/index.js` | 多处模块级单例 DOM 元素在 `destroy()` 时不清理 | 提供清理机制 |
-| `Style.js:29-34` | `Style.cacheStyle` 静态属性在多实例场景下冲突 | 改为按实例缓存（WeakMap） |
+| `Style.js:29-34` | `Style.cacheStyle` 是静态属性，多实例场景下背景样式恢复会错乱 | 改为按实例缓存（WeakMap） |
+| `index.js:777-804` | `destroy()` 未清理 `this.draw`、`this.lineDraw` 等 SVG 引用 | 添加清理逻辑 |
 
 ---
 
@@ -70,7 +71,7 @@
 | 文件 | 问题 | 建议 |
 |------|------|------|
 | `Command.js:105-133` | 历史记录采用全量快照，500 条可能占用数百 MB | 实现增量/差异历史或压缩 |
-| `Command.js:95` | `remove()` 使用 `find()` 而非 `findIndex()`，删除操作失效 | 修复为 `findIndex` |
+| `Command.js:95` | `remove()` 使用 `find()` 返回元素而非索引，`splice` 删除错误位置 | 修复为 `findIndex` |
 | `Command.js:200-256` | `data_change_detail` 每次执行 O(n) 深度对比 | 使用懒计算或增量 diff |
 
 ---
@@ -79,10 +80,11 @@
 
 | 文件 | 问题 | 建议 |
 |------|------|------|
-| `utils/index.js:1621-1663` | `defenseXSS` 仅过滤 3 个属性，存在严重安全漏洞 | 使用 DOMPurify 或删除此函数 |
+| `utils/index.js:1621-1663` | `defenseXSS` 使用正则过滤 HTML，公认不安全的 XSS 防护方式 | 使用 DOMPurify 或删除此函数 |
 | `utils/index.js:281-292` | `throttle` 缺少 leading/trailing 选项 | 使用 `lodash.throttle` 或完善实现 |
 | `utils/index.js:780-784` | `isMobile()` 使用 UA 检测（不推荐） | 使用 `navigator.userAgentData` |
 | `utils/index.js:1556-1591` | 全屏 API 包含 IE 前缀检测 | 移除 IE 相关代码 |
+| `utils/index.js:47-68` | BFS 遍历中 `forEach` 内的 `return` 无法跳出外层循环 | 修复循环逻辑 |
 
 ---
 
@@ -106,6 +108,7 @@
 | 贝塞尔曲线连线 (`Base.js`) | ✅ 正确 | 二次贝塞尔控制点固定比例，大节点间可能不平滑 |
 | 鱼骨图布局 (`Fishbone.js`) | ⚠️ | 硬编码 SVG path，缩放时可能变形 |
 | 矩形碰撞检测 (`utils/index.js:944-956`) | ✅ 正确 | 边界接触不认为重叠（正确行为） |
+| View.js 方向判断 | ❌ | `CONSTANTS.DIR.UP || CONSTANTS.DIR.LEFT` 逻辑错误，左侧值永远为真 |
 
 ---
 
@@ -133,4 +136,12 @@
 | 工具函数 | 5 | XSS 防御函数有严重漏洞 |
 | 打包配置 | 4 | 缺少构建配置，类型文件缺失 |
 | 类型定义 | 1 | 完全缺失 |
-| 核心算法 | 7 | 布局算法正确，递归可能栈溢出 |
+| 核心算法 | 7 | 布局算法正确，递归可能栈溢出，View.js 方向判断有逻辑错误 |
+
+---
+
+## P0 级问题（需立即修复）
+
+1. `src/core/view/View.js:104` — `CONSTANTS.DIR.UP || CONSTANTS.DIR.LEFT` 逻辑错误
+2. `src/core/render/node/Style.js:29` — `Style.cacheStyle` 静态属性多实例错乱
+3. `src/core/command/Command.js:95` — `remove()` 使用 `find()` 而非 `findIndex()`

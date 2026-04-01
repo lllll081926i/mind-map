@@ -17,7 +17,7 @@
 
 ## 审查日期
 
-2026-04-01
+2026-04-01（第二轮审查）
 
 ## 审查范围
 
@@ -28,3 +28,10 @@
 - `tests/` 测试文件
 - 构建配置（vite.config.js, vite.lib.config.js）
 - 依赖配置（package.json, Cargo.toml）
+
+## 项目概况
+
+- **项目名称**: mind-map-app (思绪思维导图)
+- **技术栈**: Vue 3 + Pinia + Vite 8 + Tauri 2
+- **核心库**: simple-mind-map v0.14.0-fix.2（基于 SVG.js 的纯 JS 思维导图库）
+- **架构**: Monorepo（npm workspaces），包含 mind-map-app、simple-mind-map、simple-mind-map-plugin-themes 三个子包
