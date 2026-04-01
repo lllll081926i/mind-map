@@ -23,8 +23,8 @@
 
 ## 构建验证
 
-- `npm run desktop:check`
-- `npm run build:desktop-web`
+- `npm run check`
+- `npm run frontend:build`
 - `npm run build`
 - `node ./scripts/test-ai-provider.mjs`
 - Windows：`npm run desktop:build:windows`

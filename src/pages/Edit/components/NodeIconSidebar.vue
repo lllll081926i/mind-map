@@ -1,16 +1,28 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('nodeIconSidebar.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('nodeIconSidebar.title')"
+    :force-show="activeSidebar === 'nodeIconSidebar'"
+  >
     <div class="box" :class="{ isDark: isDark }">
-      <el-tabs v-model="activeName">
-        <el-tab-pane
-          :label="$t('nodeIconSidebar.icon')"
-          name="icon"
-        ></el-tab-pane>
-        <el-tab-pane
-          :label="$t('nodeIconSidebar.sticker')"
-          name="image"
-        ></el-tab-pane>
-      </el-tabs>
+      <div class="tabBox">
+        <button
+          type="button"
+          class="tabBtn"
+          :class="{ active: activeName === 'icon' }"
+          @click="activeName = 'icon'"
+        >
+          {{ $t('nodeIconSidebar.icon') }}
+        </button>
+        <button
+          type="button"
+          class="tabBtn"
+          :class="{ active: activeName === 'image' }"
+          @click="activeName = 'image'"
+        >
+          {{ $t('nodeIconSidebar.sticker') }}
+        </button>
+      </div>
       <div class="boxContent">
         <!-- 图标 -->
         <div class="iconBox" v-if="activeName === 'icon'">
@@ -56,9 +68,11 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { nodeIconList } from 'simple-mind-map/src/svg/icons'
 import { mergerIconList } from 'simple-mind-map/src/utils/index'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 export default {
   components: {
@@ -77,22 +91,26 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   watch: {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        if (val === 'nodeIconSidebar') {
-          this.ensurePanelAssetsLoaded()
-          this.$refs.sidebar.show = true
-        } else {
-          this.$refs.sidebar.show = false
-        }
+        this.$nextTick(() => {
+          if (!this.$refs.sidebar) return
+          if (val === 'nodeIconSidebar') {
+            this.ensurePanelAssetsLoaded()
+            this.$refs.sidebar.show = true
+          } else {
+            this.$refs.sidebar.show = false
+          }
+        })
       }
     }
   },
@@ -214,6 +232,29 @@ export default {
     color: #333;
   }
 
+  .tabBox {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+
+    .tabBtn {
+      border: 1px solid #dcdfe6;
+      background: #fff;
+      color: rgba(26, 26, 26, 0.88);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &.active {
+        background: #409eff;
+        border-color: #409eff;
+        color: #fff;
+      }
+    }
+  }
+
   .boxContent {
     .iconBox {
       .item {
@@ -300,6 +341,22 @@ export default {
               border: 2px solid #409eff;
             }
           }
+        }
+      }
+    }
+  }
+
+  &.isDark {
+    .tabBox {
+      .tabBtn {
+        background: #36393d;
+        border-color: hsla(0, 0%, 100%, 0.12);
+        color: hsla(0, 0%, 100%, 0.82);
+
+        &.active {
+          background: #409eff;
+          border-color: #409eff;
+          color: #fff;
         }
       }
     }

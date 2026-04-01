@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import {
   nodeRichTextToTextWithWrap,
   textToNodeRichTextWithWrap,
@@ -44,6 +44,9 @@ import {
   htmlEscape,
   handleInputPasteText
 } from 'simple-mind-map/src/utils'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setIsDragOutlineTreeNode } from '@/stores/runtime'
 
 // 大纲树
 export default {
@@ -68,9 +71,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isReadonly: state => state.isReadonly,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAppStore, {
+      isReadonly: 'isReadonly'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {
@@ -89,8 +94,6 @@ export default {
     this.$bus.$off('hide_text_edit', this.handleHideTextEdit)
   },
   methods: {
-    ...mapMutations(['setIsDragOutlineTreeNode']),
-
     handleHideTextEdit() {
       if (this.notHandleDataChange) {
         this.notHandleDataChange = false
@@ -282,11 +285,11 @@ export default {
     },
 
     onNodeDragStart() {
-      this.setIsDragOutlineTreeNode(true)
+      setIsDragOutlineTreeNode(true)
     },
 
     onNodeDragEnd() {
-      this.setIsDragOutlineTreeNode(false)
+      setIsDragOutlineTreeNode(false)
     },
 
     // 拖拽结束事件

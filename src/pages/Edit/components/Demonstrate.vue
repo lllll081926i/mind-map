@@ -28,7 +28,7 @@
       @mouseup.stop
     >
       <div class="jump" @click="prev" :class="{ disabled: curStepIndex <= 0 }">
-        <span class="icon el-icon-back"></span>
+        <span class="icon">&lt;</span>
       </div>
       <div class="step">{{ curStepIndex + 1 }} / {{ totalStep }}</div>
       <div
@@ -36,7 +36,7 @@
         @click="next"
         :class="{ disabled: curStepIndex >= totalStep - 1 }"
       >
-        <span class="icon el-icon-right"></span>
+        <span class="icon">&gt;</span>
       </div>
       <div class="input">
         <input
@@ -95,6 +95,15 @@ export default {
       this.isEnterDemonstrate = false
       this.curStepIndex = 0
       this.totalStep = 0
+      this.$nextTick(() => {
+        const el = document.querySelector('#mindMapContainer')
+        if (el && this.$refs.exitDemonstrateBtnRef?.parentNode === el) {
+          el.removeChild(this.$refs.exitDemonstrateBtnRef)
+        }
+        if (el && this.$refs.stepBoxRef?.parentNode === el) {
+          el.removeChild(this.$refs.stepBoxRef)
+        }
+      })
     },
 
     onJump(index, total) {
@@ -179,6 +188,12 @@ export default {
   .jump {
     color: #fff;
     cursor: pointer;
+
+    .icon {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+    }
 
     &.disabled {
       cursor: not-allowed;

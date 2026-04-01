@@ -6,7 +6,9 @@
       :content="$t('scale.zoomOut')"
       placement="top"
     >
-      <div class="btn el-icon-minus" @click="narrow"></div>
+      <div class="btn" @click="narrow">
+        <span class="btnLabel">-</span>
+      </div>
     </el-tooltip>
     <div class="scaleInfo">
       <input
@@ -26,7 +28,9 @@
       :content="$t('scale.zoomIn')"
       placement="top"
     >
-      <div class="btn el-icon-plus" @click="enlarge"></div>
+      <div class="btn" @click="enlarge">
+        <span class="btnLabel">+</span>
+      </div>
     </el-tooltip>
   </div>
 </template>
@@ -58,8 +62,10 @@ export default {
     }
   },
   beforeUnmount() {
-    this.mindMap.off('scale', this.onScale)
-    this.mindMap.off('draw_click', this.onDrawClick)
+    if (this.mindMap) {
+      this.mindMap.off('scale', this.onScale)
+      this.mindMap.off('draw_click', this.onDrawClick)
+    }
   },
   methods: {
     // 转换成百分数
@@ -114,6 +120,7 @@ export default {
 .scaleContainer {
   display: flex;
   align-items: center;
+  gap: 12px;
 
   &.isDark {
     .btn {
@@ -131,10 +138,15 @@ export default {
 
   .btn {
     cursor: pointer;
+
+    .btnLabel {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+    }
   }
 
   .scaleInfo {
-    margin: 0 20px;
     display: flex;
     align-items: center;
 

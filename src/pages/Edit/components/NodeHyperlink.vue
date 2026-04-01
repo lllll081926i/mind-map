@@ -11,7 +11,7 @@
       <span class="name">{{ $t('nodeHyperlink.link') }}</span>
       <el-input
         v-model="link"
-        size="mini"
+        size="small"
         placeholder="http://xxxx.com/"
         @keyup.stop
         @keydown.stop
@@ -19,9 +19,9 @@
       >
         <template #prepend>
           <el-select v-model="protocol" style="width: 80px;">
-            <el-option label="https" value="https"></el-option>
-            <el-option label="http" value="http"></el-option>
-            <el-option label="无" value="none"></el-option>
+            <el-option label="https" value="https" />
+            <el-option label="http" value="http" />
+            <el-option label="无" value="none" />
           </el-select>
         </template>
       </el-input>
@@ -30,7 +30,7 @@
       <span class="name">{{ $t('nodeHyperlink.name') }}</span>
       <el-input
         v-model="linkTitle"
-        size="mini"
+        size="small"
         @keyup.stop
         @keydown.stop
       ></el-input>
@@ -48,8 +48,9 @@
 
 <script>
 import { isMobile } from 'simple-mind-map/src/utils/index'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { onShowNodeLink } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
 
 // 节点超链接内容设置
 export default {
@@ -64,8 +65,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {
@@ -77,6 +78,11 @@ export default {
     this.removeShowNodeLinkListener && this.removeShowNodeLinkListener()
   },
   methods: {
+    async openDialog(payload = {}) {
+      await this.$nextTick()
+      this.handleShowNodeLink(payload)
+    },
+
     syncLinkInfoFromActiveNodes() {
       if (this.activeNodes.length > 0) {
         let firstNode = this.activeNodes[0]

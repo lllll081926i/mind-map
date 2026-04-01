@@ -27,15 +27,7 @@ const syncThemeFromLocalConfig = () => {
   themeStore.syncFromLocalConfig(settingsStore.localConfig)
 }
 
-export const getRuntimeStores = () => ({
-  appStore,
-  editorStore,
-  settingsStore,
-  themeStore,
-  aiStore
-})
-
-export const applyLocalConfigPatch = data => {
+const applyCompositeConfig = (data, persist = true) => {
   const nextLocalConfig = {
     ...settingsStore.localConfig
   }
@@ -55,7 +47,47 @@ export const applyLocalConfigPatch = data => {
   if (!settingsStore.localConfig.enableAi && appStore.activeSidebar === 'ai') {
     appStore.setActiveSidebar('')
   }
-  persistCompositeConfig()
+  if (persist) {
+    persistCompositeConfig()
+  }
+}
+
+export const getRuntimeStores = () => ({
+  appStore,
+  editorStore,
+  settingsStore,
+  themeStore,
+  aiStore
+})
+
+export const applyLocalConfigPatch = data => {
+  applyCompositeConfig(data, true)
+}
+
+export const syncRuntimeFromBootstrapState = state => {
+  if (!state || typeof state !== 'object') {
+    return getRuntimeStores()
+  }
+  applyCompositeConfig(
+    {
+      ...(state.localConfig || {}),
+      ...(state.aiConfig || {})
+    },
+    false
+  )
+  setRecentFiles(state.recentFiles || [])
+  if (state.currentDocument && state.currentDocument.path) {
+    syncEditorFileSession({
+      path: state.currentDocument.path,
+      name: state.currentDocument.name || ''
+    })
+  } else {
+    syncEditorFileSession({
+      path: '',
+      name: ''
+    })
+  }
+  return getRuntimeStores()
 }
 
 export const setActiveSidebar = value => {

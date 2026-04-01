@@ -2,6 +2,7 @@ const path = require('path')
 const pkg = require('./package.json')
 const { defineConfig } = require('vite')
 const vue = require('@vitejs/plugin-vue')
+const utilShimPath = path.resolve(__dirname, 'src/shims/browserUtil.js')
 
 const isPathMatch = (id, keyword) => {
   return id.includes(`/${keyword}/`) || id.includes(`\\${keyword}\\`)
@@ -12,7 +13,6 @@ const createManualChunks = id => {
     if (
       isPathMatch(id, 'vue') ||
       isPathMatch(id, 'vue-router') ||
-      isPathMatch(id, 'vuex') ||
       isPathMatch(id, 'vue-i18n') ||
       isPathMatch(id, 'pinia') ||
       isPathMatch(id, 'element-plus')
@@ -59,7 +59,6 @@ const createManualChunks = id => {
 
 module.exports = defineConfig(({ command, mode }) => {
   const isBuild = command === 'build'
-  const isDesktopBuild = mode === 'desktop'
   const defaultReleaseUrl = 'https://github.com/lllll081926i/mind-map/releases'
   const defaultUpdateManifestUrl =
     'https://github.com/lllll081926i/mind-map/releases/latest/download/latest.json'
@@ -69,31 +68,23 @@ module.exports = defineConfig(({ command, mode }) => {
 
   return {
     plugins: [
-      vue({
-        template: {
-          compilerOptions: {
-            compatConfig: {
-              MODE: 2
-            }
-          }
-        }
-      })
+      vue()
     ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
-        vue: '@vue/compat',
         buffer: require.resolve('buffer/'),
         events: require.resolve('events/'),
         punycode: require.resolve('punycode/'),
-        stream: require.resolve('stream-browserify')
+        stream: require.resolve('stream-browserify'),
+        util: utilShimPath
       }
     },
     define: {
       global: 'globalThis',
       __APP_VERSION__: JSON.stringify(pkg.version),
       __APP_PLATFORM__: JSON.stringify(process.platform),
-      __APP_RUNTIME__: JSON.stringify(isDesktopBuild ? 'desktop' : 'web'),
+      __APP_RUNTIME__: JSON.stringify('desktop'),
       __APP_RELEASE_URL__: JSON.stringify(releaseUrl),
       __APP_UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl),
       __VUE_OPTIONS_API__: true,
@@ -112,7 +103,7 @@ module.exports = defineConfig(({ command, mode }) => {
       }
     },
     build: {
-      outDir: isDesktopBuild ? 'dist-desktop' : '../dist',
+      outDir: 'dist-desktop',
       emptyOutDir: true,
       chunkSizeWarningLimit: 4000,
       rollupOptions: {

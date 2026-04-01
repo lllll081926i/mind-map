@@ -1,10 +1,10 @@
 import { desktopPlatform } from './desktop'
-import { webPlatform } from './web'
-import { isDesktopRuntime } from './runtime'
+import { isDesktopRuntime } from './runtime.mjs'
 import {
   createDefaultBootstrapState,
-  normalizeBootstrapState,
-  readLegacyLocalStorageSnapshot
+  normalizeBootstrapDocumentState,
+  normalizeBootstrapMetaState,
+  normalizeBootstrapState
 } from './shared/configMigration'
 import { upsertRecentFile } from './shared/recentFiles'
 import {
@@ -18,9 +18,102 @@ import {
   updateCurrentFileRef
 } from '@/services/documentSession'
 
-const platform = isDesktopRuntime() ? desktopPlatform : webPlatform
+const getPlatform = () => {
+  return desktopPlatform
+}
 
 let bootstrapState = createDefaultBootstrapState()
+let bootstrapMetaPromise = null
+let bootstrapDocumentPromise = null
+let metaWriteQueue = Promise.resolve()
+let documentWriteQueue = Promise.resolve()
+let metaMutationVersion = 0
+let documentMutationVersion = 0
+
+const BOOTSTRAP_META_KEYS = [
+  'version',
+  'localConfig',
+  'aiConfig',
+  'recentFiles',
+  'lastDirectory',
+  'currentDocument'
+]
+
+const BOOTSTRAP_DOCUMENT_KEYS = ['version', 'mindMapData', 'mindMapConfig']
+
+const bumpMetaMutationVersion = () => {
+  metaMutationVersion += 1
+  return metaMutationVersion
+}
+
+const bumpDocumentMutationVersion = () => {
+  documentMutationVersion += 1
+  return documentMutationVersion
+}
+
+const pickState = (state, keys) => {
+  return keys.reduce((acc, key) => {
+    acc[key] = state[key]
+    return acc
+  }, {})
+}
+
+const applyBootstrapMetaState = (input, options = {}) => {
+  const nextMetaState = normalizeBootstrapMetaState(input)
+  const preserveCurrentMeta =
+    typeof options.startVersion === 'number' &&
+    options.startVersion !== metaMutationVersion
+  bootstrapState = normalizeBootstrapState({
+    ...bootstrapState,
+    ...(preserveCurrentMeta
+      ? pickState(bootstrapState, BOOTSTRAP_META_KEYS)
+      : nextMetaState)
+  })
+  hydrateDocumentSession()
+  return bootstrapState
+}
+
+const applyBootstrapDocumentState = (input, options = {}) => {
+  const nextDocumentState = normalizeBootstrapDocumentState(input)
+  const preserveCurrentDocument =
+    typeof options.startVersion === 'number' &&
+    options.startVersion !== documentMutationVersion
+  bootstrapState = normalizeBootstrapState({
+    ...bootstrapState,
+    ...(preserveCurrentDocument
+      ? pickState(bootstrapState, BOOTSTRAP_DOCUMENT_KEYS)
+      : nextDocumentState)
+  })
+  return bootstrapState
+}
+
+const queueMetaWrite = snapshot => {
+  if (!isDesktopRuntime()) {
+    return Promise.resolve(snapshot)
+  }
+  const platform = getPlatform()
+  metaWriteQueue = metaWriteQueue
+    .catch(() => undefined)
+    .then(async () => {
+      await platform.writeBootstrapMetaState(snapshot)
+      return snapshot
+    })
+  return metaWriteQueue
+}
+
+const queueDocumentWrite = snapshot => {
+  if (!isDesktopRuntime()) {
+    return Promise.resolve(snapshot)
+  }
+  const platform = getPlatform()
+  documentWriteQueue = documentWriteQueue
+    .catch(() => undefined)
+    .then(async () => {
+      await platform.writeBootstrapDocumentState(snapshot)
+      return snapshot
+    })
+  return documentWriteQueue
+}
 
 export const bootstrapPlatformState = async () => {
   if (!isDesktopRuntime()) {
@@ -28,40 +121,125 @@ export const bootstrapPlatformState = async () => {
     hydrateDocumentSession()
     return bootstrapState
   }
-  const storedState = await platform.readBootstrapState()
-  if (!storedState || !storedState.mindMapData) {
-    bootstrapState = readLegacyLocalStorageSnapshot()
-    await platform.writeBootstrapState(bootstrapState)
+  if (!bootstrapMetaPromise) {
+    const startVersion = metaMutationVersion
+    bootstrapMetaPromise = (async () => {
+      try {
+        const platform = getPlatform()
+        const storedState = await platform.readBootstrapMetaState()
+        return applyBootstrapMetaState(storedState, {
+          startVersion
+        })
+      } catch (error) {
+        console.error(
+          'bootstrapPlatformState failed, fallback to defaults',
+          error
+        )
+        return applyBootstrapMetaState(createDefaultBootstrapState(), {
+          startVersion
+        })
+      }
+    })()
+  }
+  return bootstrapMetaPromise
+}
+
+export const ensureBootstrapDocumentState = async () => {
+  if (!isDesktopRuntime()) {
     return bootstrapState
   }
-  bootstrapState = normalizeBootstrapState(storedState)
-  hydrateDocumentSession()
-  return bootstrapState
+  if (!bootstrapDocumentPromise) {
+    const startVersion = documentMutationVersion
+    bootstrapDocumentPromise = (async () => {
+      try {
+        const platform = getPlatform()
+        const storedState = await platform.readBootstrapDocumentState()
+        return applyBootstrapDocumentState(storedState, {
+          startVersion
+        })
+      } catch (error) {
+        console.error(
+          'ensureBootstrapDocumentState failed, fallback to defaults',
+          error
+        )
+        return applyBootstrapDocumentState(createDefaultBootstrapState(), {
+          startVersion
+        })
+      }
+    })()
+  }
+  return bootstrapDocumentPromise
 }
 
 export const getBootstrapState = () => bootstrapState
 
-export const saveBootstrapStatePatch = patch => {
-  if (!isDesktopRuntime()) return
+export const saveBootstrapStatePatch = async patch => {
   bootstrapState = normalizeBootstrapState({
     ...bootstrapState,
     ...patch
   })
-  return platform.writeBootstrapState(bootstrapState)
+  const hasMetaPatch = BOOTSTRAP_META_KEYS.some(key => key in (patch || {}))
+  const hasDocumentPatch = BOOTSTRAP_DOCUMENT_KEYS.some(
+    key => key in (patch || {})
+  )
+  if (hasMetaPatch) {
+    bumpMetaMutationVersion()
+  }
+  if (hasDocumentPatch) {
+    bumpDocumentMutationVersion()
+  }
+  if (hasMetaPatch) {
+    hydrateDocumentSession()
+  }
+  if (!isDesktopRuntime()) {
+    return bootstrapState
+  }
+  const tasks = []
+  if (hasMetaPatch) {
+    bootstrapMetaPromise = Promise.resolve(bootstrapState)
+    tasks.push(queueMetaWrite(pickState(bootstrapState, BOOTSTRAP_META_KEYS)))
+  }
+  if (hasDocumentPatch) {
+    bootstrapDocumentPromise = Promise.resolve(bootstrapState)
+    tasks.push(
+      queueDocumentWrite(pickState(bootstrapState, BOOTSTRAP_DOCUMENT_KEYS))
+    )
+  }
+  await Promise.all(tasks)
+  return bootstrapState
 }
 
 export const recordRecentFile = async fileRef => {
-  if (!isDesktopRuntime() || !fileRef || !fileRef.path) return
-  const nextState = await platform.recordRecentFile(fileRef)
-  if (nextState) {
-    bootstrapState = normalizeBootstrapState(nextState)
+  if (!fileRef || !fileRef.path) return bootstrapState
+  bumpMetaMutationVersion()
+  if (!isDesktopRuntime()) {
+    bootstrapState = normalizeBootstrapState({
+      ...bootstrapState,
+      recentFiles: upsertRecentFile(bootstrapState.recentFiles, fileRef)
+    })
     return bootstrapState
   }
-  bootstrapState = normalizeBootstrapState({
+  const platform = getPlatform()
+  const nextState = await platform.recordRecentFile(fileRef)
+  if (nextState) {
+    bootstrapState = {
+      ...bootstrapState,
+      ...normalizeBootstrapMetaState(nextState)
+    }
+    bootstrapMetaPromise = Promise.resolve(bootstrapState)
+    hydrateDocumentSession()
+    return bootstrapState
+  }
+  bootstrapState = {
     ...bootstrapState,
-    recentFiles: upsertRecentFile(bootstrapState.recentFiles, fileRef)
-  })
-  await platform.writeBootstrapState(bootstrapState)
+    ...normalizeBootstrapMetaState({
+      ...bootstrapState,
+      recentFiles: upsertRecentFile(bootstrapState.recentFiles, fileRef)
+    })
+  }
+  bootstrapMetaPromise = Promise.resolve(bootstrapState)
+  hydrateDocumentSession()
+  await queueMetaWrite(pickState(bootstrapState, BOOTSTRAP_META_KEYS))
   return bootstrapState
 }
 
@@ -82,7 +260,62 @@ export {
 export const isDesktopApp = () => isDesktopRuntime()
 
 export const openExternalUrl = url => {
+  const platform = getPlatform()
   return platform.openExternalUrl(url)
 }
 
-export default platform
+const platformAdapter = {
+  readBootstrapState(...args) {
+    return getPlatform().readBootstrapState(...args)
+  },
+  readBootstrapMetaState(...args) {
+    return getPlatform().readBootstrapMetaState(...args)
+  },
+  readBootstrapDocumentState(...args) {
+    return getPlatform().readBootstrapDocumentState(...args)
+  },
+  writeBootstrapState(...args) {
+    return getPlatform().writeBootstrapState(...args)
+  },
+  writeBootstrapMetaState(...args) {
+    return getPlatform().writeBootstrapMetaState(...args)
+  },
+  writeBootstrapDocumentState(...args) {
+    return getPlatform().writeBootstrapDocumentState(...args)
+  },
+  openMindMapFile(...args) {
+    return getPlatform().openMindMapFile(...args)
+  },
+  saveMindMapFileAs(...args) {
+    return getPlatform().saveMindMapFileAs(...args)
+  },
+  readMindMapFile(...args) {
+    return getPlatform().readMindMapFile(...args)
+  },
+  writeMindMapFile(...args) {
+    return getPlatform().writeMindMapFile(...args)
+  },
+  pickDirectory(...args) {
+    return getPlatform().pickDirectory(...args)
+  },
+  listDirectoryEntries(...args) {
+    return getPlatform().listDirectoryEntries(...args)
+  },
+  recordRecentFile(...args) {
+    return getPlatform().recordRecentFile(...args)
+  },
+  openExternalUrl(...args) {
+    return getPlatform().openExternalUrl(...args)
+  },
+  startAiProxyRequest(...args) {
+    return getPlatform().startAiProxyRequest(...args)
+  },
+  stopAiProxyRequest(...args) {
+    return getPlatform().stopAiProxyRequest(...args)
+  },
+  listen(...args) {
+    return getPlatform().listen(...args)
+  }
+}
+
+export default platformAdapter

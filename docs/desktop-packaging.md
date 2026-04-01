@@ -15,19 +15,19 @@
 ### 开发
 
 ```bash
-npm run desktop:dev
+npm run dev
 ```
 
 ### 检查 Rust 编译
 
 ```bash
-npm run desktop:check
+npm run check
 ```
 
 ### 生成桌面前端产物
 
 ```bash
-npm run build:desktop-web
+npm run frontend:build
 ```
 
 ### 构建安装包
@@ -55,15 +55,16 @@ npm run desktop:build:linux
 - 初始窗口：
   - `1440 x 900`
   - 最小 `1100 x 720`
-- 前端打包前置命令：`npm run build:desktop-web`
+- 前端开发前置命令：`npm run frontend:dev`
+- 前端打包前置命令：`npm run frontend:build`
 - 默认 `desktop:build` 仅在 Windows 上构建 `NSIS`
   - 这样不会触发 WiX / MSI 下载链路
   - macOS 和 Linux 通过各自脚本在对应宿主机构建
 
 ## 打包前检查
 
-- `npm run desktop:check`
-- `npm run build:desktop-web`
+- `npm run check`
+- `npm run frontend:build`
 - `npm run build`
 - `node ./scripts/test-ai-provider.mjs`
 

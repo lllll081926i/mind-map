@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('strusture.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('strusture.title')"
+    :force-show="activeSidebar === 'structure'"
+  >
     <div class="layoutGroupList" :class="{ isDark: isDark }">
       <div
         class="laytouGroup"
@@ -26,9 +30,11 @@
 <script>
 import Sidebar from './Sidebar.vue'
 import { storeData } from '@/api'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { layoutImgMap } from '@/config/constant.js'
 import { layoutGroupList } from '@/config'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 // 结构
 export default {
@@ -47,9 +53,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
 
     layoutGroupList() {

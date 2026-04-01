@@ -6,14 +6,18 @@ mod services;
 use services::ai::AiRequestRegistry;
 
 fn main() {
-  tauri::Builder::default()
+  let result = tauri::Builder::default()
     .manage(AiRequestRegistry::default())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       commands::config::read_bootstrap_state,
+      commands::config::read_bootstrap_meta_state,
+      commands::config::read_bootstrap_document_state,
       commands::config::write_bootstrap_state,
+      commands::config::write_bootstrap_meta_state,
+      commands::config::write_bootstrap_document_state,
       commands::config::record_recent_file,
       commands::config::open_external_url,
       commands::fs::read_text_file,
@@ -22,6 +26,10 @@ fn main() {
       commands::ai::start_ai_proxy_request,
       commands::ai::stop_ai_proxy_request
     ])
-    .run(tauri::generate_context!())
-    .expect("failed to run tauri application");
+    .run(tauri::generate_context!());
+
+  if let Err(error) = result {
+    eprintln!("Tauri application error: {}", error);
+    std::process::exit(1);
+  }
 }

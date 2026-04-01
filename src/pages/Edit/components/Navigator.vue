@@ -30,7 +30,8 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 export default {
   props: {
@@ -60,8 +61,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   mounted() {

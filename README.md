@@ -74,11 +74,11 @@
 │  ├─ pages/            页面与编辑器模块
 │  ├─ services/         AI、配置、事件等服务
 │  ├─ stores/           应用状态
-│  ├─ platform/         Web / Desktop 平台适配层
+│  ├─ platform/         桌面平台适配层
 │  └─ utils/            通用工具与 AI 配置逻辑
 ├─ src-tauri/           Tauri 桌面端工程
 ├─ simple-mind-map/     本地思维导图库依赖
-├─ scripts/             构建、复制、AI 代理等脚本
+├─ scripts/             构建、AI 代理等脚本
 ├─ docs/                迁移、发布、路线规划文档
 └─ .github/workflows/   自动打包与发布流程
 ```
@@ -108,29 +108,31 @@ cargo -V
 npm ci
 ```
 
-### 2. 启动 Web 开发模式
+### 2. 启动桌面开发模式
 
 ```bash
 npm run dev
 ```
 
-### 3. 启动桌面开发模式
+### 3. 检查桌面端 Rust 编译
 
 ```bash
-npm run desktop:dev
+npm run check
 ```
 
-### 4. 构建前端
+### 4. 桌面构建
 
 ```bash
 npm run build
 ```
 
-### 5. 检查桌面端 Rust 编译
+### 5. 如需单独验证桌面前端构建
 
 ```bash
-npm run desktop:check
+npm run frontend:build
 ```
+
+说明：`frontend:*` 命令仅供 `Tauri` 前置构建和排查使用，不作为正式开发入口。
 
 ## AI 使用说明
 
@@ -175,17 +177,17 @@ npm run ai:serve -- --port=4567
 ## 常用命令
 
 ```bash
-# Web 开发
+# 桌面开发
 npm run dev
 
-# Web 构建
+# 桌面构建
 npm run build
 
-# 桌面开发
-npm run desktop:dev
-
 # 桌面后端检查
-npm run desktop:check
+npm run check
+
+# 单独构建桌面前端资源
+npm run frontend:build
 
 # Windows 打包
 npm run desktop:build:windows

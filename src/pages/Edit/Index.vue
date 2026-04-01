@@ -11,14 +11,14 @@
 </template>
 
 <script>
-import Toolbar from './components/Toolbar.vue'
-import Edit from './components/Edit.vue'
-import { getLocalConfig } from '@/api'
+import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
-import { applyLocalConfigPatch } from '@/stores/runtime'
+
+const Toolbar = defineAsyncComponent(() => import('./components/Toolbar.vue'))
+const Edit = defineAsyncComponent(() => import('./components/Edit.vue'))
 
 export default {
   components: {
@@ -49,28 +49,11 @@ export default {
       this.setBodyDark()
     }
   },
-  async created() {
-    this.initLocalConfig()
-    const loading = this.$loading({
-      lock: true,
-      text: this.$t('other.loading')
-    })
+  created() {
     this.show = true
-    loading.close()
     this.setBodyDark()
   },
   methods: {
-    // 初始化本地配置
-    initLocalConfig() {
-      let config = getLocalConfig()
-      if (config) {
-        applyLocalConfigPatch({
-          ...this.localConfig,
-          ...config
-        })
-      }
-    },
-
     setBodyDark() {
       this.isDark
         ? document.body.classList.add('isDark')
@@ -85,6 +68,58 @@ export default {
 }
 
 body {
+  .el-select__wrapper {
+    background-color: #fff;
+    color: rgba(26, 26, 26, 0.9);
+    box-shadow: 0 0 0 1px #dcdfe6 inset;
+  }
+
+  .el-select__selection,
+  .el-select__selected-item,
+  .el-select__placeholder,
+  .el-select__input,
+  .el-select__caret,
+  .el-select__prefix,
+  .el-select__suffix,
+  .el-select-dropdown__item {
+    color: rgba(26, 26, 26, 0.9);
+  }
+
+  .el-select__placeholder.is-transparent {
+    color: #909399;
+  }
+
+  .el-select-dropdown__item.is-hovering,
+  .el-select-dropdown__item.hover,
+  .el-select-dropdown__item:hover {
+    background-color: #f5f7fa;
+  }
+
+  .el-select-dropdown__item.is-selected,
+  .el-select-dropdown__item.selected {
+    color: #409eff;
+    font-weight: 600;
+  }
+
+  .el-select__popper.el-popper {
+    background-color: #fff;
+    border-color: #dcdfe6;
+  }
+
+  .el-color-picker__trigger {
+    background-color: #fff;
+    border-color: #dcdfe6;
+  }
+
+  .el-color-picker__color {
+    border-color: rgba(26, 26, 26, 0.18);
+  }
+
+  .el-select-dropdown,
+  .el-popper {
+    z-index: 2000 !important;
+  }
+
   &.isDark {
     /* el-button */
     .el-button {
@@ -117,18 +152,41 @@ body {
     }
 
     /* el-select */
+    .el-select__wrapper {
+      background-color: #36393d;
+      color: hsla(0, 0%, 100%, 0.9);
+      box-shadow: 0 0 0 1px hsla(0, 0%, 100%, 0.1) inset;
+    }
+
+    .el-select__selection,
+    .el-select__selected-item,
+    .el-select__placeholder,
+    .el-select__input,
+    .el-select__caret,
+    .el-select__prefix,
+    .el-select__suffix {
+      color: hsla(0, 0%, 100%, 0.9);
+    }
+
+    .el-select__placeholder.is-transparent {
+      color: hsla(0, 0%, 100%, 0.45);
+    }
+
+    .el-select__popper.el-popper,
     .el-select-dropdown {
       background-color: #36393d;
       border-color: hsla(0, 0%, 100%, 0.1);
 
       .el-select-dropdown__item {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: hsla(0, 0%, 100%, 0.78);
       }
 
+      .el-select-dropdown__item.is-selected,
       .el-select-dropdown__item.selected {
         color: #409eff;
       }
 
+      .el-select-dropdown__item.is-hovering,
       .el-select-dropdown__item.hover,
       .el-select-dropdown__item:hover {
         background-color: hsla(0, 0%, 100%, 0.05);
@@ -137,6 +195,19 @@ body {
 
     .el-select .el-input.is-disabled .el-input__inner:hover {
       border-color: hsla(0, 0%, 100%, 0.1);
+    }
+
+    .el-color-picker__trigger {
+      background-color: #36393d;
+      border-color: hsla(0, 0%, 100%, 0.12);
+    }
+
+    .el-color-picker__color {
+      border-color: hsla(0, 0%, 100%, 0.2);
+    }
+
+    .el-color-picker .el-color-picker__empty {
+      color: hsla(0, 0%, 100%, 0.72);
     }
 
     /* el-popper*/

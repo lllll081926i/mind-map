@@ -6,6 +6,7 @@
     v-model="dialogVisible"
     :width="isMobile ? '90%' : '50%'"
     :top="isMobile ? '20px' : '15vh'"
+    @opened="handleDialogOpened"
   >
     <!-- <el-input
       type="textarea"
@@ -29,8 +30,9 @@
 
 <script>
 import { isMobile } from 'simple-mind-map/src/utils/index'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { onShowNodeNote } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
 
 let noteEditorLoader = null
 
@@ -58,8 +60,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   watch: {
@@ -78,6 +80,11 @@ export default {
     this.removeShowNodeNoteListener && this.removeShowNodeNoteListener()
   },
   methods: {
+    async openDialog(payload = {}) {
+      await this.$nextTick()
+      return this.handleShowNodeNote(payload)
+    },
+
     handleNodeActive(...args) {
       this.activeNodes = [...(args[1] || [])]
       this.updateNoteInfo()
@@ -102,9 +109,10 @@ export default {
         this.updateNoteInfo()
       }
       this.dialogVisible = true
-      this.$nextTick(async () => {
-        await this.initEditor()
-      })
+    },
+
+    async handleDialogOpened() {
+      await this.initEditor()
     },
 
     async initEditor() {

@@ -5,6 +5,19 @@ use tauri::Emitter;
 use tokio::sync::Mutex;
 
 const DEFAULT_TIMEOUT: u64 = 300_000;
+const MAX_TIMEOUT: u64 = 600_000;
+const ALLOWED_AI_DOMAINS: &[&str] = &[
+  "api.openai.com",
+  "ark.cn-beijing.volces.com",
+  "dashscope.aliyuncs.com",
+  "api.deepseek.com",
+  "api.moonshot.cn",
+  "api.qwen.ai",
+  "api.siliconflow.cn",
+  "api.anthropic.com",
+  "api.groq.com",
+  "openrouter.ai",
+];
 
 #[derive(Default)]
 pub struct AiRequestRegistry {
@@ -114,25 +127,52 @@ pub async fn start_proxy_request(
     let request_id_for_task = request_id.clone();
     let app_handle_for_error = app_handle.clone();
     let future = async move {
+      let timeout_ms = std::cmp::min(
+        request.timeout.unwrap_or(DEFAULT_TIMEOUT),
+        MAX_TIMEOUT,
+      );
       let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(
-          request.timeout.unwrap_or(DEFAULT_TIMEOUT),
-        ))
+        .timeout(std::time::Duration::from_millis(timeout_ms))
         .build()
         .map_err(|error| error.to_string())?;
 
-      let method = request
-        .method
-        .as_deref()
-        .unwrap_or("POST")
+      let method_str = request.method.as_deref().unwrap_or("POST");
+      if method_str != "POST" {
+        return Err("仅支持 POST 方法".into());
+      }
+      let method = method_str
         .parse::<reqwest::Method>()
         .map_err(|error| error.to_string())?;
 
-      let mut req_builder = client.request(method, &request.api);
-      if let Some(headers) = &request.headers {
-        for (key, value) in headers {
-          req_builder = req_builder.header(key, value);
-        }
+      let url = reqwest::Url::parse(&request.api)
+        .map_err(|e| format!("无效的 URL: {}", e))?;
+      if url.scheme() != "https" {
+        return Err("仅支持 HTTPS 协议".into());
+      }
+      let host = url.host_str().unwrap_or("");
+      let is_allowed = ALLOWED_AI_DOMAINS.iter().any(|domain| {
+        host == *domain || host.ends_with(&format!(".{}", domain))
+      });
+      if !is_allowed {
+        return Err("不支持的 API 域名".into());
+      }
+
+      let safe_headers: HashMap<String, String> = request
+        .headers
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(k, _)| {
+          let kl = k.to_lowercase();
+          kl == "content-type"
+            || kl == "authorization"
+            || kl == "x-api-key"
+            || kl.starts_with("x-")
+        })
+        .collect();
+
+      let mut req_builder = client.request(method, url);
+      for (key, value) in &safe_headers {
+        req_builder = req_builder.header(key, value);
       }
       let response = req_builder
         .json(&request.data)

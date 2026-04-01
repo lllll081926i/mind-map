@@ -6,7 +6,6 @@
     v-model="dialogVisible"
     v-loading.fullscreen.lock="loading"
     :element-loading-text="loadingText"
-    element-loading-spinner="el-icon-loading"
     element-loading-background="rgba(0, 0, 0, 0.8)"
     :width="isMobile ? '90%' : '800px'"
     :top="isMobile ? '20px' : '15vh'"
@@ -27,7 +26,7 @@
           >
             <div class="typeIcon" :class="[item.type]"></div>
             <div class="name">{{ item.name }}</div>
-            <div class="icon checked el-icon-check"></div>
+            <div class="icon checked">OK</div>
           </div>
         </div>
         <!-- 类型内容 -->
@@ -39,11 +38,13 @@
               <el-input
                 style="max-width: 250px"
                 v-model="fileName"
-                size="mini"
+                size="small"
                 @keydown.stop
               ></el-input>
             </div>
-            <span class="closeBtn el-icon-close" @click="cancel"></span>
+            <button class="closeBtn" type="button" @click="cancel">
+              <span class="iconfont iconguanbi"></span>
+            </button>
           </div>
           <!-- 配置 -->
           <div class="contentBox customScrollbar">
@@ -78,7 +79,7 @@
                   <div class="valueSubItem" v-if="['png'].includes(exportType)">
                     <span class="name">{{ $t('export.format') }}</span>
                     <el-radio-group v-model="imageFormat">
-                      <el-radio label="png">PNG</el-radio>
+                      <el-radio value="png">PNG</el-radio>
                     </el-radio-group>
                   </div>
                   <div class="valueSubItem">
@@ -86,7 +87,7 @@
                     <el-input
                       style="width: 200px"
                       v-model="paddingX"
-                      size="mini"
+                      size="small"
                       @change="onPaddingChange"
                       @keydown.stop
                     ></el-input>
@@ -96,7 +97,7 @@
                     <el-input
                       style="width: 200px"
                       v-model="paddingY"
-                      size="mini"
+                      size="small"
                       @change="onPaddingChange"
                       @keydown.stop
                     ></el-input>
@@ -108,7 +109,7 @@
                     <el-input
                       style="width: 200px"
                       v-model="extraText"
-                      size="mini"
+                      size="small"
                       :placeholder="$t('export.addFooterTextPlaceholder')"
                       @keydown.stop
                     ></el-input>
@@ -145,10 +146,12 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import { downTypeList } from '@/config'
 import { isMobile } from 'simple-mind-map/src/utils/index'
 import { onShowExport } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
+import { setExtraTextOnExport } from '@/stores/runtime'
 
 // 导出
 export default {
@@ -170,9 +173,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      openNodeRichText: state => state.localConfig.openNodeRichText,
-      isDark: state => state.localConfig.isDark,
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
 
     downTypeList() {
@@ -211,10 +213,13 @@ export default {
     this.removeShowExportListener && this.removeShowExportListener()
   },
   methods: {
-    ...mapMutations(['setExtraTextOnExport']),
+    async openDialog() {
+      await this.$nextTick()
+      this.dialogVisible = true
+    },
 
     handleShowExport() {
-      this.dialogVisible = true
+      this.openDialog()
     },
 
     onPaddingChange() {
@@ -229,7 +234,7 @@ export default {
     },
 
     confirm() {
-      this.setExtraTextOnExport(this.extraText)
+      setExtraTextOnExport(this.extraText)
       if (this.exportType === 'svg') {
         this.$bus.$emit(
           'export',
@@ -345,12 +350,43 @@ export default {
 
 .nodeExportDialog {
   &.isDark {
+    :deep(.el-dialog) {
+      background-color: #262a2e;
+    }
+
     :deep(.el-dialog__body) {
       .el-checkbox {
         .el-checkbox__label {
           color: hsla(0, 0%, 100%, 0.6);
         }
       }
+    }
+
+    :deep(.el-input__wrapper) {
+      background-color: #1f2327;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+    }
+
+    :deep(.el-input__inner),
+    :deep(.el-input__inner::placeholder) {
+      color: hsla(0, 0%, 100%, 0.9);
+    }
+
+    :deep(.el-radio__label) {
+      color: hsla(0, 0%, 100%, 0.72);
+    }
+
+    :deep(.el-button:not(.el-button--primary)) {
+      background-color: #2f3539;
+      border-color: rgba(255, 255, 255, 0.12);
+      color: hsla(0, 0%, 100%, 0.85);
+    }
+
+    :deep(.el-button:not(.el-button--primary):hover),
+    :deep(.el-button:not(.el-button--primary):focus) {
+      background-color: #3a4146;
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
     }
   }
 
@@ -491,9 +527,10 @@ export default {
 
             &.checked {
               color: #409eff;
-              font-size: 20px;
+              font-size: 12px;
               margin-left: auto;
               display: none;
+              letter-spacing: 0.5px;
             }
           }
 
@@ -590,8 +627,21 @@ export default {
           }
 
           .closeBtn {
-            font-size: 20px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            color: inherit;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+
+            .iconfont {
+              font-size: 14px;
+              line-height: 1;
+            }
           }
         }
 

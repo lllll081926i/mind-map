@@ -194,8 +194,10 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import { emitAiCreateAll } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 export default {
   props: {
@@ -222,8 +224,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
     hasRoot() {
       return (
@@ -261,8 +263,6 @@ export default {
     this.$bus.$off('painter_end', this.onPainterEnd)
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     // 监听模式切换
     onModeChange(mode) {
       this.readonly = mode === 'readonly'
@@ -292,12 +292,12 @@ export default {
     // 显示节点图标侧边栏
     showNodeIcon() {
       this.$bus.$emit('close_node_icon_toolbar')
-      this.setActiveSidebar('nodeIconSidebar')
+      setActiveSidebar('nodeIconSidebar')
     },
 
     // 打开公式侧边栏
     showFormula() {
-      this.setActiveSidebar('formulaSidebar')
+      setActiveSidebar('formulaSidebar')
     },
 
     // 选择附件
@@ -364,9 +364,12 @@ export default {
   .toolbarBtn {
     display: flex;
     justify-content: center;
+    align-items: center;
     flex-direction: column;
     cursor: pointer;
     margin-right: 20px;
+    min-width: 52px;
+    flex-shrink: 0;
 
     &:last-of-type {
       margin-right: 0;
@@ -406,7 +409,9 @@ export default {
 
     .text {
       margin-top: 3px;
+      line-height: 1.2;
       text-align: center;
+      white-space: nowrap;
     }
   }
 

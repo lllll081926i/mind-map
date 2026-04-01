@@ -42,6 +42,9 @@ export default {
       }, 1000)
     }
   },
+  beforeUnmount() {
+    document[fullscrrenEvent] = null
+  },
   methods: {
     // 全屏查看
     toFullscreenShow() {
@@ -60,18 +63,11 @@ export default {
 .fullscreenContainer {
   display: flex;
   align-items: center;
+  gap: 16px;
 
   &.isDark {
     .btn {
-      color: hsla(0,0%,100%,.6);
-    }
-  }
-
-  .item {
-    margin-right: 12px;
-
-    &:last-of-type {
-      margin-right: 0;
+      color: hsla(0, 0%, 100%, 0.6);
     }
   }
 

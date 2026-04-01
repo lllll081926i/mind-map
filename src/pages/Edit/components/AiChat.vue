@@ -1,13 +1,15 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('ai.chatTitle')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('ai.chatTitle')"
+    :force-show="activeSidebar === 'ai'"
+  >
     <div class="aiChatBox" :class="{ isDark: isDark }">
       <div class="chatHeader">
-        <el-button size="mini" @click="clear">
-          <span class="el-icon-delete"></span>
+        <el-button size="small" @click="clear">
           {{ $t('ai.clearRecords') }}
         </el-button>
-        <el-button size="mini" @click="modifyAiConfig">
-          <span class="el-icon-edit"></span>
+        <el-button size="small" @click="modifyAiConfig">
           {{ $t('ai.modifyAIConfiguration') }}
         </el-button>
       </div>
@@ -20,7 +22,7 @@
         >
           <div class="chatItemInner" v-if="item.type === 'user'">
             <div class="avatar">
-              <span class="icon el-icon-user"></span>
+              <span class="icon">我</span>
             </div>
             <div class="content">{{ item.content }}</div>
           </div>
@@ -39,13 +41,12 @@
           :placeholder="$t('ai.chatInputPlaceholder')"
           @keydown="onKeydown"
         ></textarea>
-        <el-button class="btn" size="mini" @click="send" :loading="isCreating">
+        <el-button class="btn" size="small" @click="send" :loading="isCreating">
           {{ $t('ai.send') }}
-          <span class="el-icon-position"></span>
         </el-button>
         <el-button
           class="stop"
-          size="mini"
+          size="small"
           type="warning"
           @click="stop"
           v-show="isCreating"
@@ -72,6 +73,51 @@ import {
 
 let md = null
 
+const sanitizeHtml = html => {
+  if (typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        'p',
+        'br',
+        'strong',
+        'em',
+        'u',
+        's',
+        'code',
+        'pre',
+        'ul',
+        'ol',
+        'li',
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'h5',
+        'h6',
+        'a',
+        'blockquote',
+        'table',
+        'thead',
+        'tbody',
+        'tr',
+        'th',
+        'td',
+        'span',
+        'div',
+        'hr'
+      ],
+      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style']
+    })
+  }
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, '')
+    .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+}
+
 export default {
   components: {
     Sidebar
@@ -96,8 +142,11 @@ export default {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        this.$refs.sidebar.show = val === 'ai'
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'ai'
+          }
+        })
       }
     }
   },
@@ -161,8 +210,9 @@ export default {
           const currentItem = this.chatList[this.chatList.length - 1]
           if (!currentItem || currentItem.type !== 'ai') return
           currentItem.rawContent = res
-          currentItem.content = md.render(res)
-          this.$refs.chatResBoxRef.scrollTop = this.$refs.chatResBoxRef.scrollHeight
+          currentItem.content = sanitizeHtml(md.render(res))
+          this.$refs.chatResBoxRef.scrollTop =
+            this.$refs.chatResBoxRef.scrollHeight
         },
         () => {
           if (responseId !== this.activeResponseId) return
@@ -172,7 +222,11 @@ export default {
           if (responseId !== this.activeResponseId) return
           this.isCreating = false
           const currentItem = this.chatList[this.chatList.length - 1]
-          if (currentItem && currentItem.type === 'ai' && !currentItem.rawContent) {
+          if (
+            currentItem &&
+            currentItem.type === 'ai' &&
+            !currentItem.rawContent
+          ) {
             this.chatList.pop()
           }
           this.$message.error(error?.message || this.$t('ai.generationFailed'))
@@ -215,6 +269,57 @@ export default {
   flex-direction: column;
 
   &.isDark {
+    .chatHeader,
+    .chatInputBox {
+      border-color: hsla(0, 0%, 100%, 0.1);
+    }
+
+    .chatHeader {
+      :deep(.el-button) {
+        background-color: #2f3539;
+        border-color: rgba(255, 255, 255, 0.12);
+        color: hsla(0, 0%, 100%, 0.85);
+      }
+
+      :deep(.el-button:hover),
+      :deep(.el-button:focus) {
+        background-color: #3a4146;
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+      }
+    }
+
+    .chatResBox {
+      .chatItem {
+        background-color: rgba(255, 255, 255, 0.02);
+
+        .chatItemInner {
+          .avatar {
+            background-color: #262a2e;
+          }
+
+          :deep(.content) {
+            color: hsla(0, 0%, 100%, 0.88);
+
+            code,
+            pre {
+              background-color: rgba(255, 255, 255, 0.08);
+            }
+          }
+        }
+      }
+    }
+
+    .chatInputBox {
+      textarea {
+        background-color: #1f2327;
+        color: hsla(0, 0%, 100%, 0.9);
+      }
+
+      textarea::placeholder {
+        color: hsla(0, 0%, 100%, 0.45);
+      }
+    }
   }
 
   .chatHeader {
@@ -329,8 +434,14 @@ export default {
             white-space: break-spaces;
             background-color: rgba(175, 184, 193, 0.2);
             border-radius: 6px;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
-              Liberation Mono, monospace;
+            font-family:
+              ui-monospace,
+              SFMono-Regular,
+              SF Mono,
+              Menlo,
+              Consolas,
+              Liberation Mono,
+              monospace;
           }
 
           pre {

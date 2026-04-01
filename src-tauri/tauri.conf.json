@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.mindmap.desktop",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run frontend:dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build:desktop-web",
+    "beforeBuildCommand": "npm run frontend:build",
     "frontendDist": "../dist-desktop"
   },
   "app": {
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'none'; object-src 'none'; media-src 'self'"
     }
   },
   "bundle": {

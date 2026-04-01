@@ -1,14 +1,22 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('theme.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('theme.title')"
+    :force-show="activeSidebar === 'theme'"
+  >
     <div class="themeGroupList" :class="{ isDark: isDark }">
-      <el-tabs v-model="activeName" class="tabBox">
-        <el-tab-pane
+      <div class="tabBox">
+        <button
+          type="button"
+          class="tabBtn"
           v-for="group in groupList"
           :key="group.name"
-          :label="group.name"
-          :name="group.name"
-        ></el-tab-pane>
-      </el-tabs>
+          :class="{ active: group.name === activeName }"
+          @click="activeName = group.name"
+        >
+          {{ group.name }}
+        </button>
+      </div>
       <div class="themeListTheme customScrollbar">
         <div
           class="themeItem"
@@ -30,9 +38,13 @@
 <script>
 import Sidebar from './Sidebar.vue'
 import { storeData } from '@/api'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import themeImgMap from 'simple-mind-map-plugin-themes/themeImgMap'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 
 // 主题
 export default {
@@ -65,11 +77,15 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      localConfig: state => state.localConfig,
-      activeSidebar: state => state.activeSidebar,
-      extendThemeGroupList: state => state.extendThemeGroupList
+    ...mapState(useThemeStore, {
+      isDark: 'isDark',
+      extendThemeGroupList: 'extendThemeGroupList'
+    }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
 
     groupList() {
@@ -107,7 +123,9 @@ export default {
     this.mindMap.off('view_theme_change', this.handleViewThemeChange)
   },
   methods: {
-    ...mapMutations(['setLocalConfig']),
+    setLocalConfig(data) {
+      applyLocalConfigPatch(data)
+    },
 
     handleViewThemeChange() {
       this.theme = this.mindMap.getTheme()
@@ -246,10 +264,42 @@ export default {
 
   .tabBox {
     flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 12px 12px;
 
-    :deep(.el-tabs__nav-wrap) {
-      display: flex;
-      justify-content: center;
+    .tabBtn {
+      border: 1px solid #dcdfe6;
+      background: #fff;
+      color: rgba(26, 26, 26, 0.88);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &.active {
+        background: #409eff;
+        border-color: #409eff;
+        color: #fff;
+      }
+    }
+  }
+
+  &.isDark {
+    .tabBox {
+      .tabBtn {
+        background: #36393d;
+        border-color: hsla(0, 0%, 100%, 0.12);
+        color: hsla(0, 0%, 100%, 0.82);
+
+        &.active {
+          background: #409eff;
+          border-color: #409eff;
+          color: #fff;
+        }
+      }
     }
   }
 

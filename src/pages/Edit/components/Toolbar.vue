@@ -12,7 +12,7 @@
         ></ToolbarNodeBtnList>
         <!-- 更多 -->
         <el-popover
-          v-model="popoverShow"
+          v-model:visible="popoverShow"
           placement="bottom-end"
           width="120"
           trigger="hover"
@@ -99,7 +99,7 @@
         <div
           class="toolbarBtn"
           @click="openExportDialog"
-          style="margin-right: 0;"
+          style="margin-right: 0"
         >
           <span class="icon iconfont iconexport"></span>
           <span class="text">{{ $t('toolbar.export') }}</span>
@@ -117,15 +117,12 @@
             <div class="fileTreeActionList">
               <div
                 class="btn"
-                :class="[
-                  fileTreeExpand ? 'el-icon-arrow-up' : 'el-icon-arrow-down'
-                ]"
+                :class="{ expanded: fileTreeExpand }"
                 @click="fileTreeExpand = !fileTreeExpand"
-              ></div>
-              <div
-                class="btn el-icon-close"
-                @click="fileTreeVisible = false"
-              ></div>
+              >
+                v
+              </div>
+              <div class="btn closeBtn" @click="fileTreeVisible = false">x</div>
             </div>
           </div>
           <div class="fileTreeWrap">
@@ -138,31 +135,31 @@
             >
               <template #default="{ node, data }">
                 <span class="customTreeNode">
-                <div class="treeNodeInfo">
-                  <span
-                    class="treeNodeIcon iconfont"
-                    :class="[
-                      data.type === 'file' ? 'iconwenjian' : 'icondakai'
-                    ]"
-                  ></span>
-                  <span class="treeNodeName">{{ node.label }}</span>
-                </div>
-                <div class="treeNodeBtnList" v-if="data.type === 'file'">
-                  <el-button
-                    type="text"
-                    size="mini"
-                    v-if="data.enableEdit"
-                    @click="editLocalFile(data)"
-                    >编辑</el-button
-                  >
-                  <el-button
-                    type="text"
-                    size="mini"
-                    v-else
-                    @click="importLocalFile(data)"
-                    >导入</el-button
-                  >
-                </div>
+                  <div class="treeNodeInfo">
+                    <span
+                      class="treeNodeIcon iconfont"
+                      :class="[
+                        data.type === 'file' ? 'iconwenjian' : 'icondakai'
+                      ]"
+                    ></span>
+                    <span class="treeNodeName">{{ node.label }}</span>
+                  </div>
+                  <div class="treeNodeBtnList" v-if="data.type === 'file'">
+                    <el-button
+                      type="text"
+                      size="small"
+                      v-if="data.enableEdit"
+                      @click="editLocalFile(data)"
+                      >编辑</el-button
+                    >
+                    <el-button
+                      type="text"
+                      size="small"
+                      v-else
+                      @click="importLocalFile(data)"
+                      >导入</el-button
+                    >
+                  </div>
                 </span>
               </template>
             </el-tree>
@@ -170,17 +167,21 @@
         </div>
       </div>
     </div>
-    <NodeImage v-if="mountedPanels.nodeImage"></NodeImage>
-    <NodeHyperlink v-if="mountedPanels.nodeHyperlink"></NodeHyperlink>
-    <NodeNote v-if="mountedPanels.nodeNote"></NodeNote>
-    <NodeTag v-if="mountedPanels.nodeTag"></NodeTag>
-    <Export v-if="mountedPanels.export"></Export>
+    <NodeImage v-if="mountedPanels.nodeImage" ref="NodeImageRef"></NodeImage>
+    <NodeHyperlink
+      v-if="mountedPanels.nodeHyperlink"
+      ref="NodeHyperlinkRef"
+    ></NodeHyperlink>
+    <NodeNote v-if="mountedPanels.nodeNote" ref="NodeNoteRef"></NodeNote>
+    <NodeTag v-if="mountedPanels.nodeTag" ref="NodeTagRef"></NodeTag>
+    <Export v-if="mountedPanels.export" ref="ExportRef"></Export>
     <Import v-if="mountedPanels.import" ref="ImportRef"></Import>
   </div>
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { defineAsyncComponent } from 'vue'
+import { mapState } from 'pinia'
 import { ElNotification as Notification } from 'element-plus'
 import exampleData from 'simple-mind-map/example/exampleData'
 import { getData } from '../../../api'
@@ -214,13 +215,16 @@ import {
   setRecentFiles,
   syncEditorFileSession
 } from '@/stores/runtime'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
 
-const NodeImage = () => import('./NodeImage.vue')
-const NodeHyperlink = () => import('./NodeHyperlink.vue')
-const NodeNote = () => import('./NodeNote.vue')
-const NodeTag = () => import('./NodeTag.vue')
-const Export = () => import('./Export.vue')
-const Import = () => import('./Import.vue')
+const NodeImage = defineAsyncComponent(() => import('./NodeImage.vue'))
+const NodeHyperlink = defineAsyncComponent(() => import('./NodeHyperlink.vue'))
+const NodeNote = defineAsyncComponent(() => import('./NodeNote.vue'))
+const NodeTag = defineAsyncComponent(() => import('./NodeTag.vue'))
+const Export = defineAsyncComponent(() => import('./Export.vue'))
+const Import = defineAsyncComponent(() => import('./Import.vue'))
 
 // 工具栏
 const defaultBtnList = [
@@ -282,15 +286,26 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      isHandleLocalFile: state => state.isHandleLocalFile,
-      openNodeRichText: state => state.localConfig.openNodeRichText,
-      enableAi: state => state.localConfig.enableAi
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      isHandleLocalFile: 'isHandleLocalFile'
+    }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
     }),
 
     isDesktopRuntime() {
       return isDesktopApp()
+    },
+
+    openNodeRichText() {
+      return this.localConfig.openNodeRichText
+    },
+
+    enableAi() {
+      return this.localConfig.enableAi
     },
 
     btnLit() {
@@ -331,15 +346,22 @@ export default {
     window.addEventListener('resize', this.computeToolbarShowThrottle)
     window.addEventListener('beforeunload', this.onUnload)
     this.$bus.$on('node_note_dblclick', this.onNodeNoteDblclick)
+    this.$bus.$on('bootstrap_state_ready', this.handleBootstrapStateReady)
   },
   beforeUnmount() {
     this.removeWriteLocalFileListener && this.removeWriteLocalFileListener()
     window.removeEventListener('resize', this.computeToolbarShowThrottle)
     window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
+    this.$bus.$off('bootstrap_state_ready', this.handleBootstrapStateReady)
+    clearTimeout(this.timer)
   },
   methods: {
-    async waitForRef(refName, retries = 40) {
+    handleBootstrapStateReady() {
+      this.refreshRecentFiles()
+    },
+
+    async waitForRef(refName, retries = 320) {
       if (this.$refs[refName]) {
         return this.$refs[refName]
       }
@@ -364,38 +386,79 @@ export default {
     },
 
     async openImportDialog() {
-      await this.ensurePanelMounted('import', 'ImportRef')
+      const importRef = await this.ensurePanelMounted('import', 'ImportRef')
+      if (importRef && typeof importRef.openDialog === 'function') {
+        importRef.openDialog()
+        return
+      }
       emitShowImport()
     },
 
     async openExportDialog() {
-      await this.ensurePanelMounted('export')
+      const exportRef = await this.ensurePanelMounted('export', 'ExportRef')
+      if (exportRef && typeof exportRef.openDialog === 'function') {
+        exportRef.openDialog()
+        return
+      }
       emitShowExport()
     },
 
     async openNodeImageDialog(activeNodes = []) {
-      await this.ensurePanelMounted('nodeImage')
+      const nodeImageRef = await this.ensurePanelMounted(
+        'nodeImage',
+        'NodeImageRef'
+      )
+      if (nodeImageRef && typeof nodeImageRef.openDialog === 'function') {
+        nodeImageRef.openDialog({
+          activeNodes
+        })
+        return
+      }
       emitShowNodeImage({
         activeNodes
       })
     },
 
     async openNodeLinkDialog(activeNodes = []) {
-      await this.ensurePanelMounted('nodeHyperlink')
+      const nodeHyperlinkRef = await this.ensurePanelMounted(
+        'nodeHyperlink',
+        'NodeHyperlinkRef'
+      )
+      if (
+        nodeHyperlinkRef &&
+        typeof nodeHyperlinkRef.openDialog === 'function'
+      ) {
+        nodeHyperlinkRef.openDialog({
+          activeNodes
+        })
+        return
+      }
       emitShowNodeLink({
         activeNodes
       })
     },
 
     async openNodeNoteDialog(activeNodes = []) {
-      await this.ensurePanelMounted('nodeNote')
+      const nodeNoteRef = await this.ensurePanelMounted('nodeNote', 'NodeNoteRef')
+      if (nodeNoteRef && typeof nodeNoteRef.openDialog === 'function') {
+        nodeNoteRef.openDialog({
+          activeNodes
+        })
+        return
+      }
       emitShowNodeNote({
         activeNodes
       })
     },
 
     async openNodeTagDialog(activeNodes = []) {
-      await this.ensurePanelMounted('nodeTag')
+      const nodeTagRef = await this.ensurePanelMounted('nodeTag', 'NodeTagRef')
+      if (nodeTagRef && typeof nodeTagRef.openDialog === 'function') {
+        nodeTagRef.openDialog({
+          activeNodes
+        })
+        return
+      }
       emitShowNodeTag({
         activeNodes
       })
@@ -496,11 +559,10 @@ export default {
 
     // 编辑指定文件
     editLocalFile(data) {
-      if (data.mode === 'desktop' || data.handle) {
-        setCurrentFileRef(data.mode === 'desktop' ? data : data.handle, data.mode)
-        syncEditorFileSession(data)
-        this.readFile()
-      }
+      if (!data || data.mode !== 'desktop') return
+      setCurrentFileRef(data, data.mode)
+      syncEditorFileSession(data)
+      this.readFile()
     },
 
     // 导入指定文件
@@ -508,15 +570,11 @@ export default {
       try {
         const importRef = await this.ensurePanelMounted('import', 'ImportRef')
         if (!importRef) return
-        let file = null
-        if (data.mode === 'desktop') {
-          const result = await platform.readMindMapFile(data)
-          file = new File([result.content], result.name, {
-            type: 'application/json'
-          })
-        } else {
-          file = await data.handle.getFile()
-        }
+        if (!data || data.mode !== 'desktop') return
+        const result = await platform.readMindMapFile(data)
+        const file = new File([result.content], result.name, {
+          type: 'application/json'
+        })
         importRef.onChange({
           raw: file,
           name: file.name
@@ -560,54 +618,32 @@ export default {
       try {
         const currentFileRef = getCurrentFileRef()
         if (!currentFileRef) return
-        if (isDesktopApp()) {
-          const result = await platform.readMindMapFile(currentFileRef)
-          setIsHandleLocalFile(true)
-          this.setData(result.content)
-          updateCurrentFileRef(result)
-          syncEditorFileSession(result)
-          await recordRecentFile({
-            ...currentFileRef,
-            ...result
-          })
-          markDocumentDirty(false)
-          this.refreshRecentFiles()
-          Notification.closeAll()
-          Notification({
-            title: this.$t('toolbar.tip'),
-            message: `${this.$t('toolbar.editingLocalFileTipFront')}${
-              result.name
-            }${this.$t('toolbar.editingLocalFileTipEnd')}`,
-            duration: 0,
-            showClose: true
-          })
-          return
-        }
-        let file = await currentFileRef.getFile()
-        let fileReader = new FileReader()
-        fileReader.onload = async () => {
-          setIsHandleLocalFile(true)
-          this.setData(fileReader.result)
-          syncEditorFileSession({
-            path: currentFileRef.path || currentFileRef.name || file.name,
-            name: file.name
-          })
-          markDocumentDirty(false)
-          Notification.closeAll()
-          Notification({
-            title: this.$t('toolbar.tip'),
-            message: `${this.$t('toolbar.editingLocalFileTipFront')}${
-              file.name
-            }${this.$t('toolbar.editingLocalFileTipEnd')}`,
-            duration: 0,
-            showClose: true
-          })
-        }
-        fileReader.readAsText(file)
+        const result = await platform.readMindMapFile(currentFileRef)
+        setIsHandleLocalFile(true)
+        this.setData(result.content)
+        updateCurrentFileRef(result)
+        syncEditorFileSession(result)
+        await recordRecentFile({
+          ...currentFileRef,
+          ...result
+        })
+        markDocumentDirty(false)
+        this.refreshRecentFiles()
+        Notification.closeAll()
+        Notification({
+          title: this.$t('toolbar.tip'),
+          message: `${this.$t('toolbar.editingLocalFileTipFront')}${
+            result.name
+          }${this.$t('toolbar.editingLocalFileTipEnd')}`,
+          duration: 0,
+          showClose: true
+        })
       } catch (error) {
         console.log(error)
         const fileError = createDesktopFsError(error)
-        this.$message.error(fileError.message || this.$t('toolbar.fileOpenFailed'))
+        this.$message.error(
+          fileError.message || this.$t('toolbar.fileOpenFailed')
+        )
       }
     },
 
@@ -645,22 +681,17 @@ export default {
         if (!this.isFullDataFile) {
           content = content.root
         }
-        let string = JSON.stringify(content)
-        if (isDesktopApp()) {
-          await platform.writeMindMapFile(currentFileRef, string)
-          await recordRecentFile(currentFileRef)
-          markDocumentDirty(false)
-          this.refreshRecentFiles()
-          return
-        }
-        const writable = await currentFileRef.createWritable()
-        await writable.write(string)
-        await writable.close()
+        const string = JSON.stringify(content)
+        await platform.writeMindMapFile(currentFileRef, string)
+        await recordRecentFile(currentFileRef)
         markDocumentDirty(false)
+        this.refreshRecentFiles()
       } catch (error) {
         console.log(error)
         const fileError = createDesktopFsError(error)
-        this.$message.error(fileError.message || this.$t('toolbar.fileOpenFailed'))
+        this.$message.error(
+          fileError.message || this.$t('toolbar.fileOpenFailed')
+        )
       } finally {
         this.waitingWriteToLocalFile = false
       }
@@ -691,7 +722,6 @@ export default {
         const loading = this.$loading({
           lock: true,
           text: this.$t('toolbar.creatingTip'),
-          spinner: 'el-icon-loading',
           background: 'rgba(0, 0, 0, 0.7)'
         })
         try {
@@ -801,7 +831,9 @@ export default {
     width: max-content;
     display: flex;
     font-size: 12px;
-    font-family: PingFangSC-Regular, PingFang SC;
+    font-family:
+      PingFangSC-Regular,
+      PingFang SC;
     font-weight: 400;
     color: rgba(26, 26, 26, 0.8);
     z-index: 2;
@@ -861,9 +893,24 @@ export default {
 
           .fileTreeActionList {
             .btn {
-              font-size: 18px;
+              width: 20px;
+              height: 20px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: 700;
               margin-left: 12px;
               cursor: pointer;
+              line-height: 1;
+
+              &.expanded {
+                transform: rotate(180deg);
+              }
+
+              &.closeBtn {
+                font-size: 14px;
+              }
             }
           }
         }
@@ -911,9 +958,12 @@ export default {
     .toolbarBtn {
       display: flex;
       justify-content: center;
+      align-items: center;
       flex-direction: column;
       cursor: pointer;
       margin-right: 20px;
+      min-width: 52px;
+      flex-shrink: 0;
 
       &:last-of-type {
         margin-right: 0;
@@ -953,6 +1003,9 @@ export default {
 
       .text {
         margin-top: 3px;
+        line-height: 1.2;
+        text-align: center;
+        white-space: nowrap;
       }
     }
   }

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="sidebarTriggerContainer "
+    class="sidebarTriggerContainer"
     @click.stop
     :class="{ hasActive: show && activeSidebar, show: show, isDark: isDark }"
     :style="{ maxHeight: maxHeight + 'px' }"
@@ -24,8 +24,12 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import { sidebarTriggerList } from '@/config'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 // 侧边栏触发器
 export default {
@@ -36,11 +40,15 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar,
-      isReadonly: state => state.isReadonly,
-      enableAi: state => state.localConfig.enableAi
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar',
+      isReadonly: 'isReadonly'
+    }),
+    ...mapState(useSettingsStore, {
+      enableAi: store => store.localConfig.enableAi
     }),
 
     triggerList() {
@@ -61,7 +69,7 @@ export default {
   watch: {
     isReadonly(val) {
       if (val) {
-        this.setActiveSidebar(null)
+        setActiveSidebar('')
       }
     }
   },
@@ -73,10 +81,8 @@ export default {
     window.removeEventListener('resize', this.onResize)
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     trigger(item) {
-      this.setActiveSidebar(item.value)
+      setActiveSidebar(item.value)
     },
 
     onResize() {
@@ -98,6 +104,7 @@ export default {
   top: 110px;
   bottom: 80px;
   right: -60px;
+  z-index: 1101;
   transition: all 0.3s;
   display: flex;
   flex-direction: column;

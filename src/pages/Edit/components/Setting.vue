@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('setting.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('setting.title')"
+    :force-show="activeSidebar === 'setting'"
+  >
     <div
       class="sidebarContent customScrollbar"
       :class="{ isDark: isDark }"
@@ -262,7 +266,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('setting.mousewheelAction') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 120px"
             v-model="config.mousewheelAction"
             placeholder=""
@@ -272,11 +276,11 @@
               }
             "
           >
-            <el-option :label="$t('setting.zoomView')" value="zoom"></el-option>
+            <el-option :label="$t('setting.zoomView')" value="zoom" />
             <el-option
               :label="$t('setting.moveViewUpDown')"
               value="move"
-            ></el-option>
+            />
           </el-select>
         </div>
       </div>
@@ -287,7 +291,7 @@
             $t('setting.mousewheelZoomActionReverse')
           }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 120px"
             v-model="config.mousewheelZoomActionReverse"
             placeholder=""
@@ -300,11 +304,11 @@
             <el-option
               :label="$t('setting.mousewheelZoomActionReverse1')"
               :value="false"
-            ></el-option>
+            />
             <el-option
               :label="$t('setting.mousewheelZoomActionReverse2')"
               :value="true"
-            ></el-option>
+            />
           </el-select>
         </div>
       </div>
@@ -313,7 +317,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('setting.createNewNodeBehavior') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 120px"
             v-model="config.createNewNodeBehavior"
             placeholder=""
@@ -326,15 +330,15 @@
             <el-option
               :label="$t('setting.default')"
               value="default"
-            ></el-option>
+            />
             <el-option
               :label="$t('setting.notActive')"
               value="notActive"
-            ></el-option>
+            />
             <el-option
               :label="$t('setting.activeOnly')"
               value="activeOnly"
-            ></el-option>
+            />
           </el-select>
         </div>
       </div>
@@ -405,8 +409,12 @@
 <script>
 import Sidebar from './Sidebar.vue'
 import { storeConfig } from '@/api'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import Color from './Color.vue'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 import {
   checkForUpdates as runUpdateCheck,
   canUseDesktopUpdater,
@@ -469,16 +477,20 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar,
-      localConfig: state => state.localConfig,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
     appVersion() {
       return __APP_VERSION__
     },
     appRuntimeLabel() {
-      return __APP_RUNTIME__ === 'desktop' ? '桌面版' : 'Web 调试版'
+      return '桌面版'
     },
     appPlatformLabel() {
       const platformMap = {
@@ -513,7 +525,9 @@ export default {
     this.$bus.$off('toggleOpenNodeRichText', this.onToggleOpenNodeRichText)
   },
   methods: {
-    ...mapMutations(['setLocalConfig']),
+    setLocalConfig(data) {
+      applyLocalConfigPatch(data)
+    },
 
     // 初始化其他配置
     initConfig() {
@@ -722,7 +736,6 @@ export default {
       const loading = this.$loading({
         lock: true,
         text: this.$t('setting.updatePreparing'),
-        spinner: 'el-icon-loading',
         background: 'rgba(0, 0, 0, 0.35)'
       })
       try {

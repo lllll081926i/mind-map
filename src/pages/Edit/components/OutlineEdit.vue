@@ -1,10 +1,11 @@
 <template>
-  <div
-    class="outlineEditContainer"
-    :class="{ isDark: isDark }"
-    ref="outlineEditContainer"
-    v-if="isOutlineEdit"
-  >
+  <Teleport to="body">
+    <div
+      class="outlineEditContainer"
+      :class="{ isDark: isDark }"
+      ref="outlineEditContainer"
+      v-if="isOutlineEdit"
+    >
     <div class="btnList">
       <el-tooltip
         class="item"
@@ -58,11 +59,12 @@
         </el-tree>
       </div>
     </div>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import {
   nodeRichTextToTextWithWrap,
   textToNodeRichTextWithWrap,
@@ -73,6 +75,9 @@ import {
 } from 'simple-mind-map/src/utils'
 import { storeData } from '@/api'
 import { printOutline } from '@/utils'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setIsOutlineEdit } from '@/stores/runtime'
 
 // 大纲侧边栏
 export default {
@@ -91,19 +96,18 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isReadonly: state => state.isReadonly,
-      isDark: state => state.localConfig.isDark,
-      isOutlineEdit: state => state.isOutlineEdit
+    ...mapState(useAppStore, {
+      isReadonly: 'isReadonly',
+      isOutlineEdit: 'isOutlineEdit'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   watch: {
     isOutlineEdit(val) {
       if (val) {
         this.refresh()
-        this.$nextTick(() => {
-          document.body.appendChild(this.$refs.outlineEditContainer)
-        })
       }
     }
   },
@@ -112,13 +116,8 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener('keydown', this.onKeyDown)
-    if (this.$refs.outlineEditContainer?.parentNode === document.body) {
-      document.body.removeChild(this.$refs.outlineEditContainer)
-    }
   },
   methods: {
-    ...mapMutations(['setIsOutlineEdit']),
-
     // 刷新树数据
     refresh() {
       let data = this.mindMap.getData()
@@ -239,7 +238,7 @@ export default {
 
     // 生成唯一的key
     getKey() {
-      return Math.random()
+      return this.data[0]?.uid || 'outline'
     },
 
     // 打印
@@ -249,7 +248,7 @@ export default {
 
     // 关闭
     onClose() {
-      this.setIsOutlineEdit(false)
+      setIsOutlineEdit(false)
       this.$bus.$emit('setData', this.getData())
     },
 

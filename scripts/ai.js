@@ -55,9 +55,12 @@ const createServe = (runtimePort = port) => {
   app.use(express.urlencoded({ extended: true }))
 
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*')
-    res.header('Access-Control-Allow-Methods', '*')
-    res.header('Access-Control-Allow-Headers', '*')
+    res.header('Access-Control-Allow-Origin', 'http://localhost:5173')
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.header('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204)
+    }
     next()
   })
 
@@ -72,8 +75,13 @@ const createServe = (runtimePort = port) => {
   })
 
   app.post('/ai/chat', async (req, res, next) => {
-    const { api, method = 'POST', headers = {}, data, timeout = DEFAULT_TIMEOUT } =
-      req.body
+    const {
+      api,
+      method = 'POST',
+      headers = {},
+      data,
+      timeout = DEFAULT_TIMEOUT
+    } = req.body
 
     try {
       const response = await axios({
@@ -100,7 +108,8 @@ const createServe = (runtimePort = port) => {
   app.use(async (error, req, res, next) => {
     const payload = await normalizeProxyError(error)
     if (res.headersSent) {
-      return next(error)
+      console.error('AI proxy error after headers sent:', payload)
+      return res.end()
     }
     res.status(payload.status).json({
       code: payload.status,
@@ -154,11 +163,7 @@ const normalizeProxyError = async error => {
   if (detail) {
     try {
       const parsed = JSON.parse(detail)
-      message =
-        parsed.msg ||
-        parsed.message ||
-        parsed.error?.message ||
-        message
+      message = parsed.msg || parsed.message || parsed.error?.message || message
       detail = parsed.detail || detail
     } catch (parseError) {
       message = detail

@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('shortcutKey.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('shortcutKey.title')"
+    :force-show="activeSidebar === 'shortcutKey'"
+  >
     <div class="box" :class="{ isDark: isDark }">
       <div v-for="item in shortcutKeyList" :key="item.type">
         <div class="title">{{ item.type }}</div>
@@ -22,7 +26,9 @@
 <script>
 import Sidebar from './Sidebar.vue'
 import { shortcutKeyList } from '@/config'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 // 快捷键
 export default {
@@ -33,9 +39,11 @@ export default {
     return {}
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
 
     shortcutKeyList() {

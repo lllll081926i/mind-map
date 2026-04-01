@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('nodeOuterFrame.nodeOuterFrameStyle')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('nodeOuterFrame.nodeOuterFrameStyle')"
+    :force-show="activeSidebar === 'nodeOuterFrameStyle'"
+  >
     <div class="sidebarContent" :class="{ isDark: isDark }">
       <div class="panelHeader">
         <span class="name">{{ $t('nodeOuterFrame.outerFrameSetting') }}</span>
@@ -14,7 +18,7 @@
             <span class="name">{{ $t('nodeOuterFrame.boxStyle') }}</span>
             <!-- 宽度 -->
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="styleConfig.strokeWidth"
               placeholder=""
@@ -40,8 +44,8 @@
             </el-select>
             <!-- 实现虚线 -->
             <el-select
-              size="mini"
-              style="width: 80px;margin-left: 4px;"
+              size="small"
+              style="width: 80px; margin-left: 4px"
               v-model="styleConfig.strokeDasharray"
               placeholder=""
               @change="
@@ -67,8 +71,8 @@
                       styleConfig.strokeDasharray === item.value
                         ? '#409eff'
                         : isDark
-                        ? '#fff'
-                        : '#000'
+                          ? '#fff'
+                          : '#000'
                     "
                     :stroke-dasharray="item.value"
                   ></line>
@@ -100,7 +104,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.radius') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="styleConfig.radius"
               placeholder=""
@@ -142,7 +146,7 @@
           </div>
         </div>
       </div>
-      <div class="panelHeader" style="margin-top: 12px;">
+      <div class="panelHeader" style="margin-top: 12px">
         <span class="name">{{ $t('nodeOuterFrame.outerFrameText') }}</span>
         <span class="deleteBtn" @click="deleteOuterFrameText">
           {{ $t('nodeOuterFrame.deleteOuterFrameText') }}
@@ -154,7 +158,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.fontFamily') }}</span>
             <el-select
-              size="mini"
+              size="small"
               v-model="styleConfig.fontFamily"
               placeholder=""
               @change="
@@ -169,8 +173,8 @@
                 :label="item.name"
                 :value="item.value"
                 :style="{ fontFamily: item.value }"
+                >{{ item.name }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
         </div>
@@ -234,7 +238,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.lineHeight') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="styleConfig.lineHeight"
               placeholder=""
@@ -256,7 +260,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.fontSize') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="styleConfig.fontSize"
               placeholder=""
@@ -271,9 +275,8 @@
                 :key="item"
                 :label="item"
                 :value="item"
-                :style="{ fontSize: item + 'px' }"
+                >{{ item }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
         </div>
@@ -300,7 +303,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('nodeOuterFrame.textFillRadius') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="styleConfig.textFillRadius"
               placeholder=""
@@ -325,20 +328,20 @@
             <span class="name">{{ $t('nodeOuterFrame.textAlign') }}</span>
             <el-radio-group
               v-model="styleConfig.textAlign"
-              size="mini"
+              size="small"
               @change="
                 value => {
                   updateOuterFrame('textAlign', value)
                 }
               "
             >
-              <el-radio-button label="left">{{
+              <el-radio-button value="left">{{
                 $t('nodeOuterFrame.left')
               }}</el-radio-button>
-              <el-radio-button label="center">{{
+              <el-radio-button value="center">{{
                 $t('nodeOuterFrame.center')
               }}</el-radio-button>
-              <el-radio-button label="right">{{
+              <el-radio-button value="right">{{
                 $t('nodeOuterFrame.right')
               }}</el-radio-button>
             </el-radio-group>
@@ -380,7 +383,7 @@
 <script>
 import Sidebar from './Sidebar.vue'
 import Color from './Color.vue'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import {
   lineWidthList,
   borderDasharrayList,
@@ -390,6 +393,9 @@ import {
   lineHeightList
 } from '@/config'
 import OuterFrame from 'simple-mind-map/src/plugins/OuterFrame'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 export default {
   components: {
@@ -417,13 +423,16 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar,
-      isDark: state => state.localConfig.isDark,
-      borderDasharrayList() {
-        return borderDasharrayList[this.$i18n.locale] || borderDasharrayList.zh
-      }
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+
+    borderDasharrayList() {
+      return borderDasharrayList[this.$i18n.locale] || borderDasharrayList.zh
+    },
 
     fontFamilyList() {
       return fontFamilyList[this.$i18n.locale] || fontFamilyList.zh
@@ -433,8 +442,11 @@ export default {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        this.$refs.sidebar.show = val === 'nodeOuterFrameStyle'
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'nodeOuterFrameStyle'
+          }
+        })
       }
     }
   },
@@ -454,8 +466,6 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     onOuterFrameActive(el, parentNode, range) {
       // 取范围内第一个节点的外框样式
       const firstNode = parentNode.children[range[0]]
@@ -470,7 +480,7 @@ export default {
       const [pl, pt] = this.styleConfig.textFillPadding
       this.paddingStyle.paddingX = pl
       this.paddingStyle.paddingY = pt
-      this.setActiveSidebar('nodeOuterFrameStyle')
+      setActiveSidebar('nodeOuterFrameStyle')
     },
 
     updateOuterFrame(key, val) {
@@ -515,7 +525,7 @@ export default {
       if (this.activeSidebar !== 'nodeOuterFrameStyle') {
         return
       }
-      this.setActiveSidebar(null)
+      setActiveSidebar('')
     }
   }
 }
@@ -577,7 +587,9 @@ export default {
 
     .name {
       font-size: 16px;
-      font-family: PingFangSC-Medium, PingFang SC;
+      font-family:
+        PingFangSC-Medium,
+        PingFang SC;
       font-weight: 500;
       color: rgba(26, 26, 26, 0.9);
     }

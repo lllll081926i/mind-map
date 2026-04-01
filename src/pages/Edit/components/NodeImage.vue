@@ -18,7 +18,7 @@
       <span class="label">请输入图片地址</span>
       <el-input
         v-model="imgUrl"
-        size="mini"
+        size="small"
         placeholder="http://xxx.com/xx.jpg"
         @keydown.stop
       ></el-input>
@@ -26,7 +26,7 @@
     <div class="title">可选</div>
     <div class="inputBox">
       <span class="label">{{ $t('nodeImage.imgTitle') }}</span>
-      <el-input v-model="imgTitle" size="mini" @keydown.stop></el-input>
+      <el-input v-model="imgTitle" size="small" @keydown.stop></el-input>
     </div>
     <template #footer>
       <span class="dialog-footer">
@@ -42,8 +42,9 @@
 <script>
 import ImgUpload from '@/components/ImgUpload/index.vue'
 import { getImageSize, isMobile } from 'simple-mind-map/src/utils/index'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { onShowNodeImage } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
 
 // 节点图片内容设置
 export default {
@@ -61,8 +62,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {
@@ -74,6 +75,11 @@ export default {
     this.removeShowNodeImageListener && this.removeShowNodeImageListener()
   },
   methods: {
+    async openDialog(payload = {}) {
+      await this.$nextTick()
+      this.handleShowNodeImage(payload)
+    },
+
     handleNodeActive(...args) {
       this.activeNodes = [...(args[1] || [])]
     },

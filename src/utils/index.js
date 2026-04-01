@@ -37,14 +37,28 @@ export const fileToBuffer = file => {
 
 // 复制文本到剪贴板
 export const copy = text => {
-  // 使用textarea可以保留换行
-  const input = document.createElement('textarea')
-  // input.setAttribute('value', text)
-  input.innerHTML = text
-  document.body.appendChild(input)
-  input.select()
-  document.execCommand('copy')
-  document.body.removeChild(input)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text)
+    })
+  } else {
+    fallbackCopy(text)
+  }
+}
+
+const fallbackCopy = text => {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    document.execCommand('copy')
+  } catch (e) {
+    console.error('copy failed', e)
+  }
+  document.body.removeChild(textarea)
 }
 
 // 复制文本到剪贴板
@@ -78,7 +92,7 @@ export const printOutline = el => {
   iframeDoc.write('<style media="print">@page {size: portrait;}</style>')
   // 写入内容
   iframeDoc.write('<div>' + printContent + '</div>')
-  setTimeout(function() {
+  setTimeout(function () {
     iframe.contentWindow?.print()
     document.body.removeChild(iframe)
   }, 500)

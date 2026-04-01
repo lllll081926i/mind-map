@@ -79,7 +79,7 @@
     </div>
     <div class="item">
       <el-dropdown @command="handleCommand">
-        <div class="btn el-icon-more"></div>
+        <div class="btn moreBtn">...</div>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="shortcutKey">
@@ -115,10 +115,19 @@ import Scale from './Scale.vue'
 import Fullscreen from './Fullscreen.vue'
 import MouseAction from './MouseAction.vue'
 import { storeData } from '@/api'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import pkg from 'simple-mind-map/package.json'
 import Demonstrate from './Demonstrate.vue'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import {
+  applyLocalConfigPatch,
+  setActiveSidebar,
+  setIsReadonly,
+  setIsSourceCodeEdit
+} from '@/stores/runtime'
 
 // 导航器工具栏
 export default {
@@ -140,24 +149,21 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isReadonly: state => state.isReadonly,
-      isDark: state => state.localConfig.isDark,
-      enableAi: state => state.localConfig.enableAi,
-      localConfig: state => state.localConfig,
-      extendThemeGroupList: state => state.extendThemeGroupList
+    ...mapState(useAppStore, {
+      isReadonly: 'isReadonly'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark',
+      extendThemeGroupList: 'extendThemeGroupList'
+    }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig',
+      enableAi: store => store.localConfig.enableAi
     })
   },
   methods: {
-    ...mapMutations([
-      'setLocalConfig',
-      'setIsReadonly',
-      'setIsSourceCodeEdit',
-      'setActiveSidebar'
-    ]),
-
     readonlyChange() {
-      this.setIsReadonly(!this.isReadonly)
+      setIsReadonly(!this.isReadonly)
       this.mindMap.setMode(this.isReadonly ? 'readonly' : 'edit')
     },
 
@@ -241,17 +247,17 @@ export default {
           config: customThemeConfig
         }
       })
-      this.setLocalConfig({
+      applyLocalConfigPatch({
         ...nextLocalConfig
       })
     },
 
     handleCommand(command) {
       if (command === 'shortcutKey') {
-        this.setActiveSidebar('shortcutKey')
+        setActiveSidebar('shortcutKey')
         return
       } else if (command === 'aiChat') {
-        this.setActiveSidebar('ai')
+        setActiveSidebar('ai')
         return
       }
       let url = ''
@@ -287,7 +293,7 @@ export default {
     },
 
     openSourceCodeEdit() {
-      this.setIsSourceCodeEdit(true)
+      setIsSourceCodeEdit(true)
     }
   }
 }
@@ -322,10 +328,24 @@ export default {
   }
 
   .item {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    flex: 0 0 auto;
     margin-right: 20px;
 
     &:last-of-type {
       margin-right: 0;
+    }
+
+    :deep(.mouseActionContainer),
+    :deep(.fullscreenContainer),
+    :deep(.scaleContainer),
+    :deep(.demonstrateContainer),
+    :deep(.el-dropdown) {
+      display: flex;
+      align-items: center;
+      height: 100%;
     }
 
     a {
@@ -333,9 +353,23 @@ export default {
       text-decoration: none;
     }
 
-    .btn {
+    > .btn,
+    :deep(.btn) {
       cursor: pointer;
       font-size: 18px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      flex: 0 0 24px;
+    }
+
+    .moreBtn {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
     }
   }
 }

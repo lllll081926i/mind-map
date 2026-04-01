@@ -30,9 +30,29 @@ export const desktopPlatform = {
     return invoke('read_bootstrap_state')
   },
 
+  async readBootstrapMetaState() {
+    const { invoke } = await loadTauriModules()
+    return invoke('read_bootstrap_meta_state')
+  },
+
+  async readBootstrapDocumentState() {
+    const { invoke } = await loadTauriModules()
+    return invoke('read_bootstrap_document_state')
+  },
+
   async writeBootstrapState(state) {
     const { invoke } = await loadTauriModules()
     return invoke('write_bootstrap_state', { state })
+  },
+
+  async writeBootstrapMetaState(state) {
+    const { invoke } = await loadTauriModules()
+    return invoke('write_bootstrap_meta_state', { state })
+  },
+
+  async writeBootstrapDocumentState(state) {
+    const { invoke } = await loadTauriModules()
+    return invoke('write_bootstrap_document_state', { state })
   },
 
   async openMindMapFile(options = {}) {

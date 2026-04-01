@@ -124,7 +124,7 @@
       </div>
       <div class="item">
         <span class="name">{{ $t('contextmenu.expandTo') }}</span>
-        <span class="el-icon-arrow-right"></span>
+        <span class="arrowIndicator">&gt;</span>
         <div
           class="subItems listBox"
           :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
@@ -161,7 +161,7 @@
       </div>
       <div class="item">
         <span class="name">{{ $t('contextmenu.copyToClipboard') }}</span>
-        <span class="el-icon-arrow-right"></span>
+        <span class="arrowIndicator">&gt;</span>
         <div
           class="subItems listBox"
           :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
@@ -182,13 +182,16 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import { emitAiCreatePart } from '@/services/appEvents'
 import { getTextFromHtml, imgToDataUrl } from 'simple-mind-map/src/utils'
 import { transformToMarkdown } from 'simple-mind-map/src/parse/toMarkdown'
 import { transformToTxt } from 'simple-mind-map/src/parse/toTxt'
 import { setDataToClipboard, setImgToClipboard, copy } from '@/utils'
 import { numberTypeList, numberLevelList } from '@/config'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 
 // 右键菜单
 export default {
@@ -215,11 +218,18 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isZenMode: state => state.localConfig.isZenMode,
-      isDark: state => state.localConfig.isDark,
-      enableAi: state => state.localConfig.enableAi
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
     }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    isZenMode() {
+      return this.localConfig.isZenMode
+    },
+    enableAi() {
+      return this.localConfig.enableAi
+    },
     expandList() {
       return [
         this.$t('contextmenu.level1'),
@@ -325,8 +335,6 @@ export default {
     this.$bus.$off('node_mousedown', this.onNodeMousedown)
   },
   methods: {
-    ...mapMutations(['setLocalConfig']),
-
     // 计算右键菜单元素的显示位置
     getShowPosition(x, y) {
       const rect = this.$refs.contextmenuRef.getBoundingClientRect()
@@ -432,7 +440,7 @@ export default {
           this.mindMap.renderer.setRootNodeCenter()
           break
         case 'TOGGLE_ZEN_MODE':
-          this.setLocalConfig({
+          applyLocalConfigPatch({
             isZenMode: !this.isZenMode
           })
           break
@@ -598,6 +606,13 @@ export default {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .arrowIndicator {
+      color: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
     }
 
     .subItems {

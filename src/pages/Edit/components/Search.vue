@@ -1,8 +1,13 @@
 <template>
   <div class="searchContainer" :class="{ isDark: isDark, show: show }">
-    <div class="closeBtnBox">
-      <span class="closeBtn el-icon-close" @click="close"></span>
-    </div>
+    <button
+      class="closeBtnBox"
+      type="button"
+      :title="$t('search.cancel')"
+      @click="close"
+    >
+      <span class="closeBtn iconfont iconguanbi"></span>
+    </button>
     <div class="searchInputBox">
       <el-input
         ref="searchInputRef"
@@ -10,12 +15,13 @@
         size="small"
         v-model="searchText"
         @keyup.enter.stop="onSearchNext"
+        @keyup.esc.stop="close"
         @keydown.stop
         @focus="onFocus"
         @blur="onBlur"
       >
         <template #prefix>
-          <i class="el-input__icon el-icon-search"></i>
+          <i class="el-input__icon iconfont iconsousuo"></i>
         </template>
         <template #append v-if="!isUndef(searchText)">
           <el-button size="small" @click="showReplaceInput = true">{{
@@ -34,12 +40,13 @@
       size="small"
       v-model="replaceText"
       style="margin: 12px 0;"
+      @keyup.esc.stop="close"
       @keydown.stop
       @focus="onFocus"
       @blur="onBlur"
     >
       <template #prefix>
-        <i class="el-input__icon el-icon-edit"></i>
+        <i class="el-input__icon iconfont iconbianji1"></i>
       </template>
       <template #append>
         <el-button size="small" @click="hideReplaceInput">{{
@@ -77,8 +84,10 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { isUndef, getTextFromHtml } from 'simple-mind-map/src/utils/index'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 // 搜索替换
 export default {
@@ -102,9 +111,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isReadonly: state => state.isReadonly,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAppStore, {
+      isReadonly: 'isReadonly'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   watch: {
@@ -275,7 +286,6 @@ export default {
 
 <style lang="less" scoped>
 .searchContainer {
-  position: relative;
   background-color: #fff;
   padding: 16px;
   width: 296px;
@@ -285,20 +295,57 @@ export default {
   top: 110px;
   right: -296px;
   transition: all 0.3s;
+  z-index: 1200;
 
   &.isDark {
     background-color: #363b3f;
     color: hsla(0, 0%, 100%, 0.85);
 
     .closeBtnBox {
-      color: #fff;
-      background-color: #363b3f;
+      color: hsla(0, 0%, 100%, 0.85);
+      background-color: #2b3034;
+      border-color: rgba(255, 255, 255, 0.12);
     }
 
     .searchInputBox {
       .searchInfo {
         color: hsla(0, 0%, 100%, 0.6);
       }
+    }
+
+    :deep(.el-input__wrapper) {
+      background-color: #2b3034;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+    }
+
+    :deep(.el-input__inner),
+    :deep(.el-input__inner::placeholder) {
+      color: hsla(0, 0%, 100%, 0.85);
+    }
+
+    :deep(.el-input-group__append) {
+      background-color: #2f3539;
+      color: hsla(0, 0%, 100%, 0.78);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+    }
+
+    :deep(.el-button) {
+      background-color: #2f3539;
+      border-color: rgba(255, 255, 255, 0.12);
+      color: hsla(0, 0%, 100%, 0.85);
+    }
+
+    :deep(.el-button:hover),
+    :deep(.el-button:focus) {
+      background-color: #3a4146;
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    :deep(.el-button.is-disabled) {
+      background-color: #2b3034;
+      border-color: rgba(255, 255, 255, 0.08);
+      color: hsla(0, 0%, 100%, 0.35);
     }
 
     .searchResultList {
@@ -331,6 +378,7 @@ export default {
   .btnList {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
   }
 
   .closeBtnBox {
@@ -340,15 +388,19 @@ export default {
     width: 20px;
     height: 20px;
     background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
     box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+    z-index: 2;
+    padding: 0;
 
     .closeBtn {
-      font-size: 16px;
+      font-size: 12px;
+      line-height: 1;
     }
   }
 

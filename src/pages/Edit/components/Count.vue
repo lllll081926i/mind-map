@@ -12,7 +12,8 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 // 字数及节点数量统计
 let countEl = document.createElement('div')
@@ -30,8 +31,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {

@@ -1,4 +1,4 @@
-import { isDesktopRuntime } from '@/platform/runtime'
+import { isDesktopRuntime } from '@/platform/runtime.mjs'
 import {
   createManualUpdateResult,
   parseUpdateManifest
@@ -12,7 +12,7 @@ export const getUpdateManifestUrl = () =>
   String(__APP_UPDATE_MANIFEST_URL__ || '').trim()
 
 export const canUseDesktopUpdater = () => {
-  return __APP_RUNTIME__ === 'desktop' && isDesktopRuntime()
+  return isDesktopRuntime()
 }
 
 export const fetchUpdateManifest = async () => {

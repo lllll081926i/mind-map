@@ -12,5 +12,9 @@ vite-dev.log
 vite-dev.err
 .tmp-build*.log
 .tmp-desktop*.log
+.tmp-frontend*.log
 docs/plans/
 .keys/
+.env
+.env.*
+!.env.library

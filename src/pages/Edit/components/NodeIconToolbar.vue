@@ -1,19 +1,36 @@
 <template>
-    <div class="nodeIconToolbar" ref="nodeIconToolbar" :style="style" @click.stop.passive v-show="showNodeIconToolbar">
-        <div class="iconListBox">
-            <div class="icon" v-for="icon in iconList" :key="icon.name" v-html="getHtml(icon.icon)" :class="{
-                selected: nodeIconList.includes(iconType + '_' + icon.name)
-            }" @click="setIcon(icon.name)"></div>
-        </div>
-        <div class="btnBox">
-            <span class="btn iconfont iconshanchu" @click="deleteIcon"></span>
-        </div>
+  <Teleport to="body">
+    <div
+      class="nodeIconToolbar"
+      ref="nodeIconToolbar"
+      :style="style"
+      @click.stop.passive
+      v-show="showNodeIconToolbar"
+    >
+      <div class="iconListBox">
+        <div
+          class="icon"
+          v-for="icon in iconList"
+          :key="icon.name"
+          v-html="getHtml(icon.icon)"
+          :class="{
+            selected: nodeIconList.includes(iconType + '_' + icon.name)
+          }"
+          @click="setIcon(icon.name)"
+        ></div>
+      </div>
+      <div class="btnBox">
+        <span class="btn iconfont iconshanchu" @click="deleteIcon"></span>
+      </div>
     </div>
+  </Teleport>
 </template>
   
 <script>
 import { nodeIconList as _nodeIconList } from 'simple-mind-map/src/svg/icons'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { setActiveSidebar } from '@/stores/runtime'
 
 export default {
   props: {
@@ -38,7 +55,9 @@ export default {
     }
   },
   computed: {
-    ...mapState(['activeSidebar'])
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    })
   },
   created() {
     this.mindMap.on('node_icon_click', this.show)
@@ -49,9 +68,6 @@ export default {
     this.mindMap.on('scale', this.onScale)
     this.$bus.$on('close_node_icon_toolbar', this.close)
   },
-  mounted() {
-    document.body.append(this.$refs.nodeIconToolbar)
-  },
   beforeUnmount() {
     this.mindMap.off('node_icon_click', this.show)
     this.mindMap.off('draw_click', this.close)
@@ -60,13 +76,8 @@ export default {
     this.mindMap.off('node_active', this.onNodeActive)
     this.mindMap.off('scale', this.onScale)
     this.$bus.$off('close_node_icon_toolbar', this.close)
-    if (this.$refs.nodeIconToolbar?.parentNode === document.body) {
-      document.body.removeChild(this.$refs.nodeIconToolbar)
-    }
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     async ensureIconListLoaded() {
       if (this.iconLoaded) return
       const { default: icon } = await import('@/config/icon')
@@ -90,7 +101,7 @@ export default {
       this.updatePos()
       this.showNodeIconToolbar = true
       if (this.activeSidebar === 'nodeIconSidebar') {
-        this.setActiveSidebar(null)
+        setActiveSidebar(null)
       }
     },
 

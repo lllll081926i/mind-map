@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('outline.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('outline.title')"
+    :force-show="activeSidebar === 'outline'"
+  >
     <div class="btnList">
       <el-tooltip
         class="item"
@@ -37,9 +41,12 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import Outline from './Outline.vue'
 import { printOutline } from '@/utils'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar, setIsOutlineEdit } from '@/stores/runtime'
 
 // 大纲侧边栏
 export default {
@@ -53,9 +60,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     })
   },
   watch: {
@@ -71,11 +80,9 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['setIsOutlineEdit', 'setActiveSidebar']),
-
     onChangeToOutlineEdit() {
-      this.setActiveSidebar(null)
-      this.setIsOutlineEdit(true)
+      setActiveSidebar('')
+      setIsOutlineEdit(true)
     },
 
     onScrollTo(y) {

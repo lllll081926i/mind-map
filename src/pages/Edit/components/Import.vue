@@ -51,7 +51,7 @@
         <el-radio
           v-for="(item, index) in canvasList"
           :key="index"
-          :label="index"
+          :value="index"
           >{{ item.title }}</el-radio
         >
       </el-radio-group>
@@ -69,8 +69,10 @@
 <script>
 import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
-import { mapMutations, mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { onShowImport } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar, setIsHandleLocalFile } from '@/stores/runtime'
 
 // 导入
 export default {
@@ -86,8 +88,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
     supportFileStr() {
       return '.smm,.json,.xmind,.md'
@@ -111,10 +113,13 @@ export default {
     this.$bus.$off('importFile', this.handleImportFile)
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
+    async openDialog() {
+      await this.$nextTick()
+      this.dialogVisible = true
+    },
 
     handleShowImport() {
-      this.dialogVisible = true
+      this.openDialog()
     },
 
     getRegexp() {
@@ -182,7 +187,7 @@ export default {
       if (this.fileList.length <= 0) {
         return this.$message.error(this.$t('import.notSelectTip'))
       }
-      this.$store.commit('setIsHandleLocalFile', false)
+      setIsHandleLocalFile(false)
       let file = this.fileList[0]
       if (/\.(smm|json)$/.test(file.name)) {
         this.handleSmm(file)
@@ -192,7 +197,7 @@ export default {
         this.handleMd(file)
       }
       this.cancel()
-      this.setActiveSidebar(null)
+      setActiveSidebar('')
     },
 
     // 处理.smm文件

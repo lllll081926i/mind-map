@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('baseStyle.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('baseStyle.title')"
+    :force-show="activeSidebar === 'baseStyle'"
+  >
     <div
       class="sidebarContent customScrollbar"
       :class="{ isDark: isDark }"
@@ -8,8 +12,26 @@
       <!-- 背景 -->
       <div class="title noTop">{{ $t('baseStyle.background') }}</div>
       <div class="row">
-        <el-tabs class="tab" v-model="activeTab">
-          <el-tab-pane :label="$t('baseStyle.color')" name="color">
+        <div class="segmentTabs">
+          <button
+            type="button"
+            class="segmentTab"
+            :class="{ active: activeTab === 'color' }"
+            @click="activeTab = 'color'"
+          >
+            {{ $t('baseStyle.color') }}
+          </button>
+          <button
+            type="button"
+            class="segmentTab"
+            :class="{ active: activeTab === 'image' }"
+            @click="activeTab = 'image'"
+          >
+            {{ $t('baseStyle.image') }}
+          </button>
+        </div>
+      </div>
+      <div class="row" v-if="activeTab === 'color'">
             <Color
               :color="style.backgroundColor"
               @change="
@@ -18,8 +40,8 @@
                 }
               "
             ></Color>
-          </el-tab-pane>
-          <el-tab-pane :label="$t('baseStyle.image')" name="image">
+      </div>
+      <div class="row column" v-if="activeTab === 'image'">
             <ImgUpload
               class="imgUpload"
               v-model="style.backgroundImage"
@@ -33,7 +55,7 @@
             <div class="rowItem">
               <span class="name">{{ $t('baseStyle.imageRepeat') }}</span>
               <el-select
-                size="mini"
+                size="small"
                 style="width: 120px"
                 v-model="style.backgroundRepeat"
                 placeholder=""
@@ -48,15 +70,15 @@
                   :key="item.value"
                   :label="item.name"
                   :value="item.value"
+                  >{{ item.name }}</el-option
                 >
-                </el-option>
               </el-select>
             </div>
             <!-- 图片位置 -->
             <div class="rowItem">
               <span class="name">{{ $t('baseStyle.imagePosition') }}</span>
               <el-select
-                size="mini"
+                size="small"
                 style="width: 120px"
                 v-model="style.backgroundPosition"
                 placeholder=""
@@ -71,15 +93,15 @@
                   :key="item.value"
                   :label="item.name"
                   :value="item.value"
+                  >{{ item.name }}</el-option
                 >
-                </el-option>
               </el-select>
             </div>
             <!-- 图片大小 -->
             <div class="rowItem">
               <span class="name">{{ $t('baseStyle.imageSize') }}</span>
               <el-select
-                size="mini"
+                size="small"
                 style="width: 120px"
                 v-model="style.backgroundSize"
                 placeholder=""
@@ -94,36 +116,38 @@
                   :key="item.value"
                   :label="item.name"
                   :value="item.value"
+                  >{{ item.name }}</el-option
                 >
-                </el-option>
               </el-select>
             </div>
             <!-- 内置背景图片 -->
             <div
               class="rowItem spaceBetween"
-              style="margin-top: 8px; margin-bottom: 8px;"
+              style="margin-top: 8px; margin-bottom: 8px"
               v-if="bgList.length > 0"
             >
-              <div class="name">{{ $t('baseStyle.builtInBackgroundImage') }}</div>
+              <div class="name">
+                {{ $t('baseStyle.builtInBackgroundImage') }}
+              </div>
               <div
-                class="iconBtn el-icon-arrow-down"
+                class="iconBtn"
                 :class="{ top: !bgListExpand }"
                 @click="bgListExpand = !bgListExpand"
-              ></div>
+              >
+                v
+              </div>
             </div>
             <div class="bgList" :class="{ expand: bgListExpand }">
               <div
                 class="bgItem"
                 v-for="(item, index) in bgList"
                 :key="index"
-                :class="{active: style.backgroundImage === item}"
+                :class="{ active: style.backgroundImage === item }"
                 @click="useBg(item)"
               >
                 <img :src="item" alt="" />
               </div>
             </div>
-          </el-tab-pane>
-        </el-tabs>
       </div>
       <!-- 连线 -->
       <div class="title">{{ $t('baseStyle.line') }}</div>
@@ -150,7 +174,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.width') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.lineWidth"
             placeholder=""
@@ -181,7 +205,7 @@
         <div class="rowItem" v-if="lineStyleListShow.length > 1">
           <span class="name">{{ $t('baseStyle.style') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.lineStyle"
             placeholder=""
@@ -215,7 +239,7 @@
         >
           <span class="name">{{ $t('baseStyle.rootStyle') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.rootLineKeepSameInCurve"
             placeholder=""
@@ -230,15 +254,15 @@
               :key="item.value"
               :label="item.name"
               :value="item.value"
+              >{{ item.name }}</el-option
             >
-            </el-option>
           </el-select>
         </div>
         <div class="rowItem" v-if="showLineRadius">
           <!-- 连线圆角大小 -->
           <span class="name">{{ $t('baseStyle.lineRadius') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.lineRadius"
             placeholder=""
@@ -253,8 +277,7 @@
               :key="item"
               :label="item"
               :value="item"
-            >
-            </el-option>
+            />
           </el-select>
         </div>
       </div>
@@ -268,7 +291,7 @@
         >
           <span class="name">{{ $t('baseStyle.rootLineStartPos') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.rootLineStartPositionKeepSameInCurve"
             placeholder=""
@@ -282,10 +305,12 @@
               key="center"
               :label="$t('baseStyle.center')"
               :value="false"
-            >
-            </el-option>
-            <el-option key="right" :label="$t('baseStyle.edge')" :value="true">
-            </el-option>
+            />
+            <el-option
+              key="right"
+              :label="$t('baseStyle.edge')"
+              :value="true"
+            />
           </el-select>
         </div>
       </div>
@@ -373,7 +398,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.width') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.generalizationLineWidth"
             placeholder=""
@@ -424,7 +449,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.associativeLineWidth') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineWidth"
             placeholder=""
@@ -477,7 +502,7 @@
             $t('baseStyle.associativeLineActiveWidth')
           }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineActiveWidth"
             placeholder=""
@@ -507,7 +532,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('style.style') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineDasharray"
             placeholder=""
@@ -534,8 +559,8 @@
                     style.associativeLineDasharray === item.value
                       ? '#409eff'
                       : isDark
-                      ? '#fff'
-                      : '#000'
+                        ? '#fff'
+                        : '#000'
                   "
                   :stroke-dasharray="item.value"
                 ></line>
@@ -550,7 +575,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.fontFamily') }}</span>
           <el-select
-            size="mini"
+            size="small"
             v-model="style.associativeLineTextFontFamily"
             placeholder=""
             @change="update('associativeLineTextFontFamily', $event)"
@@ -561,8 +586,8 @@
               :label="item.name"
               :value="item.value"
               :style="{ fontFamily: item.value }"
+              >{{ item.name }}</el-option
             >
-            </el-option>
           </el-select>
         </div>
       </div>
@@ -589,7 +614,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.fontSize') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineTextFontSize"
             placeholder=""
@@ -600,9 +625,8 @@
               :key="item"
               :label="item"
               :value="item"
-              :style="{ fontSize: item + 'px' }"
+              >{{ item }}</el-option
             >
-            </el-option>
           </el-select>
         </div>
       </div>
@@ -708,20 +732,24 @@
       <!-- 二级节点外边距 -->
       <div class="title">{{ $t('baseStyle.nodeMargin') }}</div>
       <div class="row column noBottom">
-        <el-tabs
-          class="tab"
-          v-model="marginActiveTab"
-          @tab-click="initMarginStyle"
-        >
-          <el-tab-pane
-            :label="$t('baseStyle.level2Node')"
-            name="second"
-          ></el-tab-pane>
-          <el-tab-pane
-            :label="$t('baseStyle.belowLevel2Node')"
-            name="node"
-          ></el-tab-pane>
-        </el-tabs>
+        <div class="segmentTabs">
+          <button
+            type="button"
+            class="segmentTab"
+            :class="{ active: marginActiveTab === 'second' }"
+            @click="setMarginActiveTab('second')"
+          >
+            {{ $t('baseStyle.level2Node') }}
+          </button>
+          <button
+            type="button"
+            class="segmentTab"
+            :class="{ active: marginActiveTab === 'node' }"
+            @click="setMarginActiveTab('node')"
+          >
+            {{ $t('baseStyle.belowLevel2Node') }}
+          </button>
+        </div>
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.horizontal') }}</span>
           <el-slider
@@ -800,7 +828,7 @@ import {
 } from '@/config'
 import ImgUpload from '@/components/ImgUpload/index.vue'
 import { storeData, storeConfig } from '@/api'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import {
   supportLineStyleLayoutsMap,
   supportLineRadiusLayouts,
@@ -808,6 +836,8 @@ import {
   supportRootLineKeepSameInCurveLayouts,
   rainbowLinesOptions
 } from '@/config/constant'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 // 基础样式
 export default {
@@ -881,11 +911,12 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar,
-      localConfig: state => state.localConfig,
-      isDark: state => state.localConfig.isDark,
-      bgList: state => state.bgList
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark',
+      bgList: 'bgList'
     }),
     lineStyleList() {
       return lineStyleList[this.$i18n.locale] || lineStyleList.zh
@@ -963,7 +994,7 @@ export default {
         const has = this.lineStyleListShow.find(item => {
           return item.value === this.style.lineStyle
         })
-        if (!has) {
+        if (!has && this.lineStyleListShow.length > 0) {
           this.style.lineStyle = this.lineStyleListShow[0].value
         }
       }
@@ -983,10 +1014,29 @@ export default {
       }, 0)
     },
 
+    getThemeConfigSnapshot() {
+      const themeConfig = this.mindMap.getThemeConfig() || {}
+      return {
+        ...themeConfig,
+        second: {
+          marginX: 0,
+          marginY: 0,
+          ...(themeConfig.second || {})
+        },
+        node: {
+          marginX: 0,
+          marginY: 0,
+          ...(themeConfig.node || {})
+        }
+      }
+    },
+
     // 初始样式
     initStyle() {
+      const themeConfig = this.getThemeConfigSnapshot()
       Object.keys(this.style).forEach(key => {
-        this.style[key] = this.mindMap.getThemeConfig(key)
+        const value = themeConfig[key]
+        this.style[key] = typeof value === 'undefined' ? this.style[key] : value
         if (key === 'backgroundImage' && this.style[key] === 'none') {
           this.style[key] = ''
         }
@@ -1006,21 +1056,25 @@ export default {
 
     // 外框
     initOuterFramePadding() {
-      this.outerFramePadding.outerFramePaddingX = this.mindMap.getConfig(
-        'outerFramePaddingX'
-      )
-      this.outerFramePadding.outerFramePaddingY = this.mindMap.getConfig(
-        'outerFramePaddingX'
-      )
+      this.outerFramePadding.outerFramePaddingX =
+        this.mindMap.getConfig('outerFramePaddingX')
+      this.outerFramePadding.outerFramePaddingY =
+        this.mindMap.getConfig('outerFramePaddingY')
     },
 
     // margin初始值
     initMarginStyle() {
-      ['marginX', 'marginY'].forEach(key => {
-        this.style[key] = this.mindMap.getThemeConfig()[this.marginActiveTab][
-          key
-        ]
+      const themeConfig = this.getThemeConfigSnapshot()
+      const targetMarginConfig = themeConfig[this.marginActiveTab] || {}
+      ;['marginX', 'marginY'].forEach(key => {
+        this.style[key] = targetMarginConfig[key] ?? 0
       })
+    },
+
+    setMarginActiveTab(tab) {
+      if (this.marginActiveTab === tab) return
+      this.marginActiveTab = tab
+      this.initMarginStyle()
     },
 
     // 更新配置
@@ -1029,6 +1083,12 @@ export default {
         this.style[key] = ''
       } else {
         this.style[key] = value
+      }
+      if (!this.data.theme) {
+        this.data.theme = {}
+      }
+      if (!this.data.theme.config) {
+        this.data.theme.config = {}
       }
       this.data.theme.config[key] = value
       this.$bus.$emit('showLoading')
@@ -1075,6 +1135,12 @@ export default {
     // 设置margin
     updateMargin(type, value) {
       this.style[type] = value
+      if (!this.data.theme) {
+        this.data.theme = {}
+      }
+      if (!this.data.theme.config) {
+        this.data.theme.config = {}
+      }
       if (!this.data.theme.config[this.marginActiveTab]) {
         this.data.theme.config[this.marginActiveTab] = {}
       }
@@ -1117,7 +1183,9 @@ export default {
 
   .title {
     font-size: 16px;
-    font-family: PingFangSC-Medium, PingFang SC;
+    font-family:
+      PingFangSC-Medium,
+      PingFang SC;
     font-weight: 500;
     color: rgba(26, 26, 26, 0.9);
     margin-bottom: 10px;
@@ -1141,8 +1209,28 @@ export default {
       flex-direction: column;
     }
 
-    .tab {
+    .segmentTabs {
       width: 100%;
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .segmentTab {
+      border: 1px solid #dcdfe6;
+      background: #fff;
+      color: rgba(26, 26, 26, 0.88);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &.active {
+        background: #409eff;
+        border-color: #409eff;
+        color: #fff;
+      }
     }
 
     .imgUpload {
@@ -1193,6 +1281,14 @@ export default {
       .iconBtn {
         cursor: pointer;
         transition: all 0.3s;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
 
         &.top {
           transform: rotateZ(-180deg);
@@ -1254,6 +1350,22 @@ export default {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+      }
+    }
+  }
+
+  &.isDark {
+    .row {
+      .segmentTab {
+        background: #36393d;
+        border-color: hsla(0, 0%, 100%, 0.12);
+        color: hsla(0, 0%, 100%, 0.82);
+
+        &.active {
+          background: #409eff;
+          border-color: #409eff;
+          color: #fff;
         }
       }
     }

@@ -1,7 +1,6 @@
-import { configureCompat, createApp } from 'vue'
+import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import store from './store'
 import {
   ElButton,
   ElCheckbox,
@@ -67,14 +66,11 @@ import i18n from './i18n'
 import { Buffer } from 'buffer'
 import { bootstrapPlatformState } from '@/platform'
 import pinia from '@/stores'
+import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
 import legacyBus from '@/services/legacyBus'
 // import VConsole from 'vconsole'
 // const vConsole = new VConsole()
-
-configureCompat({
-  MODE: 2
-})
 
 if (!globalThis.Buffer) {
   globalThis.Buffer = Buffer
@@ -107,36 +103,57 @@ const elementComponents = [
   ElUpload
 ]
 
+const ignoredVueWarnings = [
+  'Runtime directive used on component with non-element root node.'
+]
+
 const initApp = () => {
-  const app = createApp(App)
-  app.config.globalProperties.$bus = legacyBus
-  app.config.globalProperties.$appEvents = appEvents
-  app.config.globalProperties.$message = ElMessage
-  app.config.globalProperties.$notify = ElNotification
-  app.config.globalProperties.$loading = ElLoadingService
-  app.config.globalProperties.$confirm = ElMessageBox.confirm
-  app.config.globalProperties.$alert = ElMessageBox.alert
-  elementComponents.forEach(component => {
-    app.component(component.name, component)
-  })
-  app.directive('loading', ElLoadingDirective)
-  app.use(router)
-  app.use(store)
-  app.use(pinia)
-  app.use(i18n)
-  app.mount('#app')
+  try {
+    const app = createApp(App)
+    app.config.warnHandler = (msg, instance, trace) => {
+      if (ignoredVueWarnings.some(item => msg.includes(item))) {
+        return
+      }
+      console.warn(`[Vue warn]: ${msg}${trace || ''}`)
+    }
+    app.config.globalProperties.$bus = legacyBus
+    app.config.globalProperties.$appEvents = appEvents
+    app.config.globalProperties.$message = ElMessage
+    app.config.globalProperties.$notify = ElNotification
+    app.config.globalProperties.$loading = ElLoadingService
+    app.config.globalProperties.$confirm = ElMessageBox.confirm
+    app.config.globalProperties.$alert = ElMessageBox.alert
+    elementComponents.forEach(component => {
+      app.component(component.name, component)
+    })
+    app.directive('loading', ElLoadingDirective)
+    app.use(router)
+    app.use(pinia)
+    app.use(i18n)
+    app.mount('#app')
+  } catch (error) {
+    console.error('initApp failed', error)
+    const root = document.querySelector('#app')
+    if (root) {
+      root.innerHTML = `
+        <div style="padding:24px;font-size:14px;line-height:1.6;color:#c0392b;background:#fff4f2;">
+          应用初始化失败，请刷新后重试。
+        </div>
+      `
+    }
+  }
 }
 
-const bootstrapApp = async () => {
-  await bootstrapPlatformState()
-  // 是否处于接管应用模式
-  if (window.takeOverApp) {
-    window.initApp = initApp
-    window.$bus = legacyBus
-    window.$appEvents = appEvents
-  } else {
-    initApp()
-  }
+const bootstrapApp = () => {
+  initApp()
+  void bootstrapPlatformState()
+    .then(state => {
+      syncRuntimeFromBootstrapState(state)
+      legacyBus.$emit('bootstrap_state_ready', state)
+    })
+    .catch(error => {
+      console.error('bootstrapApp failed to restore platform state', error)
+    })
 }
 
 bootstrapApp()

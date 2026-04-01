@@ -68,8 +68,12 @@ const iconMatch = html.match(/<link rel="icon"[^>]*href="([^"]+)"[^>]*>/)
 const preloadMatches = [
   ...html.matchAll(/<link rel="modulepreload"[^>]*href="([^"]+)"[^>]*>\s*/g)
 ]
-const styleMatches = [...html.matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)]
-const scriptMatch = html.match(/<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/)
+const styleMatches = [
+  ...html.matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g)
+]
+const scriptMatch = html.match(
+  /<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/
+)
 
 if (!scriptMatch) {
   throw new Error('Cannot find build entry script in dist/index.html')
@@ -83,10 +87,25 @@ const runtimeLoader = createRuntimeAssetsLoader({
 })
 
 html = html.replace(/<link rel="icon"[^>]*href="([^"]+)"[^>]*>\s*/g, '')
-html = html.replace(/<link rel="modulepreload"[^>]*href="([^"]+)"[^>]*>\s*/g, '')
+html = html.replace(
+  /<link rel="modulepreload"[^>]*href="([^"]+)"[^>]*>\s*/g,
+  ''
+)
 html = html.replace(/<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>\s*/g, '')
-html = html.replace(/<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>\s*/g, runtimeLoader + '\n')
+html = html.replace(
+  /<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>\s*/g,
+  runtimeLoader + '\n'
+)
 
 fs.writeFileSync(tempRootIndex, html)
-fs.renameSync(tempRootIndex, rootIndex)
+try {
+  fs.renameSync(tempRootIndex, rootIndex)
+} catch (error) {
+  if (error.code === 'EXDEV') {
+    fs.copyFileSync(tempRootIndex, rootIndex)
+    fs.unlinkSync(tempRootIndex)
+  } else {
+    throw error
+  }
+}
 fs.unlinkSync(distIndex)

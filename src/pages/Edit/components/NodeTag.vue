@@ -47,8 +47,9 @@ import {
   generateColorByContent,
   isMobile
 } from 'simple-mind-map/src/utils/index'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import { onShowNodeTag } from '@/services/appEvents'
+import { useThemeStore } from '@/stores/theme'
 
 // 节点标签内容设置
 export default {
@@ -63,8 +64,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   watch: {
@@ -84,6 +85,11 @@ export default {
   },
   methods: {
     generateColorByContent,
+
+    async openDialog(payload = {}) {
+      await this.$nextTick()
+      this.handleShowNodeTag(payload)
+    },
 
     syncTagInfoFromActiveNodes() {
       if (this.activeNodes.length > 0) {

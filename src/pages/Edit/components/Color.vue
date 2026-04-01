@@ -12,8 +12,13 @@
     </div>
     <div class="moreColor">
       <span>{{ $t('color.moreColor') }}</span>
+      <span
+        class="currentColorPreview"
+        :class="{ isTransparent: !selectColor || selectColor === 'transparent' }"
+        :style="{ backgroundColor: normalizedPreviewColor }"
+      ></span>
       <el-color-picker
-        size="mini"
+        size="small"
         show-alpha
         v-model="selectColor"
         @change="changeColor"
@@ -24,7 +29,8 @@
 
 <script>
 import { colorList } from '@/config'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 // 颜色选择器
 export default {
@@ -41,9 +47,15 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
-    })
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    normalizedPreviewColor() {
+      if (!this.selectColor || this.selectColor === 'transparent') {
+        return 'transparent'
+      }
+      return this.selectColor
+    }
   },
   watch: {
     color() {
@@ -72,6 +84,19 @@ export default {
   &.isDark {
     .moreColor {
       color: hsla(0, 0%, 100%, 0.6);
+
+      .currentColorPreview {
+        border-color: hsla(0, 0%, 100%, 0.18);
+      }
+    }
+
+    :deep(.el-color-picker__trigger) {
+      background-color: #36393d;
+      border-color: hsla(0, 0%, 100%, 0.12);
+    }
+
+    :deep(.el-color-picker__color) {
+      border-color: hsla(0, 0%, 100%, 0.2);
     }
   }
 }
@@ -99,6 +124,29 @@ export default {
 
   span {
     margin-right: 5px;
+  }
+
+  .currentColorPreview {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+
+    &.isTransparent {
+      background-image:
+        linear-gradient(45deg, #dcdfe6 25%, transparent 25%),
+        linear-gradient(-45deg, #dcdfe6 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #dcdfe6 75%),
+        linear-gradient(-45deg, transparent 75%, #dcdfe6 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    }
+  }
+
+  :deep(.el-color-picker__trigger) {
+    border-radius: 6px;
   }
 }
 </style>

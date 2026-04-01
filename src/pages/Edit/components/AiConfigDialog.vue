@@ -23,7 +23,7 @@
               :key="item.value"
               :label="$t(item.labelKey)"
               :value="item.value"
-            ></el-option>
+            />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('ai.baseUrl')" prop="baseUrl">

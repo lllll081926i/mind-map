@@ -43,7 +43,10 @@
     ></Structure>
     <ShortcutKey v-if="activeSidebar === 'shortcutKey'"></ShortcutKey>
     <Contextmenu v-if="mindMap" :mindMap="mindMap"></Contextmenu>
-    <RichTextToolbar v-if="mindMap" :mindMap="mindMap"></RichTextToolbar>
+    <RichTextToolbar
+      v-if="mindMap && richTextPluginReady"
+      :mindMap="mindMap"
+    ></RichTextToolbar>
     <NodeNoteContentShow
       v-if="mindMap"
       :mindMap="mindMap"
@@ -59,7 +62,7 @@
     <OutlineEdit v-if="mindMap" :mindMap="mindMap"></OutlineEdit>
     <Scrollbar v-if="isShowScrollbar && mindMap" :mindMap="mindMap"></Scrollbar>
     <FormulaSidebar
-      v-if="mindMap && openNodeRichText"
+      v-if="mindMap && openNodeRichText && richTextPluginReady"
       :mindMap="mindMap"
     ></FormulaSidebar>
     <NodeOuterFrame v-if="mindMap" :mindMap="mindMap"></NodeOuterFrame>
@@ -92,23 +95,19 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import MindMap from 'simple-mind-map'
 import MiniMap from 'simple-mind-map/src/plugins/MiniMap.js'
 import Watermark from 'simple-mind-map/src/plugins/Watermark.js'
 import KeyboardNavigation from 'simple-mind-map/src/plugins/KeyboardNavigation.js'
-import ExportPDF from 'simple-mind-map/src/plugins/ExportPDF.js'
-import ExportXMind from 'simple-mind-map/src/plugins/ExportXMind.js'
-import Export from 'simple-mind-map/src/plugins/Export.js'
 import Drag from 'simple-mind-map/src/plugins/Drag.js'
 import Select from 'simple-mind-map/src/plugins/Select.js'
-import RichText from 'simple-mind-map/src/plugins/RichText.js'
 import AssociativeLine from 'simple-mind-map/src/plugins/AssociativeLine.js'
 import TouchEvent from 'simple-mind-map/src/plugins/TouchEvent.js'
 import NodeImgAdjust from 'simple-mind-map/src/plugins/NodeImgAdjust.js'
 import SearchPlugin from 'simple-mind-map/src/plugins/Search.js'
 import Painter from 'simple-mind-map/src/plugins/Painter.js'
 import ScrollbarPlugin from 'simple-mind-map/src/plugins/Scrollbar.js'
-import Formula from 'simple-mind-map/src/plugins/Formula.js'
 import RainbowLines from 'simple-mind-map/src/plugins/RainbowLines.js'
 import Demonstrate from 'simple-mind-map/src/plugins/Demonstrate.js'
 import OuterFrame from 'simple-mind-map/src/plugins/OuterFrame.js'
@@ -120,12 +119,11 @@ import Themes from 'simple-mind-map-plugin-themes'
 import Count from './Count.vue'
 import NavigatorToolbar from './NavigatorToolbar.vue'
 import Contextmenu from './Contextmenu.vue'
-import RichTextToolbar from './RichTextToolbar.vue'
 import { getData, getConfig, storeData } from '@/api'
 import Navigator from './Navigator.vue'
 import NodeImgPreview from './NodeImgPreview.vue'
 import SidebarTrigger from './SidebarTrigger.vue'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
 import Search from './Search.vue'
 import NodeIconSidebar from './NodeIconSidebar.vue'
 import NodeIconToolbar from './NodeIconToolbar.vue'
@@ -134,46 +132,85 @@ import { showLoading, hideLoading } from '@/utils/loading'
 import handleClipboardText from '@/utils/handleClipboardText'
 import { getParentWithClass } from '@/utils'
 import Scrollbar from './Scrollbar.vue'
-import { onLocalStorageExceeded } from '@/services/appEvents'
 import {
   clearCurrentDataGetter,
   setCurrentDataGetter
 } from '@/services/runtimeGlobals'
+import { ensureBootstrapDocumentState } from '@/platform'
 import exampleData from 'simple-mind-map/example/exampleData'
+import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
 import NodeOuterFrame from './NodeOuterFrame.vue'
 import NodeTagStyle from './NodeTagStyle.vue'
 import AssociativeLineStyle from './AssociativeLineStyle.vue'
 import NodeImgPlacementToolbar from './NodeImgPlacementToolbar.vue'
 import defaultNodeImage from '../../../assets/img/图片加载失败.svg'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
 
-const OutlineSidebar = () => import('./OutlineSidebar.vue')
-const Style = () => import('./Style.vue')
-const BaseStyle = () => import('./BaseStyle.vue')
-const Theme = () => import('./Theme.vue')
-const Structure = () => import('./Structure.vue')
-const ShortcutKey = () => import('./ShortcutKey.vue')
-const Setting = () => import('./Setting.vue')
-const AiCreate = () => import('./AiCreate.vue')
-const AiChat = () => import('./AiChat.vue')
-const NodeNoteContentShow = () => import('./NodeNoteContentShow.vue')
-const FormulaSidebar = () => import('./FormulaSidebar.vue')
-const NodeNoteSidebar = () => import('./NodeNoteSidebar.vue')
+const OutlineSidebar = defineAsyncComponent(() => import('./OutlineSidebar.vue'))
+const Style = defineAsyncComponent(() => import('./Style.vue'))
+const BaseStyle = defineAsyncComponent(() => import('./BaseStyle.vue'))
+const Theme = defineAsyncComponent(() => import('./Theme.vue'))
+const Structure = defineAsyncComponent(() => import('./Structure.vue'))
+const ShortcutKey = defineAsyncComponent(() => import('./ShortcutKey.vue'))
+const Setting = defineAsyncComponent(() => import('./Setting.vue'))
+const AiCreate = defineAsyncComponent(() => import('./AiCreate.vue'))
+const AiChat = defineAsyncComponent(() => import('./AiChat.vue'))
+const RichTextToolbar = defineAsyncComponent(() =>
+  import('./RichTextToolbar.vue')
+)
+const NodeNoteContentShow = defineAsyncComponent(() =>
+  import('./NodeNoteContentShow.vue')
+)
+const FormulaSidebar = defineAsyncComponent(() =>
+  import('./FormulaSidebar.vue')
+)
+const NodeNoteSidebar = defineAsyncComponent(() =>
+  import('./NodeNoteSidebar.vue')
+)
+
+let richTextPluginsPromise = null
+let exportPluginsPromise = null
+
+const loadRichTextPlugins = async () => {
+  if (!richTextPluginsPromise) {
+    richTextPluginsPromise = Promise.all([
+      import('simple-mind-map/src/plugins/RichText.js'),
+      import('simple-mind-map/src/plugins/Formula.js')
+    ]).then(([richTextModule, formulaModule]) => ({
+      RichText: richTextModule.default,
+      Formula: formulaModule.default
+    }))
+  }
+  return richTextPluginsPromise
+}
+
+const loadExportPlugins = async () => {
+  if (!exportPluginsPromise) {
+    exportPluginsPromise = Promise.all([
+      import('simple-mind-map/src/plugins/ExportPDF.js'),
+      import('simple-mind-map/src/plugins/ExportXMind.js'),
+      import('simple-mind-map/src/plugins/Export.js')
+    ]).then(([exportPdfModule, exportXMindModule, exportModule]) => ({
+      ExportPDF: exportPdfModule.default,
+      ExportXMind: exportXMindModule.default,
+      Export: exportModule.default
+    }))
+  }
+  return exportPluginsPromise
+}
 
 // 注册插件
 MindMap.usePlugin(MiniMap)
   .usePlugin(Watermark)
   .usePlugin(Drag)
   .usePlugin(KeyboardNavigation)
-  .usePlugin(ExportPDF)
-  .usePlugin(ExportXMind)
-  .usePlugin(Export)
   .usePlugin(Select)
   .usePlugin(AssociativeLine)
   .usePlugin(NodeImgAdjust)
   .usePlugin(TouchEvent)
   .usePlugin(SearchPlugin)
   .usePlugin(Painter)
-  .usePlugin(Formula)
   .usePlugin(RainbowLines)
   .usePlugin(Demonstrate)
   .usePlugin(OuterFrame)
@@ -229,22 +266,37 @@ export default {
       storeConfigTimer: null,
       showDragMask: false,
       onDataChange: null,
-      onViewDataChange: null
+      onViewDataChange: null,
+      richTextPluginReady: false
     }
   },
   computed: {
-    ...mapState({
-      isZenMode: state => state.localConfig.isZenMode,
-      openNodeRichText: state => state.localConfig.openNodeRichText,
-      isShowScrollbar: state => state.localConfig.isShowScrollbar,
-      enableDragImport: state => state.localConfig.enableDragImport,
-      useLeftKeySelectionRightKeyDrag: state =>
-        state.localConfig.useLeftKeySelectionRightKeyDrag,
-      extraTextOnExport: state => state.extraTextOnExport,
-      isDragOutlineTreeNode: state => state.isDragOutlineTreeNode,
-      enableAi: state => state.localConfig.enableAi,
-      activeSidebar: state => state.activeSidebar
-    })
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
+    ...mapState(useAppStore, {
+      extraTextOnExport: 'extraTextOnExport',
+      isDragOutlineTreeNode: 'isDragOutlineTreeNode',
+      activeSidebar: 'activeSidebar'
+    }),
+    isZenMode() {
+      return this.localConfig.isZenMode
+    },
+    openNodeRichText() {
+      return this.localConfig.openNodeRichText
+    },
+    isShowScrollbar() {
+      return this.localConfig.isShowScrollbar
+    },
+    enableDragImport() {
+      return this.localConfig.enableDragImport
+    },
+    useLeftKeySelectionRightKeyDrag() {
+      return this.localConfig.useLeftKeySelectionRightKeyDrag
+    },
+    enableAi() {
+      return this.localConfig.enableAi
+    }
   },
   watch: {
     openNodeRichText() {
@@ -264,22 +316,28 @@ export default {
   },
   async mounted() {
     showLoading()
-    this.getData()
-    await this.init()
-    this.$bus.$on('execCommand', this.execCommand)
-    this.$bus.$on('paddingChange', this.onPaddingChange)
-    this.$bus.$on('export', this.export)
-    this.$bus.$on('setData', this.setData)
-    this.$bus.$on('startTextEdit', this.handleStartTextEdit)
-    this.$bus.$on('endTextEdit', this.handleEndTextEdit)
-    this.$bus.$on('createAssociativeLine', this.handleCreateLineFromActiveNode)
-    this.$bus.$on('startPainter', this.handleStartPainter)
-    this.$bus.$on('node_tree_render_end', this.handleHideLoading)
-    this.$bus.$on('showLoading', this.handleShowLoading)
-    this.removeLocalStorageExceededListener = onLocalStorageExceeded(
-      this.onLocalStorageExceeded
-    )
-    window.addEventListener('resize', this.handleResize)
+    try {
+      await ensureBootstrapDocumentState()
+      this.getData()
+      await this.init()
+      this.$bus.$on('execCommand', this.execCommand)
+      this.$bus.$on('paddingChange', this.onPaddingChange)
+      this.$bus.$on('export', this.export)
+      this.$bus.$on('setData', this.setData)
+      this.$bus.$on('startTextEdit', this.handleStartTextEdit)
+      this.$bus.$on('endTextEdit', this.handleEndTextEdit)
+      this.$bus.$on(
+        'createAssociativeLine',
+        this.handleCreateLineFromActiveNode
+      )
+      this.$bus.$on('startPainter', this.handleStartPainter)
+      this.$bus.$on('node_tree_render_end', this.handleHideLoading)
+      this.$bus.$on('showLoading', this.handleShowLoading)
+      window.addEventListener('resize', this.handleResize)
+    } catch (error) {
+      console.error('Edit view init failed', error)
+      hideLoading()
+    }
   },
   beforeUnmount() {
     this.$bus.$off('execCommand', this.execCommand)
@@ -292,8 +350,6 @@ export default {
     this.$bus.$off('startPainter', this.handleStartPainter)
     this.$bus.$off('node_tree_render_end', this.handleHideLoading)
     this.$bus.$off('showLoading', this.handleShowLoading)
-    this.removeLocalStorageExceededListener &&
-      this.removeLocalStorageExceededListener()
     window.removeEventListener('resize', this.handleResize)
     if (this.onDataChange) {
       this.$bus.$off('data_change', this.onDataChange)
@@ -308,15 +364,6 @@ export default {
     }
   },
   methods: {
-    onLocalStorageExceeded() {
-      this.$notify({
-        type: 'warning',
-        title: this.$t('edit.tip'),
-        message: this.$t('edit.localStorageExceededTip'),
-        duration: 0
-      })
-    },
-
     handleStartTextEdit() {
       this.mindMap.renderer.startTextEdit()
     },
@@ -353,8 +400,26 @@ export default {
 
     // 获取思维导图数据，实际应该调接口获取
     getData() {
-      this.mindMapData = getData()
+      const nextMindMapData = getData()
+      this.mindMapData = this.normalizeMindMapData(nextMindMapData)
       this.mindMapConfig = getConfig() || {}
+    },
+
+    normalizeMindMapData(data) {
+      if (
+        data &&
+        typeof data === 'object' &&
+        data.root &&
+        data.theme &&
+        typeof data.theme === 'object'
+      ) {
+        return data
+      }
+      console.error(
+        'Invalid mind map bootstrap data, fallback to example data',
+        data
+      )
+      return simpleDeepClone(exampleData)
     },
 
     // 存储数据当数据有变时
@@ -389,7 +454,8 @@ export default {
     async init() {
       const { default: icon } = await import('@/config/icon')
       let hasFileURL = this.hasFileURL()
-      let { root, layout, theme, view } = this.mindMapData
+      const initialData = this.normalizeMindMapData(this.mindMapData)
+      let { root, layout, theme, view } = initialData
       const config = this.mindMapConfig
       // 如果url中存在要打开的文件，那么思维导图数据、主题、布局都使用默认的
       if (hasFileURL) {
@@ -408,8 +474,8 @@ export default {
         data: root,
         fit: false,
         layout: layout,
-        theme: theme.template,
-        themeConfig: theme.config,
+        theme: theme?.template || exampleData.theme.template,
+        themeConfig: theme?.config || exampleData.theme.config,
         viewData: view,
         nodeTextEditZIndex: 1000,
         nodeNoteTooltipZIndex: 1000,
@@ -459,7 +525,7 @@ export default {
           if (!text) return null
           const el = document.createElement('div')
           el.className = 'footer'
-          el.innerHTML = text
+          el.textContent = text
           const cssText = `
             .footer {
               width: 100%;
@@ -500,7 +566,12 @@ export default {
           })
         }
       })
-      this.loadPlugins()
+      const rawExport = this.mindMap.export.bind(this.mindMap)
+      this.mindMap.export = async (...args) => {
+        await this.ensureExportPluginsLoaded()
+        return rawExport(...args)
+      }
+      await this.loadPlugins()
       this.mindMap.keyCommand.addShortcut('Control+s', () => {
         this.manualSave()
       })
@@ -538,10 +609,6 @@ export default {
         })
       })
       this.bindSaveEvent()
-      // 如果应用被接管，那么抛出事件传递思维导图实例
-      if (window.takeOverApp) {
-        this.$bus.$emit('app_inited', this.mindMap)
-      }
       // 解析url中的文件
       if (hasFileURL) {
         this.$bus.$emit('handle_file_url')
@@ -556,10 +623,33 @@ export default {
       this.cooperateTest()
     },
 
+    async ensureExportPluginsLoaded() {
+      if (!this.mindMap) return null
+      const { ExportPDF, ExportXMind, Export } = await loadExportPlugins()
+      this.mindMap.addPlugin(ExportPDF)
+      this.mindMap.addPlugin(ExportXMind)
+      this.mindMap.addPlugin(Export)
+      return {
+        ExportPDF,
+        ExportXMind,
+        Export
+      }
+    },
+
+    async ensureRichTextPluginsLoaded() {
+      return loadRichTextPlugins()
+    },
+
     // 加载相关插件
-    loadPlugins() {
-      if (this.openNodeRichText) this.addRichTextPlugin()
-      if (this.isShowScrollbar) this.addScrollbarPlugin()
+    async loadPlugins() {
+      const tasks = []
+      if (this.openNodeRichText) {
+        tasks.push(this.addRichTextPlugin())
+      }
+      if (this.isShowScrollbar) {
+        tasks.push(Promise.resolve(this.addScrollbarPlugin()))
+      }
+      await Promise.all(tasks)
     },
 
     // url中是否存在要打开的文件
@@ -620,13 +710,22 @@ export default {
     },
 
     // 加载节点富文本编辑插件
-    addRichTextPlugin() {
+    async addRichTextPlugin() {
       if (!this.mindMap) return
+      const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
+      if (!this.mindMap || !this.openNodeRichText) return
       this.mindMap.addPlugin(RichText)
+      this.mindMap.addPlugin(Formula)
+      this.richTextPluginReady = true
     },
 
     // 移除节点富文本编辑插件
-    removeRichTextPlugin() {
+    async removeRichTextPlugin() {
+      this.richTextPluginReady = false
+      if (!this.mindMap || !richTextPluginsPromise) return
+      const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
+      if (!this.mindMap || this.openNodeRichText) return
+      this.mindMap.removePlugin(Formula)
       this.mindMap.removePlugin(RichText)
     },
 

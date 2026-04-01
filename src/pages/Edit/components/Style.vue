@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('style.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('style.title')"
+    :force-show="activeSidebar === 'nodeStyle'"
+  >
     <div
       class="styleBox"
       :class="{ isDark: isDark }"
@@ -12,7 +16,7 @@
           <div class="rowItem">
             <!-- <span class="name">{{ $t('style.fontFamily') }}</span> -->
             <el-select
-              size="mini"
+              size="small"
               style="width: 100px"
               v-model="style.fontFamily"
               placeholder=""
@@ -24,14 +28,14 @@
                 :label="item.name"
                 :value="item.value"
                 :style="{ fontFamily: item.value }"
+                >{{ item.name }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
           <div class="rowItem">
             <!-- <span class="name">{{ $t('style.fontSize') }}</span> -->
             <el-select
-              size="mini"
+              size="small"
               style="width: 60px"
               v-model="style.fontSize"
               placeholder=""
@@ -42,14 +46,13 @@
                 :key="item"
                 :label="item"
                 :value="item"
-                :style="{ fontSize: item + 'px' }"
+                >{{ item }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
           <div class="rowItem">
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.textAlign"
               placeholder=""
@@ -60,8 +63,8 @@
                 :key="item.value"
                 :label="item.name"
                 :value="item.value"
+                >{{ item.name }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
         </div>
@@ -117,20 +120,20 @@
                   </div>
                 </template>
                 <el-radio-group
-                  size="mini"
+                  size="small"
                   v-model="style.textDecoration"
                   @change="update('textDecoration')"
                 >
-                  <el-radio-button label="none">{{
+                  <el-radio-button value="none">{{
                     $t('style.none')
                   }}</el-radio-button>
-                  <el-radio-button label="underline">{{
+                  <el-radio-button value="underline">{{
                     $t('style.underline')
                   }}</el-radio-button>
-                  <el-radio-button label="line-through">{{
+                  <el-radio-button value="line-through">{{
                     $t('style.lineThrough')
                   }}</el-radio-button>
-                  <el-radio-button label="overline">{{
+                  <el-radio-button value="overline">{{
                     $t('style.overline')
                   }}</el-radio-button>
                 </el-radio-group>
@@ -159,7 +162,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.style') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.borderDasharray"
               placeholder=""
@@ -182,8 +185,8 @@
                       style.borderDasharray === item.value
                         ? '#409eff'
                         : isDark
-                        ? '#fff'
-                        : '#000'
+                          ? '#fff'
+                          : '#000'
                     "
                     :stroke-dasharray="item.value"
                   ></line>
@@ -196,7 +199,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.width') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.borderWidth"
               placeholder=""
@@ -220,7 +223,7 @@
           <div class="rowItem" v-show="style.shape === 'rectangle'">
             <span class="name">{{ $t('style.borderRadius') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.borderRadius"
               placeholder=""
@@ -231,8 +234,7 @@
                 :key="item"
                 :label="item"
                 :value="item"
-              >
-              </el-option>
+              />
             </el-select>
           </div>
         </div>
@@ -250,7 +252,7 @@
               </template>
               <Color :color="style.fillColor" @change="changeFillColor"></Color>
             </el-popover>
-            <span class="name" style="margin-left: 20px;">{{
+            <span class="name" style="margin-left: 20px">{{
               $t('style.gradientStyle')
             }}</span>
             <el-checkbox
@@ -290,7 +292,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.direction') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.linearGradientDir"
               placeholder=""
@@ -301,8 +303,8 @@
                 :key="item.value"
                 :label="item.name"
                 :value="item.value"
+                >{{ item.name }}</el-option
               >
-              </el-option>
             </el-select>
           </div>
         </div>
@@ -312,7 +314,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.shape') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 120px"
               v-model="style.shape"
               placeholder=""
@@ -323,7 +325,11 @@
                 :key="item.value"
                 :label="item.name"
                 :value="item.value"
-                style="display: flex; justify-content: center; align-items: center;"
+                style="
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                "
               >
                 <svg
                   :width="item.width || 60"
@@ -337,8 +343,8 @@
                       style.shape === item.value
                         ? '#409eff'
                         : isDark
-                        ? '#fff'
-                        : '#000'
+                          ? '#fff'
+                          : '#000'
                     "
                     stroke-width="2"
                   ></path>
@@ -365,7 +371,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.style') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.lineDasharray"
               placeholder=""
@@ -388,8 +394,8 @@
                       style.lineDasharray === item.value
                         ? '#409eff'
                         : isDark
-                        ? '#fff'
-                        : '#000'
+                          ? '#fff'
+                          : '#000'
                     "
                     :stroke-dasharray="item.value"
                   ></line>
@@ -402,7 +408,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.width') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.lineWidth"
               placeholder=""
@@ -426,7 +432,7 @@
           <div class="rowItem">
             <span class="name">{{ $t('style.arrowDir') }}</span>
             <el-select
-              size="mini"
+              size="small"
               style="width: 80px"
               v-model="style.lineMarkerDir"
               placeholder=""
@@ -436,12 +442,12 @@
                 key="start"
                 :label="$t('style.arrowDirStart')"
                 value="start"
-              ></el-option>
+              />
               <el-option
                 key="end"
                 :label="$t('style.arrowDirEnd')"
                 value="end"
-              ></el-option>
+              />
             </el-select>
           </div>
         </div>
@@ -474,19 +480,19 @@
             <span class="name">{{ $t('style.placement') }}</span>
             <el-radio-group
               v-model="style.imgPlacement"
-              size="mini"
+              size="small"
               @change="update('imgPlacement')"
             >
-              <el-radio-button label="top">{{
+              <el-radio-button value="top">{{
                 $t('style.top')
               }}</el-radio-button>
-              <el-radio-button label="bottom">{{
+              <el-radio-button value="bottom">{{
                 $t('style.bottom')
               }}</el-radio-button>
-              <el-radio-button label="left">{{
+              <el-radio-button value="left">{{
                 $t('style.left')
               }}</el-radio-button>
-              <el-radio-button label="right">{{
+              <el-radio-button value="right">{{
                 $t('style.right')
               }}</el-radio-button>
             </el-radio-group>
@@ -499,13 +505,13 @@
             <span class="name">{{ $t('style.placement') }}</span>
             <el-radio-group
               v-model="style.tagPlacement"
-              size="mini"
+              size="small"
               @change="update('tagPlacement')"
             >
-              <el-radio-button label="right">{{
+              <el-radio-button value="right">{{
                 $t('style.right')
               }}</el-radio-button>
-              <el-radio-button label="bottom">{{
+              <el-radio-button value="bottom">{{
                 $t('style.bottom')
               }}</el-radio-button>
             </el-radio-group>
@@ -534,7 +540,9 @@ import {
   linearGradientDirList,
   alignList
 } from '@/config'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 
 // 节点样式设置
 export default {
@@ -586,9 +594,11 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
     fontFamilyList() {
       return fontFamilyList[this.$i18n.locale] || fontFamilyList.zh
@@ -599,7 +609,7 @@ export default {
     shapeList() {
       return [
         ...(shapeList[this.$i18n.locale] || shapeList.zh),
-        ...this.mindMap.extendShapeList
+        ...(this.mindMap.extendShapeList || [])
           .filter(item => {
             return !['fishHead'].includes(item.name)
           })
@@ -614,7 +624,7 @@ export default {
     },
     shapeListMap() {
       const map2 = {}
-      this.mindMap.extendShapeList.forEach(item => {
+      ;(this.mindMap.extendShapeList || []).forEach(item => {
         map2[item.name] = item.path
       })
       return {
@@ -824,7 +834,9 @@ export default {
 
   .title {
     font-size: 16px;
-    font-family: PingFangSC-Medium, PingFang SC;
+    font-family:
+      PingFangSC-Medium,
+      PingFang SC;
     font-weight: 500;
     color: rgba(26, 26, 26, 0.9);
     margin-bottom: 10px;

@@ -1,34 +1,37 @@
 <template>
-  <div
-    class="nodeTagStyleContainer"
-    ref="elRef"
-    :style="position"
-    v-show="show"
-    :class="{ isDark: isDark }"
-  >
-    <div class="row">
-      <el-input
-        v-model="text"
-        :placeholder="$t('nodeTagStyle.placeholder')"
-        size="mini"
-        @blur="updateTagText"
-        @keydown.stop
-        @keyup.enter.stop="updateTagText"
-      ></el-input>
-      <div class="deleteBtn" @click.stop="deleteTag">
-        <span class="iconfont iconshanchu"></span>
-        <span class="text">{{ $t('nodeTagStyle.delete') }}</span>
+  <Teleport to="body">
+    <div
+      class="nodeTagStyleContainer"
+      ref="elRef"
+      :style="position"
+      v-show="show"
+      :class="{ isDark: isDark }"
+    >
+      <div class="row">
+        <el-input
+          v-model="text"
+          :placeholder="$t('nodeTagStyle.placeholder')"
+          size="small"
+          @blur="updateTagText"
+          @keydown.stop
+          @keyup.enter.stop="updateTagText"
+        ></el-input>
+        <div class="deleteBtn" @click.stop="deleteTag">
+          <span class="iconfont iconshanchu"></span>
+          <span class="text">{{ $t('nodeTagStyle.delete') }}</span>
+        </div>
+      </div>
+      <div class="row">
+        <Color :color="fill" @change="updateTagFill"></Color>
       </div>
     </div>
-    <div class="row">
-      <Color :color="fill" @change="updateTagFill"></Color>
-    </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
 import Color from './Color.vue'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 export default {
   components: {
@@ -53,8 +56,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     })
   },
   created() {
@@ -70,12 +73,6 @@ export default {
     this.mindMap.off('translate', this.hide)
     this.mindMap.off('svg_mousedown', this.hide)
     this.mindMap.off('expand_btn_click', this.hide)
-    if (this.$refs.elRef?.parentNode === document.body) {
-      document.body.removeChild(this.$refs.elRef)
-    }
-  },
-  mounted() {
-    document.body.appendChild(this.$refs.elRef)
   },
   methods: {
     onNodeTagClick(node, tag, index, el) {

@@ -22,7 +22,9 @@
           class="previewBox"
           :style="{ backgroundImage: `url('${value}')` }"
         ></div>
-        <span class="delBtn el-icon-close" @click="deleteImg"></span>
+        <button class="delBtn" type="button" @click="deleteImg">
+          <span class="iconfont iconguanbi"></span>
+        </button>
       </div>
     </div>
   </div>

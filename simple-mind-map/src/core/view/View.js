@@ -439,8 +439,10 @@ class View {
     switch (type) {
       case 'scale':
         this.mindMap.emit('scale', this.scale)
+        break
       case 'translate':
         this.mindMap.emit('translate', this.x, this.y)
+        break
     }
   }
 }

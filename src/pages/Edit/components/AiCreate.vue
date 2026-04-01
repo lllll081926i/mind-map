@@ -176,7 +176,9 @@ export default {
   },
   created() {
     this.removeAiCreateAllListener = onAiCreateAll(this.aiCrateAll)
-    this.removeAiCreatePartListener = onAiCreatePart(this.showAiCreatePartDialog)
+    this.removeAiCreatePartListener = onAiCreatePart(
+      this.showAiCreatePartDialog
+    )
     this.removeAiChatListener = onAiChat(this.aiChat)
     this.removeAiChatStopListener = onAiChatStop(this.aiChatStop)
     this.removeShowAiConfigDialogListener = onShowAiConfigDialog(
@@ -303,6 +305,9 @@ export default {
       const aiInputText = this.aiInput.trim()
       if (!aiInputText) {
         this.$message.warning(this.$t('ai.noInputTip'))
+        return
+      }
+      if (this.isAiCreating) {
         return
       }
       this.closeAiCreateDialog()
@@ -527,7 +532,9 @@ export default {
             this.resetOnAiCreatingStop()
             this.resetAiCreatePartDialog()
             this.resetOnRenderEnd()
-            this.$message.error(error?.message || this.$t('ai.generationFailed'))
+            this.$message.error(
+              error?.message || this.$t('ai.generationFailed')
+            )
           }
         )
       } catch (error) {

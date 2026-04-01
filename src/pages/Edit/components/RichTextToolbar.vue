@@ -1,12 +1,13 @@
 <template>
-  <div
-    class="richTextToolbar"
-    ref="richTextToolbar"
-    :style="style"
-    :class="{ isDark: isDark }"
-    @click.stop.passive
-    v-show="showRichTextToolbar"
-  >
+  <Teleport to="body">
+    <div
+      class="richTextToolbar"
+      ref="richTextToolbar"
+      :style="style"
+      :class="{ isDark: isDark }"
+      @click.stop.passive
+      v-show="showRichTextToolbar"
+    >
     <el-tooltip :content="$t('richTextToolbar.bold')" placement="top">
       <div class="btn" :class="{ active: formatInfo.bold }" @click="toggleBold">
         <span class="icon iconfont iconzitijiacu"></span>
@@ -73,8 +74,7 @@
             v-for="item in fontSizeList"
             :key="item"
             :style="{
-              fontSize: item + 'px',
-              height: (item < 30 ? 30 : item + 10) + 'px'
+              height: '32px'
             }"
             :class="{ active: formatInfo.size === item + 'px' }"
             @click="changeFontSize(item)"
@@ -144,13 +144,15 @@
         <span class="icon iconfont iconqingchu"></span>
       </div>
     </el-tooltip>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <script>
 import { fontFamilyList, fontSizeList, alignList } from '@/config'
 import Color from './Color.vue'
-import { mapState } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 export default {
   components: {
@@ -175,8 +177,8 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
 
     fontFamilyList() {
@@ -190,14 +192,8 @@ export default {
   created() {
     this.$bus.$on('rich_text_selection_change', this.onRichTextSelectionChange)
   },
-  mounted() {
-    document.body.append(this.$refs.richTextToolbar)
-  },
   beforeUnmount() {
     this.$bus.$off('rich_text_selection_change', this.onRichTextSelectionChange)
-    if (this.$refs.richTextToolbar?.parentNode === document.body) {
-      document.body.removeChild(this.$refs.richTextToolbar)
-    }
   },
   methods: {
     onRichTextSelectionChange(hasRange, rect, formatInfo) {

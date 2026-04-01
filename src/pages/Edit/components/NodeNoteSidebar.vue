@@ -1,12 +1,19 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('note.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('note.title')"
+    :force-show="activeSidebar === 'noteSidebar'"
+  >
     <div class="noteContentWrap" ref="noteContentWrap"></div>
   </Sidebar>
 </template>
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 let noteSidebarViewerLoader = null
 
@@ -36,21 +43,25 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark,
-      activeSidebar: state => state.activeSidebar
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     })
   },
   watch: {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        if (val === 'noteSidebar') {
-          this.$refs.sidebar.show = true
-        } else {
-          this.$refs.sidebar.show = false
-        }
+        this.$nextTick(() => {
+          if (!this.$refs.sidebar) return
+          if (val === 'noteSidebar') {
+            this.$refs.sidebar.show = true
+          } else {
+            this.$refs.sidebar.show = false
+          }
+        })
       }
     }
   },
@@ -68,8 +79,6 @@ export default {
     this.mindMap.off('node_note_click', this.onNodeNoteClick)
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     onNodeActive(...args) {
       if (this.activeSidebar !== 'noteSidebar') {
         return
@@ -77,10 +86,10 @@ export default {
       const nodes = [...(args[1] || [])]
       if (nodes.length > 0) {
         if (nodes[0] !== this.node) {
-          this.setActiveSidebar(null)
+          setActiveSidebar('')
         }
       } else {
-        this.setActiveSidebar(null)
+        setActiveSidebar(null)
       }
     },
 
@@ -96,7 +105,7 @@ export default {
 
     async onNodeNoteClick(node) {
       this.node = node
-      this.setActiveSidebar('noteSidebar')
+      setActiveSidebar('noteSidebar')
       await this.initEditor()
       this.editor.setMarkdown(node.getData('note'))
     }

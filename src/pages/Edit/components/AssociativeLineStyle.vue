@@ -25,7 +25,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.associativeLineWidth') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineWidth"
             placeholder=""
@@ -78,7 +78,7 @@
             $t('baseStyle.associativeLineActiveWidth')
           }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineActiveWidth"
             placeholder=""
@@ -108,7 +108,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('style.style') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineDasharray"
             placeholder=""
@@ -135,8 +135,8 @@
                     style.associativeLineDasharray === item.value
                       ? '#409eff'
                       : isDark
-                      ? '#fff'
-                      : '#000'
+                        ? '#fff'
+                        : '#000'
                   "
                   :stroke-dasharray="item.value"
                 ></line>
@@ -151,7 +151,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.fontFamily') }}</span>
           <el-select
-            size="mini"
+            size="small"
             v-model="style.associativeLineTextFontFamily"
             placeholder=""
             @change="update('associativeLineTextFontFamily', $event)"
@@ -162,8 +162,8 @@
               :label="item.name"
               :value="item.value"
               :style="{ fontFamily: item.value }"
+              >{{ item.name }}</el-option
             >
-            </el-option>
           </el-select>
         </div>
       </div>
@@ -190,7 +190,7 @@
         <div class="rowItem">
           <span class="name">{{ $t('baseStyle.fontSize') }}</span>
           <el-select
-            size="mini"
+            size="small"
             style="width: 80px"
             v-model="style.associativeLineTextFontSize"
             placeholder=""
@@ -201,9 +201,8 @@
               :key="item"
               :label="item"
               :value="item"
-              :style="{ fontSize: item + 'px' }"
+              >{{ item }}</el-option
             >
-            </el-option>
           </el-select>
         </div>
       </div>
@@ -220,7 +219,10 @@ import {
   fontSizeList,
   borderDasharrayList
 } from '@/config'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 const defaultStyle = {
   associativeLineColor: '',
@@ -255,10 +257,16 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar,
-      isDark: state => state.localConfig.isDark
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
     }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+
+    hasActiveLine() {
+      return !!this.activeLineNode && !!this.activeLineToNode
+    },
 
     fontFamilyList() {
       return fontFamilyList[this.$i18n.locale] || fontFamilyList.zh
@@ -272,8 +280,11 @@ export default {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        this.$refs.sidebar.show = val === 'associativeLineStyle'
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'associativeLineStyle'
+          }
+        })
       }
     }
   },
@@ -297,8 +308,6 @@ export default {
     )
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     onAssociativeLineClick(a, b, node, toNode) {
       this.activeLineNode = node
       this.activeLineToNode = toNode
@@ -309,12 +318,12 @@ export default {
       Object.keys(this.style).forEach(item => {
         this.style[item] = styleConfig[item]
       })
-      this.setActiveSidebar('associativeLineStyle')
+      setActiveSidebar('associativeLineStyle')
     },
 
     associativeLineDeactivate() {
       if (this.activeSidebar === 'associativeLineStyle') {
-        this.setActiveSidebar(null)
+        setActiveSidebar('')
       }
       this.activeLineNode = null
       this.activeLineToNode = null
@@ -324,6 +333,9 @@ export default {
     },
 
     update(prop, value) {
+      if (!this.hasActiveLine) {
+        return
+      }
       this.style[prop] = value
       const associativeLineStyle =
         this.activeLineNode.getData('associativeLineStyle') || {}
@@ -365,7 +377,9 @@ export default {
 
   .title {
     font-size: 16px;
-    font-family: PingFangSC-Medium, PingFang SC;
+    font-family:
+      PingFangSC-Medium,
+      PingFang SC;
     font-weight: 500;
     color: rgba(26, 26, 26, 0.9);
     margin-bottom: 10px;

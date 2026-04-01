@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('formulaSidebar.title')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('formulaSidebar.title')"
+    :force-show="activeSidebar === 'formulaSidebar'"
+  >
     <div class="box" :class="{ isDark: isDark }">
       <div class="formulaInputBox">
         <el-input
@@ -12,7 +16,7 @@
         />
         <el-button
           size="small"
-          style="width: 100%; margin-top: 20px;"
+          style="width: 100%; margin-top: 20px"
           @click="confirm"
           >{{ $t('formulaSidebar.confirm') }}</el-button
         >
@@ -32,8 +36,12 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
 import { formulaList } from '@/config/constant'
+import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 export default {
   components: {
@@ -52,18 +60,25 @@ export default {
     }
   },
   computed: {
-    ...mapState({
-      activeSidebar: state => state.activeSidebar, 
-      isDark: state => state.localConfig.isDark, 
-      localConfig: state => state.localConfig
+    ...mapState(useAppStore, {
+      activeSidebar: 'activeSidebar'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
     })
   },
   watch: {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        if (!this.$refs.sidebar) return
-        this.$refs.sidebar.show = val === 'formulaSidebar'
+        this.$nextTick(() => {
+          if (this.$refs.sidebar) {
+            this.$refs.sidebar.show = val === 'formulaSidebar'
+          }
+        })
       }
     }
   },
@@ -80,8 +95,6 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     init() {
       if (!window.katex) return
       this.list = formulaList.map(item => {
@@ -101,7 +114,7 @@ export default {
         this.activeNodes.length <= 0 &&
         this.activeSidebar === 'formulaSidebar'
       ) {
-        this.setActiveSidebar(null)
+        setActiveSidebar('')
       }
     },
 

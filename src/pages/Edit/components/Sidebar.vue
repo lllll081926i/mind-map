@@ -2,10 +2,12 @@
   <div
     class="sidebarContainer"
     @click.stop
-    :class="{ show: show, isDark: isDark }"
-    :style="{ zIndex: zIndex }"
+    :class="{ isDark: isDark }"
+    :style="sidebarStyle"
   >
-    <span class="closeBtn el-icon-close" @click="close"></span>
+    <button class="closeBtn" type="button" @click="close">
+      <span class="iconfont iconguanbi"></span>
+    </button>
     <div class="sidebarHeader" v-if="title">
       {{ title }}
     </div>
@@ -17,7 +19,9 @@
 
 <script>
 import { store } from '@/config'
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
+import { setActiveSidebar } from '@/stores/runtime'
 
 // 侧边栏容器
 export default {
@@ -25,23 +29,38 @@ export default {
     title: {
       type: String,
       default: ''
+    },
+    forceShow: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
-      show: false,
-      zIndex: 0
+      show: this.forceShow || false,
+      zIndex: 1100
     }
   },
   computed: {
-    ...mapState({
-      isDark: state => state.localConfig.isDark
-    })
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    isShown() {
+      return this.forceShow || this.show
+    },
+    sidebarStyle() {
+      return {
+        zIndex: this.zIndex,
+        right: this.isShown ? '0' : '-300px',
+        opacity: this.isShown ? 1 : 0,
+        pointerEvents: this.isShown ? 'auto' : 'none'
+      }
+    }
   },
   watch: {
-    show(val, oldVal) {
+    isShown(val, oldVal) {
       if (val && !oldVal) {
-        this.zIndex = store.sidebarZIndex++
+        this.zIndex = 1100 + store.sidebarZIndex++
       }
     }
   },
@@ -52,15 +71,13 @@ export default {
     this.$bus.$off('closeSideBar', this.handleCloseSidebar)
   },
   methods: {
-    ...mapMutations(['setActiveSidebar']),
-
     handleCloseSidebar() {
       this.close()
     },
 
     close() {
       this.show = false
-      this.setActiveSidebar(null)
+      setActiveSidebar('')
     },
 
     getEl() {
@@ -77,6 +94,7 @@ export default {
   top: 110px;
   bottom: 0;
   width: 300px;
+  z-index: 1100;
   background-color: #fff;
   border-left: 1px solid #e8e8e8;
   display: flex;
@@ -97,16 +115,25 @@ export default {
     }
   }
 
-  &.show {
-    right: 0;
-  }
-
   .closeBtn {
     position: absolute;
     right: 20px;
     top: 12px;
-    font-size: 20px;
     cursor: pointer;
+    border: none;
+    background: transparent;
+    color: inherit;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .iconfont {
+      font-size: 14px;
+      line-height: 1;
+    }
   }
 
   .sidebarHeader {

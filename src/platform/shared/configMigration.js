@@ -12,21 +12,6 @@ import {
 } from './configSchema'
 import { normalizeRecentFiles } from './recentFiles'
 
-export const LOCAL_STORAGE_KEYS = {
-  data: 'SIMPLE_MIND_MAP_DATA',
-  config: 'SIMPLE_MIND_MAP_CONFIG',
-  localConfig: 'SIMPLE_MIND_MAP_LOCAL_CONFIG'
-}
-
-const safeParse = value => {
-  if (!value) return null
-  try {
-    return JSON.parse(value)
-  } catch (error) {
-    return null
-  }
-}
-
 const pickAiConfigInput = input => {
   const localConfig = input && input.localConfig ? input.localConfig : {}
   const aiConfig = input && input.aiConfig ? input.aiConfig : {}
@@ -55,8 +40,7 @@ export const createDefaultBootstrapState = () => {
   }
 }
 
-export const normalizeBootstrapState = input => {
-  const defaults = createDefaultBootstrapState()
+const createNormalizedConfigState = input => {
   const separatedLocalConfig = separateAppAndAiConfig(
     (input && input.localConfig) || {}
   )
@@ -65,20 +49,20 @@ export const normalizeBootstrapState = input => {
     ...separatedLocalConfig.localConfig
   }
   return {
-    version: DESKTOP_STATE_VERSION,
-    mindMapData:
-      input && input.mindMapData && typeof input.mindMapData === 'object'
-        ? input.mindMapData
-        : defaults.mindMapData,
-    mindMapConfig:
-      input && input.mindMapConfig && typeof input.mindMapConfig === 'object'
-        ? input.mindMapConfig
-        : null,
     localConfig,
     aiConfig: normalizeAiConfig({
       ...pickAiConfigInput(input),
       ...separatedLocalConfig.aiConfig
-    }),
+    })
+  }
+}
+
+export const normalizeBootstrapMetaState = input => {
+  const normalizedConfigState = createNormalizedConfigState(input)
+  return {
+    version: DESKTOP_STATE_VERSION,
+    localConfig: normalizedConfigState.localConfig,
+    aiConfig: normalizedConfigState.aiConfig,
     recentFiles: normalizeRecentFiles(input && input.recentFiles),
     lastDirectory:
       input && typeof input.lastDirectory === 'string' ? input.lastDirectory : '',
@@ -97,13 +81,24 @@ export const normalizeBootstrapState = input => {
   }
 }
 
-export const readLegacyLocalStorageSnapshot = () => {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return createDefaultBootstrapState()
+export const normalizeBootstrapDocumentState = input => {
+  const defaults = createDefaultBootstrapState()
+  return {
+    version: DESKTOP_STATE_VERSION,
+    mindMapData:
+      input && input.mindMapData && typeof input.mindMapData === 'object'
+        ? input.mindMapData
+        : defaults.mindMapData,
+    mindMapConfig:
+      input && input.mindMapConfig && typeof input.mindMapConfig === 'object'
+        ? input.mindMapConfig
+        : null
   }
-  return normalizeBootstrapState({
-    mindMapData: safeParse(localStorage.getItem(LOCAL_STORAGE_KEYS.data)),
-    mindMapConfig: safeParse(localStorage.getItem(LOCAL_STORAGE_KEYS.config)),
-    localConfig: safeParse(localStorage.getItem(LOCAL_STORAGE_KEYS.localConfig))
-  })
+}
+
+export const normalizeBootstrapState = input => {
+  return {
+    ...normalizeBootstrapMetaState(input),
+    ...normalizeBootstrapDocumentState(input)
+  }
 }

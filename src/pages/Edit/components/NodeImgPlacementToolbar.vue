@@ -1,24 +1,26 @@
 <template>
-  <div
-    class="nodeImgPlacementToolbar"
-    ref="nodeImgPlacementToolbar"
-    :style="style"
-    @click.stop.passive
-    v-show="showImgPlacementToolbar"
-  >
+  <Teleport to="body">
     <div
-      class="imgPlacementItem iconfont iconcontentleft"
-      v-for="item in imgPlacementList"
-      :key="item"
-      :class="[
-        {
-          selected: imgPlacement === item
-        },
-        'icon_' + item
-      ]"
-      @click="updateImgPlacement(item)"
-    ></div>
-  </div>
+      class="nodeImgPlacementToolbar"
+      ref="nodeImgPlacementToolbar"
+      :style="style"
+      @click.stop.passive
+      v-show="showImgPlacementToolbar"
+    >
+      <div
+        class="imgPlacementItem iconfont iconcontentleft"
+        v-for="item in imgPlacementList"
+        :key="item"
+        :class="[
+          {
+            selected: imgPlacement === item
+          },
+          'icon_' + item
+        ]"
+        @click="updateImgPlacement(item)"
+      ></div>
+    </div>
+  </Teleport>
 </template>
 
 <script>
@@ -52,9 +54,6 @@ export default {
     this.mindMap.on('delete_node_img_from_delete_btn', this.close)
     this.mindMap.on('translate', this.close)
   },
-  mounted() {
-    document.body.append(this.$refs.nodeImgPlacementToolbar)
-  },
   beforeUnmount() {
     this.mindMap.off('node_img_click', this.show)
     this.mindMap.off('draw_click', this.close)
@@ -65,9 +64,6 @@ export default {
     this.mindMap.off('node_img_adjust_btn_mousedown', this.close)
     this.mindMap.off('delete_node_img_from_delete_btn', this.close)
     this.mindMap.off('translate', this.close)
-    if (this.$refs.nodeImgPlacementToolbar?.parentNode === document.body) {
-      document.body.removeChild(this.$refs.nodeImgPlacementToolbar)
-    }
   },
   methods: {
     show(node, imgNode) {
