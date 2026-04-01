@@ -35,6 +35,7 @@
 
 - 安装包可生成
 - Windows 产出 `NSIS` 安装包
+- Windows ARM64 产出 `NSIS` 安装包与免安装版
 - macOS 产出 `app` / `dmg`
 - Linux 产出 `deb` / `AppImage`
 - 安装后可启动

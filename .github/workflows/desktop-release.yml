@@ -51,8 +51,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build web app
-        run: npm run build
+      - name: Build frontend app
+        run: npm run frontend:build
 
       - name: Check desktop backend
         run: npm run desktop:check
@@ -126,6 +126,9 @@ jobs:
             release_args: --bundles nsis --config src-tauri/tauri.release.conf.json
             include_updater_json: true
             upload_plain_binary: false
+            target_triple: ''
+            portable_asset_suffix: ''
+            portable_source_path: ''
             artifact_name: windows-installer
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
           - label: Windows Portable
@@ -134,14 +137,42 @@ jobs:
             release_args: --no-bundle
             include_updater_json: false
             upload_plain_binary: false
+            target_triple: ''
+            portable_asset_suffix: windows_x64
+            portable_source_path: src-tauri/target/release/mind-map-desktop.exe
             artifact_name: windows-portable
             artifact_path: src-tauri/target/release/Mind.Map.Desktop_*.exe
+          - label: Windows ARM64 Installer
+            os: windows-latest
+            args: --bundles nsis --target aarch64-pc-windows-msvc
+            release_args: --bundles nsis --target aarch64-pc-windows-msvc --config src-tauri/tauri.release.conf.json
+            include_updater_json: true
+            upload_plain_binary: false
+            target_triple: aarch64-pc-windows-msvc
+            portable_asset_suffix: ''
+            portable_source_path: ''
+            artifact_name: windows-arm64-installer
+            artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+          - label: Windows ARM64 Portable
+            os: windows-latest
+            args: --no-bundle --target aarch64-pc-windows-msvc
+            release_args: --no-bundle --target aarch64-pc-windows-msvc
+            include_updater_json: false
+            upload_plain_binary: false
+            target_triple: aarch64-pc-windows-msvc
+            portable_asset_suffix: windows_arm64
+            portable_source_path: src-tauri/target/aarch64-pc-windows-msvc/release/mind-map-desktop.exe
+            artifact_name: windows-arm64-portable
+            artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/Mind.Map.Desktop_*.exe
           - label: macOS Bundle
             os: macos-latest
             args: --bundles app,dmg
             release_args: --bundles app,dmg --config src-tauri/tauri.release.conf.json
             include_updater_json: true
             upload_plain_binary: false
+            target_triple: ''
+            portable_asset_suffix: ''
+            portable_source_path: ''
             dmg_ignore_ci: 'true'
             artifact_name: macos-bundle
             artifact_path: |
@@ -153,6 +184,9 @@ jobs:
             release_args: --bundles deb,appimage --config src-tauri/tauri.release.conf.json
             include_updater_json: true
             upload_plain_binary: false
+            target_triple: ''
+            portable_asset_suffix: ''
+            portable_source_path: ''
             artifact_name: linux-bundle
             artifact_path: |
               src-tauri/target/release/bundle/deb/*.deb
@@ -171,6 +205,62 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Windows ARM64 build environment
+        if: matrix.target_triple == 'aarch64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $installationPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+          if (-not $installationPath) {
+            throw 'Visual Studio ARM64 build tools not found on runner.'
+          }
+
+          $devCmd = Join-Path $installationPath 'Common7\Tools\VsDevCmd.bat'
+          if (-not (Test-Path $devCmd)) {
+            throw "VsDevCmd.bat not found: $devCmd"
+          }
+
+          $varsToExport = @(
+            'PATH',
+            'INCLUDE',
+            'LIB',
+            'LIBPATH',
+            'VCINSTALLDIR',
+            'VCToolsInstallDir',
+            'VCToolsVersion',
+            'VSINSTALLDIR',
+            'VisualStudioVersion',
+            'WindowsLibPath',
+            'WindowsSdkBinPath',
+            'WindowsSdkDir',
+            'WindowsSdkVerBinPath',
+            'WindowsSDKLibVersion',
+            'WindowsSDKVersion',
+            'UniversalCRTSdkDir',
+            'UCRTVersion',
+            'ExtensionSdkDir',
+            'VSCMD_ARG_HOST_ARCH',
+            'VSCMD_ARG_TGT_ARCH'
+          )
+
+          $environmentLines = cmd /c "`"$devCmd`" -host_arch=amd64 -arch=arm64 && set"
+          foreach ($entry in $environmentLines) {
+            if ($entry -notmatch '^(.*?)=(.*)$') {
+              continue
+            }
+
+            $name = $matches[1]
+            $value = $matches[2]
+            if ($name -in $varsToExport) {
+              "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+
+      - name: Install Windows ARM64 Rust target
+        if: matrix.target_triple == 'aarch64-pc-windows-msvc'
+        shell: pwsh
+        run: rustup target add ${{ matrix.target_triple }}
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -228,18 +318,19 @@ jobs:
 
       - name: Normalize Windows portable asset name
         id: portable_asset
-        if: matrix.label == 'Windows Portable'
+        if: matrix.portable_asset_suffix != ''
         shell: pwsh
         run: |
           $version = (Get-Content 'package.json' | ConvertFrom-Json).version
-          $source = 'src-tauri/target/release/mind-map-desktop.exe'
-          $target = "src-tauri/target/release/Mind.Map.Desktop_${version}_windows_x64.exe"
+          $source = "${{ matrix.portable_source_path }}"
+          $targetDir = Split-Path $source -Parent
+          $target = Join-Path $targetDir "Mind.Map.Desktop_${version}_${{ matrix.portable_asset_suffix }}.exe"
           Copy-Item $source $target -Force
           "path=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$(Split-Path $target -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload Windows portable release asset
-        if: matrix.label == 'Windows Portable' && needs.create_release.outputs.release_id != ''
+        if: matrix.portable_asset_suffix != '' && needs.create_release.outputs.release_id != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -247,7 +338,7 @@ jobs:
           gh release upload "${{ needs.create_release.outputs.tag_name }}" "${{ steps.portable_asset.outputs.path }}" --clobber
 
       - name: Upload workflow artifact
-        if: success() && matrix.label != 'Windows Portable'
+        if: success() && matrix.portable_asset_suffix == ''
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
@@ -256,7 +347,7 @@ jobs:
           path: ${{ matrix.artifact_path }}
 
       - name: Upload Windows portable workflow artifact
-        if: success() && matrix.label == 'Windows Portable'
+        if: success() && matrix.portable_asset_suffix != ''
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
