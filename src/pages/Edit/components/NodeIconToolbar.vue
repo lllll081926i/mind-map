@@ -82,6 +82,9 @@ export default {
       if (this.iconLoaded) return
       const { default: icon } = await import('@/config/icon')
       this.allIconList = [..._nodeIconList, ...(icon || [])]
+      this.mindMap?.updateConfig?.({
+        iconList: [...(icon || [])]
+      })
       this.iconLoaded = true
     },
 

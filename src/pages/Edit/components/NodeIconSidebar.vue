@@ -78,6 +78,12 @@ export default {
   components: {
     Sidebar
   },
+  props: {
+    mindMap: {
+      type: Object,
+      default: null
+    }
+  },
   data() {
     return {
       activeName: 'icon',
@@ -120,10 +126,14 @@ export default {
       if (!this.iconLoaded) {
         tasks.push(
           import('@/config/icon').then(module => {
+            const extendedIcons = module.default || []
             this.nodeIconList = mergerIconList([
               ...nodeIconList,
-              ...(module.default || [])
+              ...extendedIcons
             ])
+            this.mindMap?.updateConfig?.({
+              iconList: [...extendedIcons]
+            })
             this.iconLoaded = true
           })
         )

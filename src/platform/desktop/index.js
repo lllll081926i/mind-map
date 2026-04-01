@@ -7,6 +7,27 @@ const getFileName = filePath => {
 }
 
 const browserFileStore = new Map()
+const MAX_BROWSER_FILE_STORE_SIZE = 12
+
+const setBrowserFileEntry = (path, entry) => {
+  if (!path) return
+  if (browserFileStore.has(path)) {
+    browserFileStore.delete(path)
+  }
+  browserFileStore.set(path, entry)
+  while (browserFileStore.size > MAX_BROWSER_FILE_STORE_SIZE) {
+    const oldestKey = browserFileStore.keys().next().value
+    if (!oldestKey) break
+    browserFileStore.delete(oldestKey)
+  }
+}
+
+const getBrowserFileEntry = path => {
+  const entry = browserFileStore.get(path)
+  if (!entry) return null
+  setBrowserFileEntry(path, entry)
+  return entry
+}
 
 const readBrowserFileText = file => {
   return new Promise((resolve, reject) => {
@@ -78,7 +99,7 @@ const createBrowserTauriModules = () => {
     invoke: async (command, payload = {}) => {
       switch (command) {
         case 'read_text_file': {
-          const entry = browserFileStore.get(payload.path)
+          const entry = getBrowserFileEntry(payload.path)
           if (!entry) {
             throw new Error('当前环境不支持读取未缓存的本地文件')
           }
@@ -86,7 +107,7 @@ const createBrowserTauriModules = () => {
         }
         case 'write_text_file': {
           const path = payload.path
-          const currentEntry = browserFileStore.get(path) || {
+          const currentEntry = getBrowserFileEntry(path) || {
             name: getFileName(path),
             content: ''
           }
@@ -95,7 +116,7 @@ const createBrowserTauriModules = () => {
             content: String(payload.content || ''),
             pendingDownload: false
           }
-          browserFileStore.set(path, nextEntry)
+          setBrowserFileEntry(path, nextEntry)
           if (currentEntry.pendingDownload) {
             downloadBrowserFile({
               name: currentEntry.name,
@@ -126,7 +147,7 @@ const createBrowserTauriModules = () => {
       })
       if (!file) return null
       const path = createBrowserFilePath(file.name)
-      browserFileStore.set(path, {
+      setBrowserFileEntry(path, {
         name: file.name,
         content: await readBrowserFileText(file),
         pendingDownload: false
@@ -136,7 +157,7 @@ const createBrowserTauriModules = () => {
     save: async options => {
       const name = normalizeSaveName(options?.defaultPath)
       const path = createBrowserFilePath(name)
-      browserFileStore.set(path, {
+      setBrowserFileEntry(path, {
         name,
         content: '',
         pendingDownload: true

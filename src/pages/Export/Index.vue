@@ -197,6 +197,8 @@ import defaultNodeImage from '@/assets/img/图片加载失败.svg'
 let exportPluginsPromise = null
 let richTextPluginsPromise = null
 let mindMapRuntimePromise = null
+let extendedIconListPromise = null
+const BUILTIN_NODE_ICON_TYPES = ['expression', 'priority', 'progress', 'sign']
 
 const FORMAT_NAME_KEY_MAP = {
   smm: 'smm',
@@ -237,6 +239,45 @@ const normalizeMindMapData = data => {
     return data
   }
   return createFallbackData()
+}
+
+const loadExtendedIconList = async () => {
+  if (!extendedIconListPromise) {
+    extendedIconListPromise = import('@/config/icon').then(module => {
+      return Array.isArray(module.default) ? module.default : []
+    })
+  }
+  return extendedIconListPromise
+}
+
+const hasExtendedNodeIcons = data => {
+  const visit = node => {
+    if (!node || typeof node !== 'object') return false
+    const nodeIcons = Array.isArray(node.data?.icon) ? node.data.icon : []
+    if (
+      nodeIcons.some(item => {
+        const [type = ''] = String(item || '').split('_')
+        return type && !BUILTIN_NODE_ICON_TYPES.includes(type)
+      })
+    ) {
+      return true
+    }
+    const children = Array.isArray(node.children) ? node.children : []
+    return children.some(child => visit(child))
+  }
+  return visit(data?.root || data)
+}
+
+const hasRichTextNodes = data => {
+  const visit = node => {
+    if (!node || typeof node !== 'object') return false
+    if (node.data?.richText) {
+      return true
+    }
+    const children = Array.isArray(node.children) ? node.children : []
+    return children.some(child => visit(child))
+  }
+  return visit(data?.root || data)
 }
 
 const loadMindMapRuntime = async () => {
@@ -305,6 +346,8 @@ export default {
       previewLoading: true,
       exporting: false,
       mindMap: null,
+      exportPluginsInstalled: false,
+      extendedIconList: [],
       exportState: createDefaultExportState(baseName),
       exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat]
     }
@@ -429,12 +472,13 @@ export default {
           throw new Error(this.$t('exportPage.previewContainerMissing'))
         }
         const { MindMap } = await loadMindMapRuntime()
-        const { default: icon } = await import('@/config/icon')
         const fullData = normalizeMindMapData(getData())
+        if (hasExtendedNodeIcons(fullData)) {
+          this.extendedIconList = await loadExtendedIconList()
+        }
         const { root, layout, theme, view } = fullData
         const config = getConfig() || {}
         const fallbackData = createFallbackData()
-        const { ExportPDF, ExportXMind, Export } = await loadExportPlugins()
         this.mindMap = new MindMap({
           el: this.$refs.previewRef,
           data: root,
@@ -444,15 +488,12 @@ export default {
           themeConfig: theme?.config || fallbackData.theme.config,
           viewData: view,
           customInnerElsAppendTo: null,
-          iconList: [...icon],
+          iconList: [...this.extendedIconList],
           defaultNodeImage,
           addContentToFooter: () => this.createFooterContent(),
           ...(config || {})
         })
-        this.mindMap.addPlugin(ExportPDF)
-        this.mindMap.addPlugin(ExportXMind)
-        this.mindMap.addPlugin(Export)
-        if (this.localConfig.openNodeRichText) {
+        if (hasRichTextNodes(fullData)) {
           const { RichText, Formula } = await loadRichTextPlugins()
           this.mindMap.addPlugin(RichText)
           this.mindMap.addPlugin(Formula)
@@ -463,6 +504,15 @@ export default {
       } finally {
         this.previewLoading = false
       }
+    },
+
+    async ensureExportPluginsInstalled() {
+      if (!this.mindMap || this.exportPluginsInstalled) return
+      const { ExportPDF, ExportXMind, Export } = await loadExportPlugins()
+      this.mindMap.addPlugin(ExportPDF)
+      this.mindMap.addPlugin(ExportXMind)
+      this.mindMap.addPlugin(Export)
+      this.exportPluginsInstalled = true
     },
 
     async handleExport() {
@@ -478,6 +528,7 @@ export default {
           : getResolvedExportType(this.exportState.exportType)
       this.exporting = true
       try {
+        await this.ensureExportPluginsInstalled()
         this.mindMap.updateConfig({
           exportPaddingX: Number(this.exportState.paddingX) || 0,
           exportPaddingY: Number(this.exportState.paddingY) || 0

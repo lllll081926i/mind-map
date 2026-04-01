@@ -75,6 +75,8 @@ test('导出页不再静态引入思维导图核心运行时', () => {
   )
   assert.match(exportPageSource, /import\('simple-mind-map'\)/)
   assert.match(exportPageSource, /import\('simple-mind-map-plugin-themes'\)/)
+  assert.match(exportPageSource, /hasExtendedNodeIcons/)
+  assert.match(exportPageSource, /ensureExportPluginsInstalled/)
 })
 
 test('编辑页不再静态引入思维导图核心运行时', () => {
@@ -85,6 +87,8 @@ test('编辑页不再静态引入思维导图核心运行时', () => {
   )
   assert.match(editPageSource, /import\('simple-mind-map'\)/)
   assert.match(editPageSource, /import\('simple-mind-map-plugin-themes'\)/)
+  assert.match(editPageSource, /hasExtendedNodeIcons/)
+  assert.match(editPageSource, /ensureExtendedIconListLoaded/)
 })
 
 test('编辑页不再直接依赖 simple-mind-map 示例数据链路', () => {
@@ -147,6 +151,16 @@ test('编辑页按需加载剪贴板图片处理工具，避免首包回流 mind
   assert.match(editPageSource, /import\('@\/utils\/handleClipboardText'\)/)
 })
 
+test('编辑页与导出页不再无条件预取扩展图标资源，导出插件也延后到真正导出时再安装', () => {
+  assert.doesNotMatch(editPageSource, /const \{ default: icon \} = await import\('@\/config\/icon'\)/)
+  assert.doesNotMatch(exportPageSource, /const \{ default: icon \} = await import\('@\/config\/icon'\)/)
+  const previewBootstrapSection = exportPageSource.split(
+    'async ensureExportPluginsInstalled'
+  )[0]
+  assert.doesNotMatch(previewBootstrapSection, /loadExportPlugins\(\)/)
+  assert.match(exportPageSource, /await this\.ensureExportPluginsInstalled\(\)/)
+})
+
 test('工具栏布局计算不再通过递归 nextTick 试探按钮数量', () => {
   assert.doesNotMatch(toolbarSource, /const loopCheck = \(\) =>/)
   assert.doesNotMatch(
@@ -163,6 +177,27 @@ test('编辑页使用稳定的事件转发器并在销毁前解绑', () => {
   assert.doesNotMatch(
     editPageSource,
     /this\.mindMap\.on\(event,\s*\(\.\.\.args\)\s*=>\s*\{/
+  )
+})
+
+test('编辑页仅在存在富文本内容或首次进入富文本编辑时才加载富文本插件', () => {
+  assert.match(editPageSource, /const hasRichTextNodes = data =>/)
+  assert.match(editPageSource, /async ensureRichTextPluginReady\(\)/)
+  assert.match(editPageSource, /beforeTextEdit: async \(node, isInserting\) =>/)
+  assert.match(editPageSource, /await this\.ensureRichTextPluginReady\(\)/)
+  assert.match(editPageSource, /if \(hasRichTextNodes\(initialData\)\)/)
+  assert.match(
+    editPageSource,
+    /if \(hasRichTextNodes\(initialData\)\) \{\s*if \(this\.openNodeRichText\) \{\s*tasks\.push\(this\.addRichTextPlugin\(\)\)/
+  )
+})
+
+test('导出页预览仅在文档包含富文本节点时才加载富文本插件', () => {
+  assert.match(exportPageSource, /const hasRichTextNodes = data =>/)
+  assert.match(exportPageSource, /if \(hasRichTextNodes\(fullData\)\)/)
+  assert.doesNotMatch(
+    exportPageSource,
+    /if \(this\.localConfig\.openNodeRichText\) \{\s*const \{ RichText, Formula \} = await loadRichTextPlugins\(\)/m
   )
 })
 

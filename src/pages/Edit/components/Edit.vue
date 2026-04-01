@@ -136,7 +136,9 @@ let exportPluginsPromise = null
 let scrollbarPluginPromise = null
 let handleClipboardTextPromise = null
 let mindMapRuntimePromise = null
+let extendedIconListPromise = null
 const VIEW_DATA_DEBOUNCE_MS = 300
+const BUILTIN_NODE_ICON_TYPES = ['expression', 'priority', 'progress', 'sign']
 const PRIMARY_SIDEBAR_COMPONENTS = {
   outline: OutlineSidebar,
   nodeStyle: Style,
@@ -263,6 +265,45 @@ const loadHandleClipboardText = async () => {
   return handleClipboardTextPromise
 }
 
+const loadExtendedIconList = async () => {
+  if (!extendedIconListPromise) {
+    extendedIconListPromise = import('@/config/icon').then(module => {
+      return Array.isArray(module.default) ? module.default : []
+    })
+  }
+  return extendedIconListPromise
+}
+
+const hasExtendedNodeIcons = data => {
+  const visit = node => {
+    if (!node || typeof node !== 'object') return false
+    const nodeIcons = Array.isArray(node.data?.icon) ? node.data.icon : []
+    if (
+      nodeIcons.some(item => {
+        const [type = ''] = String(item || '').split('_')
+        return type && !BUILTIN_NODE_ICON_TYPES.includes(type)
+      })
+    ) {
+      return true
+    }
+    const children = Array.isArray(node.children) ? node.children : []
+    return children.some(child => visit(child))
+  }
+  return visit(data?.root || data)
+}
+
+const hasRichTextNodes = data => {
+  const visit = node => {
+    if (!node || typeof node !== 'object') return false
+    if (node.data?.richText) {
+      return true
+    }
+    const children = Array.isArray(node.children) ? node.children : []
+    return children.some(child => visit(child))
+  }
+  return visit(data?.root || data)
+}
+
 const loadRichTextPlugins = async () => {
   if (!richTextPluginsPromise) {
     richTextPluginsPromise = Promise.all([
@@ -334,7 +375,10 @@ export default {
       onDataChange: null,
       onViewDataChange: null,
       richTextPluginReady: false,
-      mindMapEventForwarders: {}
+      richTextPluginLoadingPromise: null,
+      mindMapEventForwarders: {},
+      extendedIconList: [],
+      extendedIconLoaded: false
     }
   },
   computed: {
@@ -412,6 +456,11 @@ export default {
         this.removeRichTextPlugin()
       }
     },
+    activeSidebar(value) {
+      if (value === 'formulaSidebar' && this.openNodeRichText) {
+        this.addRichTextPlugin()
+      }
+    },
     isShowScrollbar() {
       if (this.isShowScrollbar) {
         this.addScrollbarPlugin()
@@ -475,7 +524,18 @@ export default {
   },
   methods: {
     handleStartTextEdit() {
-      this.mindMap?.renderer?.startTextEdit()
+      if (!this.mindMap?.renderer) return
+      if (!this.openNodeRichText) {
+        this.mindMap.renderer.startTextEdit()
+        return
+      }
+      this.addRichTextPlugin()
+        .then(() => {
+          this.mindMap?.renderer?.startTextEdit()
+        })
+        .catch(error => {
+          console.error('load rich text plugin before text edit failed', error)
+        })
     },
 
     handleEndTextEdit() {
@@ -589,6 +649,8 @@ export default {
       hasFileURL
     }) {
       let { root, layout, theme, view } = initialData
+      const configBeforeTextEdit =
+        typeof config?.beforeTextEdit === 'function' ? config.beforeTextEdit : null
       if (hasFileURL) {
         root = fallbackData.root
         layout = fallbackData.layout
@@ -615,6 +677,18 @@ export default {
           openBlankMode: false
         },
         ...(config || {}),
+        beforeTextEdit: async (node, isInserting) => {
+          if (configBeforeTextEdit) {
+            const allowEdit = await configBeforeTextEdit(node, isInserting)
+            if (!allowEdit) {
+              return false
+            }
+          }
+          if (this.openNodeRichText) {
+            await this.ensureRichTextPluginReady()
+          }
+          return true
+        },
         iconList: [...icon],
         useLeftKeySelectionRightKeyDrag: this.useLeftKeySelectionRightKeyDrag,
         customInnerElsAppendTo: null,
@@ -740,16 +814,33 @@ export default {
       return { ...fullData }
     },
 
+    async ensureExtendedIconListLoaded(force = false) {
+      if (!force && this.extendedIconLoaded) {
+        return this.extendedIconList
+      }
+      const nextIconList = await loadExtendedIconList()
+      this.extendedIconList = [...nextIconList]
+      this.extendedIconLoaded = true
+      if (this.mindMap) {
+        this.mindMap.updateConfig({
+          iconList: [...this.extendedIconList]
+        })
+      }
+      return this.extendedIconList
+    },
+
     // 初始化
     async init() {
       await this.$nextTick()
-      const { default: icon } = await import('@/config/icon')
       const handleClipboardText = await loadHandleClipboardText()
       const { MindMap } = await loadMindMapRuntime()
       const hasFileURL = this.hasFileURL()
       const initialData = this.normalizeMindMapData(this.mindMapData)
       const fallbackData = createDefaultMindMapData(this.$t('edit.root'))
       const config = this.mindMapConfig
+      if (hasExtendedNodeIcons(initialData)) {
+        await this.ensureExtendedIconListLoaded(true)
+      }
       const containerEl = this.resolveMindMapContainerEl()
       if (!containerEl) {
         throw new Error('mindMapContainer element unavailable')
@@ -758,7 +849,7 @@ export default {
         this.createMindMapOptions({
           containerEl,
           handleClipboardText,
-          icon,
+          icon: this.extendedIconList,
           initialData,
           fallbackData,
           config,
@@ -766,7 +857,7 @@ export default {
         })
       )
       this.patchMindMapExport()
-      await this.loadPlugins()
+      await this.loadPlugins(initialData)
       this.mindMap.keyCommand.addShortcut('Control+s', () => {
         this.manualSave()
       })
@@ -795,11 +886,46 @@ export default {
       return loadRichTextPlugins()
     },
 
+    async ensureRichTextPluginReady() {
+      if (!this.mindMap || !this.openNodeRichText) {
+        return false
+      }
+      if (this.richTextPluginReady && this.mindMap.richText && this.mindMap.formula) {
+        return true
+      }
+      if (this.richTextPluginLoadingPromise) {
+        return this.richTextPluginLoadingPromise
+      }
+      this.richTextPluginLoadingPromise = (async () => {
+        const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
+        if (!this.mindMap || !this.openNodeRichText) {
+          return false
+        }
+        if (!this.mindMap.richText) {
+          this.mindMap.addPlugin(RichText)
+        }
+        if (!this.mindMap.formula) {
+          this.mindMap.addPlugin(Formula)
+        }
+        this.richTextPluginReady = Boolean(
+          this.mindMap.richText && this.mindMap.formula
+        )
+        return this.richTextPluginReady
+      })()
+      try {
+        return await this.richTextPluginLoadingPromise
+      } finally {
+        this.richTextPluginLoadingPromise = null
+      }
+    },
+
     // 加载相关插件
-    async loadPlugins() {
+    async loadPlugins(initialData = this.mindMapData) {
       const tasks = []
-      if (this.openNodeRichText) {
-        tasks.push(this.addRichTextPlugin())
+      if (hasRichTextNodes(initialData)) {
+        if (this.openNodeRichText) {
+          tasks.push(this.addRichTextPlugin())
+        }
       }
       if (this.isShowScrollbar) {
         tasks.push(this.addScrollbarPlugin())
@@ -815,8 +941,14 @@ export default {
     },
 
     // 动态设置思维导图数据
-    setData(data) {
+    async setData(data) {
       this.handleShowLoading()
+      if (hasExtendedNodeIcons(data)) {
+        await this.ensureExtendedIconListLoaded(true)
+      }
+      if (this.openNodeRichText && hasRichTextNodes(data)) {
+        await this.ensureRichTextPluginReady()
+      }
       const rootNodeData = data.root || data
       if (data.root) {
         this.mindMap.setFullData(data)
@@ -864,17 +996,13 @@ export default {
 
     // 加载节点富文本编辑插件
     async addRichTextPlugin() {
-      if (!this.mindMap) return
-      const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
-      if (!this.mindMap || !this.openNodeRichText) return
-      this.mindMap.addPlugin(RichText)
-      this.mindMap.addPlugin(Formula)
-      this.richTextPluginReady = true
+      return this.ensureRichTextPluginReady()
     },
 
     // 移除节点富文本编辑插件
     async removeRichTextPlugin() {
       this.richTextPluginReady = false
+      this.richTextPluginLoadingPromise = null
       if (!this.mindMap || !richTextPluginsPromise) return
       const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
       if (!this.mindMap || this.openNodeRichText) return
