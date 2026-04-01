@@ -1,4 +1,42 @@
 export default {
+  app: {
+    initFailed: '应用初始化失败，请刷新后重试。'
+  },
+  home: {
+    brandTitle: '思绪思维导图',
+    brandMeta: '桌面工作台',
+    refresh: '刷新',
+    createNew: '开始新建',
+    createFromTemplate: '从模板新建',
+    openLocalFile: '打开本地文件',
+    openLocalFolder: '打开本地文件夹',
+    recentTitle: '最近',
+    folderFilesDesc: '已打开文件夹中的思维导图文件',
+    recentFilesDesc: '最近编辑过的桌面文件会在这里继续接力',
+    searchPlaceholder: '搜索名称或路径',
+    clearRecent: '清空记录',
+    tableName: '名称',
+    tablePath: '文件路径',
+    tableAction: '操作',
+    empty: '暂无可显示的文件',
+    open: '打开',
+    templateDialogTitle: '从模板新建',
+    fileActionFailed: '文件操作失败',
+    templates: {
+      project: {
+        name: '项目计划模板',
+        desc: '适合任务分解、阶段规划与里程碑梳理'
+      },
+      study: {
+        name: '学习笔记模板',
+        desc: '适合章节整理、知识卡片和复习框架'
+      },
+      brainstorm: {
+        name: '头脑风暴模板',
+        desc: '适合快速发散、创意收敛和主题延展'
+      }
+    }
+  },
   baseStyle: {
     title: '基础样式',
     background: '背景',
@@ -99,6 +137,7 @@ export default {
     openReleasePage: '打开发布页',
     updateSourceNotConfigured: '当前未配置更新源，请在构建环境中设置发布页或更新清单地址。',
     updateCheckFailed: '检查更新失败',
+    updateInstallMissing: '当前没有可安装的更新',
     updatePreparing: '正在准备更新…',
     updateDownloading: '正在下载更新…',
     updateDownloadingWithSize: '正在下载更新… {current} / {total} MB',
@@ -225,6 +264,8 @@ export default {
     closeMiniMap: '关闭小地图',
     readonly: '切换为只读模式',
     edit: '切换为编辑模式',
+    darkMode: '切换为深色模式',
+    lightMode: '切换为浅色模式',
     backToRoot: '回到根节点',
     changeSourceCodeEdit: '切换为源码编辑模式',
     shortcutKeys: '快捷键',
@@ -261,7 +302,7 @@ export default {
   shortcutKey: {
     title: '快捷键'
   },
-  strusture: {
+  structure: {
     title: '结构'
   },
   style: {
@@ -311,6 +352,7 @@ export default {
   },
   theme: {
     title: '主题',
+    default: '默认主题',
     classics: '经典',
     dark: '深色',
     simple: '朴素',
@@ -334,12 +376,13 @@ export default {
     displayOutline: '显示大纲',
     baseStyle: '基础样式',
     theme: '主题',
-    strusture: '结构',
+    structure: '结构',
     newFile: '新建',
     openFile: '打开',
     saveAs: '另存为',
     import: '导入',
     export: '导出',
+    exportCenter: '导出中心',
     shortcutKey: '快捷键',
     associativeLine: '关联线',
     painter: '格式刷',
@@ -359,9 +402,68 @@ export default {
     directory: '目录',
     recentFiles: '最近文件',
     noRecentFiles: '暂无最近文件',
+    returnHome: '返回首页',
+    edit: '编辑',
+    importAction: '导入',
+    unsavedData: '存在未保存的数据',
+    expandDirectory: '展开目录树',
+    collapseDirectory: '收起目录树',
+    closeDirectory: '关闭目录树',
     newFileTip: '新建文件前请先导出当前编辑的文件，谨防内容丢失',
     openFileTip: '打开文件前请先导出当前编辑的文件，谨防内容丢失',
     ai: 'AI'
+  },
+  exportPage: {
+    eyebrow: '导出中心',
+    title: '导出不同的文件格式',
+    description:
+      '说明：当前页面只启用桌面版已经真实支持的导出能力，HTML 和 Word 保留为即将支持。',
+    backHome: '返回首页',
+    backEdit: '返回编辑',
+    upcoming: '即将支持',
+    fileName: '导出文件名称',
+    descriptionLabel: '说明',
+    optionsLabel: '选项',
+    disabledTip: '当前格式尚未提供桌面导出能力。',
+    includeConfig: '包含主题、结构和视图配置',
+    imageFormat: '图片格式',
+    paddingX: '水平内边距',
+    paddingY: '垂直内边距',
+    extraText: '底部补充文字',
+    extraTextPlaceholder: '比如：来自思绪思维导图',
+    transparentBg: '背景透明',
+    fitBg: '完整保留背景图片',
+    noExtraOptions: '当前格式无需额外配置。',
+    export: '导出',
+    preview: '预览',
+    previewDesc: '当前预览会使用最新的工作区数据',
+    fallbackFileName: '思维导图',
+    previewContainerMissing: '预览容器不存在',
+    previewInitFailed: '导出页预览初始化失败',
+    exportDoneTitle: '导出完成',
+    exportDoneMessage: '已触发 .{extension} 文件导出',
+    exportFailed: '导出失败',
+    statusDisabled: '该格式暂不可导出',
+    statusPreparing: '正在准备导出文件',
+    statusReady: '当前将导出为 .{extension} 文件',
+    formatNames: {
+      smm: '思维文件',
+      png: '图片',
+      svg: 'SVG',
+      pdf: 'PDF',
+      pdfHd: '高清PDF',
+      md: 'Markdown',
+      xmind: 'XMind',
+      txt: 'Txt',
+      json: 'JSON',
+      html: 'HTML',
+      word: 'Word'
+    },
+    fallbackFormat: {
+      name: '思绪文件',
+      desc: 'SimpleMindMap私有格式，可用于再次导入，客户端可直接编辑',
+      displayName: '思维文件'
+    }
   },
   edit: {
     newFeatureNoticeTitle: '新特性提醒',

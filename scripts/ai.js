@@ -105,7 +105,7 @@ const createServe = (runtimePort = port) => {
     }
   })
 
-  app.use(async (error, req, res, next) => {
+  app.use(async (error, req, res, _next) => {
     const payload = await normalizeProxyError(error)
     if (res.headersSent) {
       console.error('AI proxy error after headers sent:', payload)
@@ -165,7 +165,7 @@ const normalizeProxyError = async error => {
       const parsed = JSON.parse(detail)
       message = parsed.msg || parsed.message || parsed.error?.message || message
       detail = parsed.detail || detail
-    } catch (parseError) {
+    } catch (_parseError) {
       message = detail
     }
   }

@@ -29,7 +29,14 @@
             @show-node-tag="openNodeTagDialog"
           ></ToolbarNodeBtnList>
           <template #reference>
-            <div class="toolbarBtn">
+            <div
+              class="toolbarBtn"
+              role="button"
+              tabindex="0"
+              :aria-label="$t('toolbar.more')"
+              @keydown.enter.prevent="popoverShow = !popoverShow"
+              @keydown.space.prevent="popoverShow = !popoverShow"
+            >
               <span class="icon iconfont icongongshi"></span>
               <span class="text">{{ $t('toolbar.more') }}</span>
             </div>
@@ -38,7 +45,16 @@
       </div>
       <!-- 导出 -->
       <div class="toolbarBlock">
-        <div class="toolbarBtn" @click="openDirectory" v-if="!isMobile">
+        <div
+          class="toolbarBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.directory')"
+          @click="openDirectory"
+          @keydown.enter.prevent="openDirectory"
+          @keydown.space.prevent="openDirectory"
+          v-if="!isMobile"
+        >
           <span class="icon iconfont icondakai"></span>
           <span class="text">{{ $t('toolbar.directory') }}</span>
         </div>
@@ -48,7 +64,15 @@
           placement="bottom"
           v-if="!isMobile"
         >
-          <div class="toolbarBtn" @click="createNewLocalFile">
+          <div
+            class="toolbarBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.newFile')"
+            @click="createNewLocalFile"
+            @keydown.enter.prevent="createNewLocalFile"
+            @keydown.space.prevent="createNewLocalFile"
+          >
             <span class="icon iconfont iconxinjian"></span>
             <span class="text">{{ $t('toolbar.newFile') }}</span>
           </div>
@@ -59,7 +83,15 @@
           placement="bottom"
           v-if="!isMobile"
         >
-          <div class="toolbarBtn" @click="openLocalFile">
+          <div
+            class="toolbarBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.openFile')"
+            @click="openLocalFile"
+            @keydown.enter.prevent="openLocalFile"
+            @keydown.space.prevent="openLocalFile"
+          >
             <span class="icon iconfont iconwenjian1"></span>
             <span class="text">{{ $t('toolbar.openFile') }}</span>
           </div>
@@ -69,7 +101,12 @@
           trigger="click"
           @command="openRecentFile"
         >
-          <div class="toolbarBtn">
+          <div
+            class="toolbarBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.recentFiles')"
+          >
             <span class="icon iconfont iconwenjian"></span>
             <span class="text">{{ $t('toolbar.recentFiles') }}</span>
           </div>
@@ -88,21 +125,55 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <div class="toolbarBtn" @click="saveLocalFile" v-if="!isMobile">
+        <div
+          class="toolbarBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.saveAs')"
+          @click="saveLocalFile"
+          @keydown.enter.prevent="saveLocalFile"
+          @keydown.space.prevent="saveLocalFile"
+          v-if="!isMobile"
+        >
           <span class="icon iconfont iconlingcunwei"></span>
           <span class="text">{{ $t('toolbar.saveAs') }}</span>
         </div>
-        <div class="toolbarBtn" @click="openImportDialog">
+        <div
+          class="toolbarBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.import')"
+          @click="openImportDialog"
+          @keydown.enter.prevent="openImportDialog"
+          @keydown.space.prevent="openImportDialog"
+        >
           <span class="icon iconfont icondaoru"></span>
           <span class="text">{{ $t('toolbar.import') }}</span>
         </div>
+        <div class="toolbarDivider"></div>
         <div
-          class="toolbarBtn"
+          class="toolbarBtn pageEntryBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.exportCenter')"
           @click="openExportDialog"
-          style="margin-right: 0"
+          @keydown.enter.prevent="openExportDialog"
+          @keydown.space.prevent="openExportDialog"
         >
           <span class="icon iconfont iconexport"></span>
-          <span class="text">{{ $t('toolbar.export') }}</span>
+          <span class="text">{{ $t('toolbar.exportCenter') }}</span>
+        </div>
+        <div
+          class="toolbarBtn pageEntryBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.returnHome')"
+          @click="goHome"
+          @keydown.enter.prevent="goHome"
+          @keydown.space.prevent="goHome"
+        >
+          <span class="icon iconfont iconzhuye"></span>
+          <span class="text">{{ $t('toolbar.returnHome') }}</span>
         </div>
         <!-- 本地文件树 -->
         <div
@@ -118,11 +189,30 @@
               <div
                 class="btn"
                 :class="{ expanded: fileTreeExpand }"
+                role="button"
+                tabindex="0"
+                :aria-label="
+                  fileTreeExpand
+                    ? $t('toolbar.collapseDirectory')
+                    : $t('toolbar.expandDirectory')
+                "
                 @click="fileTreeExpand = !fileTreeExpand"
+                @keydown.enter.prevent="fileTreeExpand = !fileTreeExpand"
+                @keydown.space.prevent="fileTreeExpand = !fileTreeExpand"
               >
                 v
               </div>
-              <div class="btn closeBtn" @click="fileTreeVisible = false">x</div>
+              <div
+                class="btn closeBtn"
+                role="button"
+                tabindex="0"
+                :aria-label="$t('toolbar.closeDirectory')"
+                @click="fileTreeVisible = false"
+                @keydown.enter.prevent="fileTreeVisible = false"
+                @keydown.space.prevent="fileTreeVisible = false"
+              >
+                x
+              </div>
             </div>
           </div>
           <div class="fileTreeWrap">
@@ -150,19 +240,30 @@
                       size="small"
                       v-if="data.enableEdit"
                       @click="editLocalFile(data)"
-                      >编辑</el-button
+                      >{{ $t('toolbar.edit') }}</el-button
                     >
                     <el-button
                       type="text"
                       size="small"
                       v-else
                       @click="importLocalFile(data)"
-                      >导入</el-button
+                      >{{ $t('toolbar.importAction') }}</el-button
                     >
                   </div>
                 </span>
               </template>
             </el-tree>
+          </div>
+        </div>
+      </div>
+      <div class="toolbarMeasure">
+        <div class="toolbarBlock isMeasure" ref="toolbarMeasureBlockRef">
+          <div ref="toolbarMeasureListRef">
+            <ToolbarNodeBtnList :list="btnLit"></ToolbarNodeBtnList>
+          </div>
+          <div class="toolbarBtn" ref="toolbarMeasureMoreRef">
+            <span class="icon iconfont icongongshi"></span>
+            <span class="text">{{ $t('toolbar.more') }}</span>
           </div>
         </div>
       </div>
@@ -174,7 +275,6 @@
     ></NodeHyperlink>
     <NodeNote v-if="mountedPanels.nodeNote" ref="NodeNoteRef"></NodeNote>
     <NodeTag v-if="mountedPanels.nodeTag" ref="NodeTagRef"></NodeTag>
-    <Export v-if="mountedPanels.export" ref="ExportRef"></Export>
     <Import v-if="mountedPanels.import" ref="ImportRef"></Import>
   </div>
 </template>
@@ -183,8 +283,7 @@
 import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { ElNotification as Notification } from 'element-plus'
-import exampleData from 'simple-mind-map/example/exampleData'
-import { getData } from '../../../api'
+import { getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
@@ -196,13 +295,14 @@ import platform, {
   recordRecentFile,
   setLastDirectory
 } from '@/platform'
+import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import {
   createDesktopFsError,
   setCurrentFileRef,
   updateCurrentFileRef
 } from '@/services/documentSession'
 import {
-  emitShowExport,
+  onBootstrapStateReady,
   emitShowImport,
   emitShowNodeImage,
   emitShowNodeLink,
@@ -223,8 +323,8 @@ const NodeImage = defineAsyncComponent(() => import('./NodeImage.vue'))
 const NodeHyperlink = defineAsyncComponent(() => import('./NodeHyperlink.vue'))
 const NodeNote = defineAsyncComponent(() => import('./NodeNote.vue'))
 const NodeTag = defineAsyncComponent(() => import('./NodeTag.vue'))
-const Export = defineAsyncComponent(() => import('./Export.vue'))
 const Import = defineAsyncComponent(() => import('./Import.vue'))
+const LOCAL_FILE_WRITE_DEBOUNCE_MS = 1000
 
 // 工具栏
 const defaultBtnList = [
@@ -242,7 +342,6 @@ const defaultBtnList = [
   'summary',
   'associativeLine',
   'formula',
-  // 'attachment',
   'outerFrame',
   'annotation',
   'ai'
@@ -254,7 +353,6 @@ export default {
     NodeHyperlink,
     NodeNote,
     NodeTag,
-    Export,
     Import,
     ToolbarNodeBtnList
   },
@@ -275,12 +373,12 @@ export default {
       rootDirName: '',
       fileTreeExpand: true,
       waitingWriteToLocalFile: false,
+      layoutMeasureToken: 0,
       mountedPanels: {
         nodeImage: false,
         nodeHyperlink: false,
         nodeNote: false,
         nodeTag: false,
-        export: false,
         import: false
       }
     }
@@ -330,7 +428,6 @@ export default {
       }
     },
     btnLit: {
-      deep: true,
       handler() {
         this.computeToolbarShow()
       }
@@ -346,14 +443,17 @@ export default {
     window.addEventListener('resize', this.computeToolbarShowThrottle)
     window.addEventListener('beforeunload', this.onUnload)
     this.$bus.$on('node_note_dblclick', this.onNodeNoteDblclick)
-    this.$bus.$on('bootstrap_state_ready', this.handleBootstrapStateReady)
+    this.removeBootstrapStateReadyListener = onBootstrapStateReady(
+      this.handleBootstrapStateReady
+    )
   },
   beforeUnmount() {
     this.removeWriteLocalFileListener && this.removeWriteLocalFileListener()
+    this.removeBootstrapStateReadyListener &&
+      this.removeBootstrapStateReadyListener()
     window.removeEventListener('resize', this.computeToolbarShowThrottle)
     window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
-    this.$bus.$off('bootstrap_state_ready', this.handleBootstrapStateReady)
     clearTimeout(this.timer)
   },
   methods: {
@@ -361,17 +461,17 @@ export default {
       this.refreshRecentFiles()
     },
 
-    async waitForRef(refName, retries = 320) {
-      if (this.$refs[refName]) {
-        return this.$refs[refName]
+    async waitForRef(refName, { maxWaitMs = 800, intervalMs = 16 } = {}) {
+      const startedAt = Date.now()
+      while (Date.now() - startedAt <= maxWaitMs) {
+        if (this.$refs[refName]) {
+          return this.$refs[refName]
+        }
+        await new Promise(resolve => {
+          setTimeout(resolve, intervalMs)
+        })
       }
-      if (retries <= 0) {
-        return null
-      }
-      await new Promise(resolve => {
-        setTimeout(resolve, 16)
-      })
-      return this.waitForRef(refName, retries - 1)
+      return this.$refs[refName] || null
     },
 
     async ensurePanelMounted(panelKey, refName = '') {
@@ -395,12 +495,17 @@ export default {
     },
 
     async openExportDialog() {
-      const exportRef = await this.ensurePanelMounted('export', 'ExportRef')
-      if (exportRef && typeof exportRef.openDialog === 'function') {
-        exportRef.openDialog()
+      if (this.$route.path === '/export') {
         return
       }
-      emitShowExport()
+      await this.$router.push('/export')
+    },
+
+    async goHome() {
+      if (this.$route.path === '/home') {
+        return
+      }
+      await this.$router.push('/home')
     },
 
     async openNodeImageDialog(activeNodes = []) {
@@ -470,31 +575,94 @@ export default {
     },
 
     // 计算工具按钮如何显示
-    computeToolbarShow() {
-      if (!this.$refs.toolbarRef) return
-      const windowWidth = window.innerWidth - 40
+    getOuterWidth(el) {
+      if (!el || typeof window === 'undefined') return 0
+      const rect = el.getBoundingClientRect()
+      const style = window.getComputedStyle(el)
+      return (
+        rect.width +
+        parseFloat(style.marginLeft || 0) +
+        parseFloat(style.marginRight || 0)
+      )
+    },
+
+    getFixedToolbarWidth() {
+      if (!this.$refs.toolbarRef) return 0
+      const blocks = Array.from(this.$refs.toolbarRef.children).filter(item => {
+        return (
+          item.classList &&
+          item.classList.contains('toolbarBlock') &&
+          !item.classList.contains('isMeasure')
+        )
+      })
+      return blocks.slice(1).reduce((total, block) => {
+        return total + this.getOuterWidth(block)
+      }, 0)
+    },
+
+    getNodeToolbarMeasure() {
+      const measureBlock = this.$refs.toolbarMeasureBlockRef
+      const measureList = this.$refs.toolbarMeasureListRef
+      const moreBtn = this.$refs.toolbarMeasureMoreRef
+      if (!measureBlock || !measureList || !moreBtn) {
+        return null
+      }
+      const buttonWidths = Array.from(
+        measureList.querySelectorAll('.toolbarBtn')
+      ).map(item => this.getOuterWidth(item))
+      const moreButtonWidth = this.getOuterWidth(moreBtn)
+      const blockWidth = this.getOuterWidth(measureBlock)
+      const blockChromeWidth =
+        blockWidth -
+        buttonWidths.reduce((total, width) => total + width, 0) -
+        moreButtonWidth
+      return {
+        buttonWidths,
+        moreButtonWidth,
+        blockChromeWidth: Math.max(blockChromeWidth, 0)
+      }
+    },
+
+    async computeToolbarShow() {
+      const token = ++this.layoutMeasureToken
+      await this.$nextTick()
+      if (token !== this.layoutMeasureToken) return
       const all = [...this.btnLit]
-      let index = 1
-      const loopCheck = () => {
-        if (index > all.length) return done()
-        this.horizontalList = all.slice(0, index)
-        this.$nextTick(() => {
-          const width = this.$refs.toolbarRef.getBoundingClientRect().width
-          if (width < windowWidth) {
-            index++
-            loopCheck()
-          } else if (index > 0 && width > windowWidth) {
-            index--
-            this.horizontalList = all.slice(0, index)
-            done()
-          }
-        })
+      const measure = this.getNodeToolbarMeasure()
+      if (!measure) return
+      const windowWidth = Math.max(window.innerWidth - 40, 0)
+      const availableNodeWidth = Math.max(
+        windowWidth - this.getFixedToolbarWidth(),
+        0
+      )
+      const { buttonWidths, moreButtonWidth, blockChromeWidth } = measure
+      const totalButtonWidth = buttonWidths.reduce((total, width) => {
+        return total + width
+      }, 0)
+      if (blockChromeWidth + totalButtonWidth <= availableNodeWidth) {
+        this.horizontalList = all
+        this.verticalList = []
+        this.showMoreBtn = false
+        this.popoverShow = false
+        return
       }
-      const done = () => {
-        this.verticalList = all.slice(index)
-        this.showMoreBtn = this.verticalList.length > 0
+
+      let usedWidth = blockChromeWidth + moreButtonWidth
+      let visibleCount = 0
+      buttonWidths.some(width => {
+        if (usedWidth + width > availableNodeWidth) {
+          return true
+        }
+        usedWidth += width
+        visibleCount += 1
+        return false
+      })
+      this.horizontalList = all.slice(0, visibleCount)
+      this.verticalList = all.slice(visibleCount)
+      this.showMoreBtn = this.verticalList.length > 0
+      if (!this.showMoreBtn) {
+        this.popoverShow = false
       }
-      loopCheck()
     },
 
     // 监听本地文件读写
@@ -506,12 +674,12 @@ export default {
       }
       this.timer = setTimeout(() => {
         this.writeLocalFile(content)
-      }, 1000)
+      }, LOCAL_FILE_WRITE_DEBOUNCE_MS)
     },
 
     onUnload(e) {
       if (this.waitingWriteToLocalFile) {
-        const msg = '存在未保存的数据'
+        const msg = this.$t('toolbar.unsavedData')
         e.returnValue = msg
         return msg
       }
@@ -537,7 +705,7 @@ export default {
         }
         resolve(await platform.listDirectoryEntries(directoryRef))
       } catch (error) {
-        console.log(error)
+        console.error('loadFileTreeNode failed', error)
         this.fileTreeVisible = false
         resolve([])
         if (error.toString().includes('aborted')) {
@@ -581,7 +749,7 @@ export default {
         })
         importRef.confirm()
       } catch (error) {
-        console.log(error)
+        console.error('importLocalFile failed', error)
       }
     },
 
@@ -605,7 +773,7 @@ export default {
         syncEditorFileSession(nextFileHandle)
         this.readFile()
       } catch (error) {
-        console.log(error)
+        console.error('openLocalFile failed', error)
         if (error.toString().includes('aborted')) {
           return
         }
@@ -639,7 +807,7 @@ export default {
           showClose: true
         })
       } catch (error) {
-        console.log(error)
+        console.error('readFile failed', error)
         const fileError = createDesktopFsError(error)
         this.$message.error(
           fileError.message || this.$t('toolbar.fileOpenFailed')
@@ -659,13 +827,13 @@ export default {
         } else {
           this.isFullDataFile = false
           data = {
-            ...exampleData,
+            ...createDefaultMindMapData(),
             root: data
           }
         }
         this.$bus.$emit('setData', data)
       } catch (error) {
-        console.log(error)
+        console.error('parse local file failed', error)
         this.$message.error(this.$t('toolbar.fileOpenFailed'))
       }
     },
@@ -687,7 +855,7 @@ export default {
         markDocumentDirty(false)
         this.refreshRecentFiles()
       } catch (error) {
-        console.log(error)
+        console.error('writeLocalFile failed', error)
         const fileError = createDesktopFsError(error)
         this.$message.error(
           fileError.message || this.$t('toolbar.fileOpenFailed')
@@ -699,7 +867,7 @@ export default {
 
     // 创建本地文件
     async createNewLocalFile() {
-      await this.createLocalFile(exampleData)
+      await this.createLocalFile(createDefaultMindMapData())
     },
 
     // 另存为
@@ -737,7 +905,7 @@ export default {
           loading.close()
         }
       } catch (error) {
-        console.log(error)
+        console.error('createLocalFile failed', error)
         if (error.toString().includes('aborted')) {
           return
         }
@@ -821,8 +989,20 @@ export default {
           color: #54595f;
         }
       }
+
+      .toolbarDivider {
+        background: hsla(0, 0%, 100%, 0.1);
+      }
+
+      .pageEntryBtn {
+        .icon {
+          background: hsla(0, 0%, 100%, 0.04);
+          border-color: hsla(0, 0%, 100%, 0.1);
+        }
+      }
     }
   }
+
   .toolbar {
     position: fixed;
     left: 50%;
@@ -840,12 +1020,13 @@ export default {
 
     .toolbarBlock {
       display: flex;
+      align-items: center;
       background-color: #fff;
-      padding: 10px 20px;
-      border-radius: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
       box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
       border: 1px solid rgba(0, 0, 0, 0.06);
-      margin-right: 20px;
+      margin-right: 8px;
       flex-shrink: 0;
       position: relative;
 
@@ -856,7 +1037,7 @@ export default {
       .fileTreeBox {
         position: absolute;
         left: 0;
-        top: 68px;
+        top: 60px;
         width: 100%;
         height: 30px;
         background-color: #fff;
@@ -961,8 +1142,8 @@ export default {
       align-items: center;
       flex-direction: column;
       cursor: pointer;
-      margin-right: 20px;
-      min-width: 52px;
+      margin-right: 8px;
+      min-width: 40px;
       flex-shrink: 0;
 
       &:last-of-type {
@@ -1007,6 +1188,31 @@ export default {
         text-align: center;
         white-space: nowrap;
       }
+    }
+
+    .toolbarDivider {
+      width: 1px;
+      height: 34px;
+      background: rgba(15, 23, 42, 0.08);
+      margin: 0 1px;
+      flex-shrink: 0;
+    }
+
+    .pageEntryBtn {
+      min-width: 54px;
+
+      .icon {
+        width: 28px;
+        align-items: center;
+      }
+    }
+
+    .toolbarMeasure {
+      position: fixed;
+      left: -99999px;
+      top: -99999px;
+      visibility: hidden;
+      pointer-events: none;
     }
   }
 }

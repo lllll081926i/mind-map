@@ -50,29 +50,9 @@ export default {
       activeSidebar: 'activeSidebar'
     })
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (!this.$refs.sidebar) return
-          if (val === 'noteSidebar') {
-            this.$refs.sidebar.show = true
-          } else {
-            this.$refs.sidebar.show = false
-          }
-        })
-      }
-    }
-  },
   created() {
     this.$bus.$on('node_active', this.onNodeActive)
     this.mindMap.on('node_note_click', this.onNodeNoteClick)
-  },
-  mounted() {
-    if (this.activeSidebar === 'noteSidebar') {
-      this.$refs.sidebar.show = true
-    }
   },
   beforeUnmount() {
     this.$bus.$off('node_active', this.onNodeActive)
@@ -89,7 +69,7 @@ export default {
           setActiveSidebar('')
         }
       } else {
-        setActiveSidebar(null)
+        setActiveSidebar('')
       }
     },
 

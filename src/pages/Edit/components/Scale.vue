@@ -14,6 +14,8 @@
       <input
         ref="inputRef"
         type="text"
+        name="scalePercent"
+        aria-label="缩放百分比"
         v-model="scaleNum"
         @input="onScaleNumInput"
         @change="onScaleNumChange"

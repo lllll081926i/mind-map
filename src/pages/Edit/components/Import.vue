@@ -74,6 +74,9 @@ import { onShowImport } from '@/services/appEvents'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar, setIsHandleLocalFile } from '@/stores/runtime'
 
+const MAX_IMPORT_FILE_SIZE = 25 * 1024 * 1024
+const ALLOWED_REMOTE_PROTOCOLS = new Set(['http:', 'https:'])
+
 // 导入
 export default {
   data() {
@@ -126,20 +129,80 @@ export default {
       return /\.(smm|json|xmind|md)$/
     },
 
+    getImportPayload(file) {
+      return file?.raw || file || null
+    },
+
+    getImportFileError(file) {
+      const payload = this.getImportPayload(file)
+      const name = String(file?.name || payload?.name || '')
+      if (!name || !this.getRegexp().test(name)) {
+        return (
+          this.$t('import.pleaseSelect') +
+          this.supportFileStr +
+          this.$t('import.file')
+        )
+      }
+      const size = Number(payload?.size || 0)
+      if (size <= 0) {
+        return this.$t('import.fileContentError')
+      }
+      if (size > MAX_IMPORT_FILE_SIZE) {
+        return `导入文件不能超过 ${Math.floor(MAX_IMPORT_FILE_SIZE / 1024 / 1024)} MB`
+      }
+      return ''
+    },
+
+    resolveSafeImportURL(fileURL) {
+      try {
+        const url = new URL(fileURL, window.location.href)
+        if (!ALLOWED_REMOTE_PROTOCOLS.has(url.protocol)) {
+          return ''
+        }
+        if (url.origin !== window.location.origin) {
+          return ''
+        }
+        if (!this.getRegexp().test(url.pathname)) {
+          return ''
+        }
+        return url.toString()
+      } catch (error) {
+        console.error('resolveSafeImportURL failed', error)
+        return ''
+      }
+    },
+
     // 检查url中是否操作需要打开的文件
     async handleFileURL() {
       try {
         const fileURL = this.$route.query.fileURL
         if (!fileURL) return
-        const macth = this.getRegexp().exec(fileURL)
+        const safeURL = this.resolveSafeImportURL(fileURL)
+        if (!safeURL) {
+          return
+        }
+        const macth = this.getRegexp().exec(safeURL)
         if (!macth) {
           return
         }
         const type = macth[1]
-        const res = await fetch(fileURL)
+        const res = await fetch(safeURL)
+        if (!res.ok) {
+          throw new Error('文件请求失败')
+        }
         const file = await res.blob()
+        const fileName = safeURL.split('/').pop() || `import.${type}`
+        const nextFile = new File([file], fileName, {
+          type: file.type || 'application/octet-stream'
+        })
+        const importError = this.getImportFileError(nextFile)
+        if (importError) {
+          this.$message.error(importError)
+          return
+        }
         const data = {
-          raw: file
+          raw: nextFile,
+          name: fileName
         }
         if (type === 'smm' || type === 'json') {
           this.handleSmm(data)
@@ -149,18 +212,15 @@ export default {
           this.handleMd(data)
         }
       } catch (error) {
-        console.log(error)
+        console.error('handleFileURL failed', error)
       }
     },
 
     // 文件选择
     onChange(file) {
-      if (!this.getRegexp().test(file.name)) {
-        this.$message.error(
-          this.$t('import.pleaseSelect') +
-            this.supportFileStr +
-            this.$t('import.file')
-        )
+      const importError = this.getImportFileError(file)
+      if (importError) {
+        this.$message.error(importError)
         this.fileList = []
       } else {
         this.fileList.push(file)
@@ -207,13 +267,13 @@ export default {
       fileReader.onload = evt => {
         try {
           let data = JSON.parse(evt.target.result)
-          if (typeof data !== 'object') {
+          if (!data || typeof data !== 'object') {
             throw new Error(this.$t('import.fileContentError'))
           }
           this.$bus.$emit('setData', data)
           this.$message.success(this.$t('import.importSuccess'))
         } catch (error) {
-          console.log(error)
+          console.error('handleSmm failed', error)
           this.$message.error(this.$t('import.fileParsingFailed'))
         }
       }
@@ -231,7 +291,7 @@ export default {
         this.$bus.$emit('setData', data)
         this.$message.success(this.$t('import.importSuccess'))
       } catch (error) {
-        console.log(error)
+        console.error('handleXmind failed', error)
         this.$message.error(this.$t('import.fileParsingFailed'))
       }
     },
@@ -261,7 +321,7 @@ export default {
           this.$bus.$emit('setData', data)
           this.$message.success(this.$t('import.importSuccess'))
         } catch (error) {
-          console.log(error)
+          console.error('handleMd failed', error)
           this.$message.error(this.$t('import.fileParsingFailed'))
         }
       }
@@ -269,6 +329,11 @@ export default {
 
     // 导入指定文件
     handleImportFile(file) {
+      const importError = this.getImportFileError(file)
+      if (importError) {
+        this.$message.error(importError)
+        return
+      }
       this.onChange({
         raw: file,
         name: file.name

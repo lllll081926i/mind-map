@@ -1,0 +1,12 @@
+{
+  "name": "simple-mind-map-plugin-themes",
+  "version": "1.0.1-local.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/themes.esm.min.js",
+  "exports": {
+    ".": "./dist/themes.esm.min.js",
+    "./themeList": "./themeList.js",
+    "./themeImgMap": "./themeImgMap.js"
+  }
+}

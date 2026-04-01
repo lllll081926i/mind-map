@@ -14,34 +14,15 @@
     <Count :mindMap="mindMap" v-if="!isZenMode"></Count>
     <Navigator v-if="mindMap" :mindMap="mindMap"></Navigator>
     <NavigatorToolbar :mindMap="mindMap" v-if="!isZenMode"></NavigatorToolbar>
-    <OutlineSidebar
-      v-if="mindMap && activeSidebar === 'outline'"
-      :mindMap="mindMap"
-    ></OutlineSidebar>
-    <Style
-      v-if="mindMap && !isZenMode && activeSidebar === 'nodeStyle'"
-      :mindMap="mindMap"
-    ></Style>
-    <BaseStyle
-      v-if="mindMap && activeSidebar === 'baseStyle'"
-      :data="mindMapData"
-      :configData="mindMapConfig"
-      :mindMap="mindMap"
-    ></BaseStyle>
+    <component
+      :is="primarySidebarComponent"
+      v-bind="primarySidebarProps"
+      v-if="primarySidebarComponent"
+    ></component>
     <AssociativeLineStyle
       v-if="mindMap"
       :mindMap="mindMap"
     ></AssociativeLineStyle>
-    <Theme
-      v-if="mindMap && activeSidebar === 'theme'"
-      :data="mindMapData"
-      :mindMap="mindMap"
-    ></Theme>
-    <Structure
-      v-if="mindMap && activeSidebar === 'structure'"
-      :mindMap="mindMap"
-    ></Structure>
-    <ShortcutKey v-if="activeSidebar === 'shortcutKey'"></ShortcutKey>
     <Contextmenu v-if="mindMap" :mindMap="mindMap"></Contextmenu>
     <RichTextToolbar
       v-if="mindMap && richTextPluginReady"
@@ -67,11 +48,6 @@
     ></FormulaSidebar>
     <NodeOuterFrame v-if="mindMap" :mindMap="mindMap"></NodeOuterFrame>
     <NodeTagStyle v-if="mindMap" :mindMap="mindMap"></NodeTagStyle>
-    <Setting
-      v-if="mindMap && activeSidebar === 'setting'"
-      :configData="mindMapConfig"
-      :mindMap="mindMap"
-    ></Setting>
     <NodeImgPlacementToolbar
       v-if="mindMap"
       :mindMap="mindMap"
@@ -96,64 +72,50 @@
 
 <script>
 import { defineAsyncComponent } from 'vue'
-import MindMap from 'simple-mind-map'
-import MiniMap from 'simple-mind-map/src/plugins/MiniMap.js'
-import Watermark from 'simple-mind-map/src/plugins/Watermark.js'
-import KeyboardNavigation from 'simple-mind-map/src/plugins/KeyboardNavigation.js'
-import Drag from 'simple-mind-map/src/plugins/Drag.js'
-import Select from 'simple-mind-map/src/plugins/Select.js'
-import AssociativeLine from 'simple-mind-map/src/plugins/AssociativeLine.js'
-import TouchEvent from 'simple-mind-map/src/plugins/TouchEvent.js'
-import NodeImgAdjust from 'simple-mind-map/src/plugins/NodeImgAdjust.js'
-import SearchPlugin from 'simple-mind-map/src/plugins/Search.js'
-import Painter from 'simple-mind-map/src/plugins/Painter.js'
-import ScrollbarPlugin from 'simple-mind-map/src/plugins/Scrollbar.js'
-import RainbowLines from 'simple-mind-map/src/plugins/RainbowLines.js'
-import Demonstrate from 'simple-mind-map/src/plugins/Demonstrate.js'
-import OuterFrame from 'simple-mind-map/src/plugins/OuterFrame.js'
-import MindMapLayoutPro from 'simple-mind-map/src/plugins/MindMapLayoutPro.js'
-import NodeBase64ImageStorage from 'simple-mind-map/src/plugins/NodeBase64ImageStorage.js'
-import Themes from 'simple-mind-map-plugin-themes'
-// 协同编辑插件
-// import Cooperate from 'simple-mind-map/src/plugins/Cooperate.js'
+import defaultNodeImage from '@/assets/img/图片加载失败.svg'
 import Count from './Count.vue'
-import NavigatorToolbar from './NavigatorToolbar.vue'
-import Contextmenu from './Contextmenu.vue'
 import { getData, getConfig, storeData } from '@/api'
 import Navigator from './Navigator.vue'
 import NodeImgPreview from './NodeImgPreview.vue'
 import SidebarTrigger from './SidebarTrigger.vue'
 import { mapState } from 'pinia'
-import Search from './Search.vue'
-import NodeIconSidebar from './NodeIconSidebar.vue'
-import NodeIconToolbar from './NodeIconToolbar.vue'
-import OutlineEdit from './OutlineEdit.vue'
+import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import { showLoading, hideLoading } from '@/utils/loading'
-import handleClipboardText from '@/utils/handleClipboardText'
-import { getParentWithClass } from '@/utils'
-import Scrollbar from './Scrollbar.vue'
 import {
   clearCurrentDataGetter,
   setCurrentDataGetter
 } from '@/services/runtimeGlobals'
+import { onShowLoading } from '@/services/appEvents'
 import { ensureBootstrapDocumentState } from '@/platform'
-import exampleData from 'simple-mind-map/example/exampleData'
-import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
-import NodeOuterFrame from './NodeOuterFrame.vue'
 import NodeTagStyle from './NodeTagStyle.vue'
 import AssociativeLineStyle from './AssociativeLineStyle.vue'
 import NodeImgPlacementToolbar from './NodeImgPlacementToolbar.vue'
-import defaultNodeImage from '../../../assets/img/图片加载失败.svg'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 
 const OutlineSidebar = defineAsyncComponent(() => import('./OutlineSidebar.vue'))
+const NavigatorToolbar = defineAsyncComponent(() =>
+  import('./NavigatorToolbar.vue')
+)
+const Contextmenu = defineAsyncComponent(() => import('./Contextmenu.vue'))
 const Style = defineAsyncComponent(() => import('./Style.vue'))
 const BaseStyle = defineAsyncComponent(() => import('./BaseStyle.vue'))
 const Theme = defineAsyncComponent(() => import('./Theme.vue'))
 const Structure = defineAsyncComponent(() => import('./Structure.vue'))
-const ShortcutKey = defineAsyncComponent(() => import('./ShortcutKey.vue'))
 const Setting = defineAsyncComponent(() => import('./Setting.vue'))
+const ShortcutKey = defineAsyncComponent(() => import('./ShortcutKey.vue'))
+const Search = defineAsyncComponent(() => import('./Search.vue'))
+const NodeIconSidebar = defineAsyncComponent(() =>
+  import('./NodeIconSidebar.vue')
+)
+const NodeIconToolbar = defineAsyncComponent(() =>
+  import('./NodeIconToolbar.vue')
+)
+const OutlineEdit = defineAsyncComponent(() => import('./OutlineEdit.vue'))
+const Scrollbar = defineAsyncComponent(() => import('./Scrollbar.vue'))
+const NodeOuterFrame = defineAsyncComponent(() =>
+  import('./NodeOuterFrame.vue')
+)
 const AiCreate = defineAsyncComponent(() => import('./AiCreate.vue'))
 const AiChat = defineAsyncComponent(() => import('./AiChat.vue'))
 const RichTextToolbar = defineAsyncComponent(() =>
@@ -171,6 +133,135 @@ const NodeNoteSidebar = defineAsyncComponent(() =>
 
 let richTextPluginsPromise = null
 let exportPluginsPromise = null
+let scrollbarPluginPromise = null
+let handleClipboardTextPromise = null
+let mindMapRuntimePromise = null
+const VIEW_DATA_DEBOUNCE_MS = 300
+const PRIMARY_SIDEBAR_COMPONENTS = {
+  outline: OutlineSidebar,
+  nodeStyle: Style,
+  baseStyle: BaseStyle,
+  theme: Theme,
+  structure: Structure,
+  setting: Setting,
+  shortcutKey: ShortcutKey
+}
+
+const FORWARDED_MIND_MAP_EVENTS = [
+  'node_active',
+  'data_change',
+  'view_data_change',
+  'back_forward',
+  'node_contextmenu',
+  'node_click',
+  'draw_click',
+  'expand_btn_click',
+  'svg_mousedown',
+  'mouseup',
+  'mode_change',
+  'node_tree_render_end',
+  'rich_text_selection_change',
+  'transforming-dom-to-images',
+  'generalization_node_contextmenu',
+  'painter_start',
+  'painter_end',
+  'scrollbar_change',
+  'scale',
+  'translate',
+  'node_attachmentClick',
+  'node_attachmentContextmenu',
+  'demonstrate_jump',
+  'exit_demonstrate',
+  'node_note_dblclick',
+  'node_mousedown'
+]
+
+const loadMindMapRuntime = async () => {
+  if (!mindMapRuntimePromise) {
+    mindMapRuntimePromise = Promise.all([
+      import('simple-mind-map'),
+      import('simple-mind-map-plugin-themes'),
+      import('simple-mind-map/src/plugins/MiniMap.js'),
+      import('simple-mind-map/src/plugins/Watermark.js'),
+      import('simple-mind-map/src/plugins/KeyboardNavigation.js'),
+      import('simple-mind-map/src/plugins/Drag.js'),
+      import('simple-mind-map/src/plugins/Select.js'),
+      import('simple-mind-map/src/plugins/AssociativeLine.js'),
+      import('simple-mind-map/src/plugins/TouchEvent.js'),
+      import('simple-mind-map/src/plugins/NodeImgAdjust.js'),
+      import('simple-mind-map/src/plugins/Search.js'),
+      import('simple-mind-map/src/plugins/Painter.js'),
+      import('simple-mind-map/src/plugins/RainbowLines.js'),
+      import('simple-mind-map/src/plugins/Demonstrate.js'),
+      import('simple-mind-map/src/plugins/OuterFrame.js'),
+      import('simple-mind-map/src/plugins/MindMapLayoutPro.js'),
+      import('simple-mind-map/src/plugins/NodeBase64ImageStorage.js')
+    ]).then(
+      ([
+        mindMapModule,
+        themesModule,
+        miniMapModule,
+        watermarkModule,
+        keyboardNavigationModule,
+        dragModule,
+        selectModule,
+        associativeLineModule,
+        touchEventModule,
+        nodeImgAdjustModule,
+        searchPluginModule,
+        painterModule,
+        rainbowLinesModule,
+        demonstrateModule,
+        outerFrameModule,
+        mindMapLayoutProModule,
+        nodeBase64ImageStorageModule
+      ]) => {
+        const MindMap = mindMapModule.default
+        MindMap.usePlugin(miniMapModule.default)
+          .usePlugin(watermarkModule.default)
+          .usePlugin(dragModule.default)
+          .usePlugin(keyboardNavigationModule.default)
+          .usePlugin(selectModule.default)
+          .usePlugin(associativeLineModule.default)
+          .usePlugin(nodeImgAdjustModule.default)
+          .usePlugin(touchEventModule.default)
+          .usePlugin(searchPluginModule.default)
+          .usePlugin(painterModule.default)
+          .usePlugin(rainbowLinesModule.default)
+          .usePlugin(demonstrateModule.default)
+          .usePlugin(outerFrameModule.default)
+          .usePlugin(mindMapLayoutProModule.default)
+          .usePlugin(nodeBase64ImageStorageModule.default)
+        themesModule.default.init(MindMap)
+        if (typeof MoreThemes !== 'undefined') {
+          MoreThemes.init(MindMap)
+        }
+        return {
+          MindMap
+        }
+      }
+    )
+  }
+  return mindMapRuntimePromise
+}
+
+const loadScrollbarPlugin = async () => {
+  if (!scrollbarPluginPromise) {
+    scrollbarPluginPromise = import(
+      'simple-mind-map/src/plugins/Scrollbar.js'
+    ).then(module => module.default)
+  }
+  return scrollbarPluginPromise
+}
+
+const loadHandleClipboardText = async () => {
+  if (!handleClipboardTextPromise) {
+    handleClipboardTextPromise = import('@/utils/handleClipboardText').then(
+      module => module.default
+    )
+  }
+  return handleClipboardTextPromise
+}
 
 const loadRichTextPlugins = async () => {
   if (!richTextPluginsPromise) {
@@ -200,31 +291,6 @@ const loadExportPlugins = async () => {
   return exportPluginsPromise
 }
 
-// 注册插件
-MindMap.usePlugin(MiniMap)
-  .usePlugin(Watermark)
-  .usePlugin(Drag)
-  .usePlugin(KeyboardNavigation)
-  .usePlugin(Select)
-  .usePlugin(AssociativeLine)
-  .usePlugin(NodeImgAdjust)
-  .usePlugin(TouchEvent)
-  .usePlugin(SearchPlugin)
-  .usePlugin(Painter)
-  .usePlugin(RainbowLines)
-  .usePlugin(Demonstrate)
-  .usePlugin(OuterFrame)
-  .usePlugin(MindMapLayoutPro)
-  .usePlugin(NodeBase64ImageStorage)
-// .usePlugin(Cooperate) // 协同插件
-
-// 注册主题
-Themes.init(MindMap)
-// 扩展主题列表
-if (typeof MoreThemes !== 'undefined') {
-  MoreThemes.init(MindMap)
-}
-
 export default {
   components: {
     OutlineSidebar,
@@ -232,6 +298,7 @@ export default {
     BaseStyle,
     Theme,
     Structure,
+    Setting,
     Count,
     NavigatorToolbar,
     ShortcutKey,
@@ -249,7 +316,6 @@ export default {
     FormulaSidebar,
     NodeOuterFrame,
     NodeTagStyle,
-    Setting,
     AssociativeLineStyle,
     NodeImgPlacementToolbar,
     NodeNoteSidebar,
@@ -267,7 +333,8 @@ export default {
       showDragMask: false,
       onDataChange: null,
       onViewDataChange: null,
-      richTextPluginReady: false
+      richTextPluginReady: false,
+      mindMapEventForwarders: {}
     }
   },
   computed: {
@@ -296,6 +363,45 @@ export default {
     },
     enableAi() {
       return this.localConfig.enableAi
+    },
+    primarySidebarComponent() {
+      const key = this.activeSidebar
+      if (!key) return null
+      if (key === 'nodeStyle' && this.isZenMode) {
+        return null
+      }
+      if (key !== 'shortcutKey' && !this.mindMap) {
+        return null
+      }
+      return PRIMARY_SIDEBAR_COMPONENTS[key] || null
+    },
+    primarySidebarProps() {
+      switch (this.activeSidebar) {
+        case 'outline':
+        case 'nodeStyle':
+        case 'structure':
+          return {
+            mindMap: this.mindMap
+          }
+        case 'baseStyle':
+          return {
+            data: this.mindMapData,
+            configData: this.mindMapConfig,
+            mindMap: this.mindMap
+          }
+        case 'theme':
+          return {
+            data: this.mindMapData,
+            mindMap: this.mindMap
+          }
+        case 'setting':
+          return {
+            configData: this.mindMapConfig,
+            mindMap: this.mindMap
+          }
+        default:
+          return {}
+      }
     }
   },
   watch: {
@@ -332,7 +438,7 @@ export default {
       )
       this.$bus.$on('startPainter', this.handleStartPainter)
       this.$bus.$on('node_tree_render_end', this.handleHideLoading)
-      this.$bus.$on('showLoading', this.handleShowLoading)
+      this.removeShowLoadingListener = onShowLoading(this.handleShowLoading)
       window.addEventListener('resize', this.handleResize)
     } catch (error) {
       console.error('Edit view init failed', error)
@@ -349,7 +455,7 @@ export default {
     this.$bus.$off('createAssociativeLine', this.handleCreateLineFromActiveNode)
     this.$bus.$off('startPainter', this.handleStartPainter)
     this.$bus.$off('node_tree_render_end', this.handleHideLoading)
-    this.$bus.$off('showLoading', this.handleShowLoading)
+    this.removeShowLoadingListener && this.removeShowLoadingListener()
     window.removeEventListener('resize', this.handleResize)
     if (this.onDataChange) {
       this.$bus.$off('data_change', this.onDataChange)
@@ -360,28 +466,33 @@ export default {
     clearTimeout(this.storeConfigTimer)
     clearCurrentDataGetter()
     if (this.mindMap) {
+      this.unbindMindMapEvents()
       this.mindMap.destroy()
     }
   },
   methods: {
     handleStartTextEdit() {
-      this.mindMap.renderer.startTextEdit()
+      this.mindMap?.renderer?.startTextEdit()
     },
 
     handleEndTextEdit() {
-      this.mindMap.renderer.endTextEdit()
+      this.mindMap?.renderer?.endTextEdit()
     },
 
     handleCreateLineFromActiveNode() {
-      this.mindMap.associativeLine.createLineFromActiveNode()
+      this.mindMap?.associativeLine?.createLineFromActiveNode()
     },
 
     handleStartPainter() {
-      this.mindMap.painter.startPainter()
+      this.mindMap?.painter?.startPainter()
+    },
+
+    handleShowNoteContent(content, left, top, node) {
+      this.$bus.$emit('showNoteContent', content, left, top, node)
     },
 
     handleResize() {
-      this.mindMap.resize()
+      this.mindMap?.resize()
     },
 
     // 显示loading
@@ -416,10 +527,10 @@ export default {
         return data
       }
       console.error(
-        'Invalid mind map bootstrap data, fallback to example data',
+        'Invalid mind map bootstrap data, fallback to default desktop data',
         data
       )
-      return simpleDeepClone(exampleData)
+      return createDefaultMindMapData()
     },
 
     // 存储数据当数据有变时
@@ -439,7 +550,7 @@ export default {
           storeData({
             view: data
           })
-        }, 300)
+        }, VIEW_DATA_DEBOUNCE_MS)
       }
       this.$bus.$on('data_change', this.onDataChange)
       this.$bus.$on('view_data_change', this.onViewDataChange)
@@ -450,42 +561,50 @@ export default {
       storeData(this.mindMap.getData(true))
     },
 
-    // 初始化
-    async init() {
-      const { default: icon } = await import('@/config/icon')
-      let hasFileURL = this.hasFileURL()
-      const initialData = this.normalizeMindMapData(this.mindMapData)
+    resolveMindMapContainerEl() {
+      const refEl = this.$refs.mindMapContainer
+      if (refEl && typeof refEl.getBoundingClientRect === 'function') {
+        return refEl
+      }
+      if (refEl?.$el && typeof refEl.$el.getBoundingClientRect === 'function') {
+        return refEl.$el
+      }
+      const domEl = document.getElementById('mindMapContainer')
+      if (domEl && typeof domEl.getBoundingClientRect === 'function') {
+        return domEl
+      }
+      return null
+    },
+
+    createMindMapOptions({
+      containerEl,
+      handleClipboardText,
+      icon,
+      initialData,
+      fallbackData,
+      config,
+      hasFileURL
+    }) {
       let { root, layout, theme, view } = initialData
-      const config = this.mindMapConfig
-      // 如果url中存在要打开的文件，那么思维导图数据、主题、布局都使用默认的
       if (hasFileURL) {
-        root = {
-          data: {
-            text: this.$t('edit.root')
-          },
-          children: []
-        }
-        layout = exampleData.layout
-        theme = exampleData.theme
+        root = fallbackData.root
+        layout = fallbackData.layout
+        theme = fallbackData.theme
         view = null
       }
-      this.mindMap = new MindMap({
-        el: this.$refs.mindMapContainer,
+      return {
+        el: containerEl,
         data: root,
         fit: false,
         layout: layout,
-        theme: theme?.template || exampleData.theme.template,
-        themeConfig: theme?.config || exampleData.theme.config,
+        theme: theme?.template || fallbackData.theme.template,
+        themeConfig: theme?.config || fallbackData.theme.config,
         viewData: view,
         nodeTextEditZIndex: 1000,
         nodeNoteTooltipZIndex: 1000,
         customNoteContentShow: {
-          show: (content, left, top, node) => {
-            this.$bus.$emit('showNoteContent', content, left, top, node)
-          },
-          hide: () => {
-            // this.$bus.$emit('hideNoteContent')
-          }
+          show: this.handleShowNoteContent,
+          hide: () => {}
         },
         openRealtimeRenderOnNodeTextEdit: true,
         enableAutoEnterTextEditWhenKeydown: true,
@@ -546,7 +665,7 @@ export default {
         expandBtnNumHandler: num => {
           return num >= 100 ? '…' : num
         },
-        beforeDeleteNodeImg: node => {
+        beforeDeleteNodeImg: _node => {
           return new Promise(resolve => {
             this.$confirm(
               this.$t('edit.deleteNodeImgTip'),
@@ -565,62 +684,95 @@ export default {
               })
           })
         }
-      })
+      }
+    },
+
+    patchMindMapExport() {
+      if (!this.mindMap) return
       const rawExport = this.mindMap.export.bind(this.mindMap)
       this.mindMap.export = async (...args) => {
         await this.ensureExportPluginsLoaded()
         return rawExport(...args)
       }
+    },
+
+    bindMindMapEvents() {
+      if (!this.mindMap) return
+      this.unbindMindMapEvents()
+      this.mindMapEventForwarders = FORWARDED_MIND_MAP_EVENTS.reduce(
+        (handlers, eventName) => {
+          handlers[eventName] = (...args) => {
+            this.$bus.$emit(eventName, ...args)
+          }
+          return handlers
+        },
+        {}
+      )
+      Object.entries(this.mindMapEventForwarders).forEach(([eventName, handler]) => {
+        this.mindMap.on(eventName, handler)
+      })
+    },
+
+    unbindMindMapEvents() {
+      if (!this.mindMap || !this.mindMapEventForwarders) return
+      Object.entries(this.mindMapEventForwarders).forEach(([eventName, handler]) => {
+        if (typeof this.mindMap.off === 'function') {
+          this.mindMap.off(eventName, handler)
+        }
+      })
+      this.mindMapEventForwarders = {}
+    },
+
+    registerCurrentDataGetter() {
+      setCurrentDataGetter(() => {
+        return this.getCurrentMindMapData()
+      })
+    },
+
+    getCurrentMindMapData() {
+      if (!this.mindMap) {
+        return createDefaultMindMapData()
+      }
+      const fullData = this.mindMap.getData(true)
+      return { ...fullData }
+    },
+
+    // 初始化
+    async init() {
+      await this.$nextTick()
+      const { default: icon } = await import('@/config/icon')
+      const handleClipboardText = await loadHandleClipboardText()
+      const { MindMap } = await loadMindMapRuntime()
+      const hasFileURL = this.hasFileURL()
+      const initialData = this.normalizeMindMapData(this.mindMapData)
+      const fallbackData = createDefaultMindMapData(this.$t('edit.root'))
+      const config = this.mindMapConfig
+      const containerEl = this.resolveMindMapContainerEl()
+      if (!containerEl) {
+        throw new Error('mindMapContainer element unavailable')
+      }
+      this.mindMap = new MindMap(
+        this.createMindMapOptions({
+          containerEl,
+          handleClipboardText,
+          icon,
+          initialData,
+          fallbackData,
+          config,
+          hasFileURL
+        })
+      )
+      this.patchMindMapExport()
       await this.loadPlugins()
       this.mindMap.keyCommand.addShortcut('Control+s', () => {
         this.manualSave()
       })
-      // 转发事件
-      ;[
-        'node_active',
-        'data_change',
-        'view_data_change',
-        'back_forward',
-        'node_contextmenu',
-        'node_click',
-        'draw_click',
-        'expand_btn_click',
-        'svg_mousedown',
-        'mouseup',
-        'mode_change',
-        'node_tree_render_end',
-        'rich_text_selection_change',
-        'transforming-dom-to-images',
-        'generalization_node_contextmenu',
-        'painter_start',
-        'painter_end',
-        'scrollbar_change',
-        'scale',
-        'translate',
-        'node_attachmentClick',
-        'node_attachmentContextmenu',
-        'demonstrate_jump',
-        'exit_demonstrate',
-        'node_note_dblclick',
-        'node_mousedown'
-      ].forEach(event => {
-        this.mindMap.on(event, (...args) => {
-          this.$bus.$emit(event, ...args)
-        })
-      })
+      this.bindMindMapEvents()
       this.bindSaveEvent()
-      // 解析url中的文件
       if (hasFileURL) {
         this.$bus.$emit('handle_file_url')
       }
-      // api/index.js文件使用
-      // 当正在编辑本地文件时通过该方法获取最新数据
-      setCurrentDataGetter(() => {
-        const fullData = this.mindMap.getData(true)
-        return { ...fullData }
-      })
-      // 协同测试
-      this.cooperateTest()
+      this.registerCurrentDataGetter()
     },
 
     async ensureExportPluginsLoaded() {
@@ -647,7 +799,7 @@ export default {
         tasks.push(this.addRichTextPlugin())
       }
       if (this.isShowScrollbar) {
-        tasks.push(Promise.resolve(this.addScrollbarPlugin()))
+        tasks.push(this.addScrollbarPlugin())
       }
       await Promise.all(tasks)
     },
@@ -662,15 +814,13 @@ export default {
     // 动态设置思维导图数据
     setData(data) {
       this.handleShowLoading()
-      let rootNodeData = null
+      const rootNodeData = data.root || data
       if (data.root) {
         this.mindMap.setFullData(data)
-        rootNodeData = data.root
       } else {
         this.mindMap.setData(data)
-        rootNodeData = data
       }
-      this.mindMap.view.reset()
+      this.mindMap?.view?.reset?.()
       this.manualSave()
       // 如果导入的是富文本内容，那么自动开启富文本模式
       if (rootNodeData.data.richText && !this.openNodeRichText) {
@@ -699,7 +849,7 @@ export default {
         await this.mindMap.export(...args)
         hideLoading()
       } catch (error) {
-        console.log(error)
+        console.error('export failed', error)
         hideLoading()
       }
     },
@@ -730,44 +880,19 @@ export default {
     },
 
     // 加载滚动条插件
-    addScrollbarPlugin() {
+    async addScrollbarPlugin() {
       if (!this.mindMap) return
+      const ScrollbarPlugin = await loadScrollbarPlugin()
+      if (!this.mindMap || !this.isShowScrollbar) return
       this.mindMap.addPlugin(ScrollbarPlugin)
     },
 
     // 移除滚动条插件
-    removeScrollbarPlugin() {
+    async removeScrollbarPlugin() {
+      if (!this.mindMap || !scrollbarPluginPromise) return
+      const ScrollbarPlugin = await loadScrollbarPlugin()
+      if (!this.mindMap || this.isShowScrollbar) return
       this.mindMap.removePlugin(ScrollbarPlugin)
-    },
-
-    // 协同测试
-    cooperateTest() {
-      const isLocalDebugHost = ['localhost', '127.0.0.1'].includes(
-        window.location.hostname
-      )
-      const enableCooperateDebug = this.$route.query.cooperateDebug === '1'
-      if (
-        this.mindMap.cooperate &&
-        this.$route.query.userName &&
-        enableCooperateDebug &&
-        isLocalDebugHost
-      ) {
-        this.mindMap.cooperate.setProvider(null, {
-          roomName: 'demo-room',
-          signalingList: ['ws://localhost:4444']
-        })
-        this.mindMap.cooperate.setUserInfo({
-          id: Math.random(),
-          name: this.$route.query.userName,
-          color: ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399'][
-            Math.floor(Math.random() * 5)
-          ],
-          avatar:
-            Math.random() > 0.5
-              ? 'https://img0.baidu.com/it/u=4270674549,2416627993&fm=253&app=138&size=w931&n=0&f=JPEG&fmt=auto?sec=1696006800&t=4d32871d14a7224a4591d0c3c7a97311'
-              : ''
-        })
-      }
     },
 
     // 拖拽文件到页面导入

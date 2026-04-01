@@ -56,7 +56,7 @@
                 }"
                 @click="setImage(image)"
               >
-                <img :src="image.url" alt="" />
+                <img :src="image.url" :alt="image.title || item.name" />
               </div>
             </div>
           </div>
@@ -102,26 +102,14 @@ export default {
     activeSidebar: {
       immediate: true,
       handler(val) {
-        this.$nextTick(() => {
-          if (!this.$refs.sidebar) return
-          if (val === 'nodeIconSidebar') {
-            this.ensurePanelAssetsLoaded()
-            this.$refs.sidebar.show = true
-          } else {
-            this.$refs.sidebar.show = false
-          }
-        })
+        if (val === 'nodeIconSidebar') {
+          void this.ensurePanelAssetsLoaded()
+        }
       }
     }
   },
   created() {
     this.$bus.$on('node_active', this.handleNodeActive)
-  },
-  mounted() {
-    if (this.activeSidebar === 'nodeIconSidebar') {
-      this.ensurePanelAssetsLoaded()
-      this.$refs.sidebar.show = true
-    }
   },
   beforeUnmount() {
     this.$bus.$off('node_active', this.handleNodeActive)

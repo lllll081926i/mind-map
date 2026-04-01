@@ -40,7 +40,10 @@ export default {
   computed: {
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
-    })
+    }),
+    useLeftKeySelectionRightKeyDrag() {
+      return !!this.localConfig.useLeftKeySelectionRightKeyDrag
+    }
   },
   methods: {
     toggleAction() {

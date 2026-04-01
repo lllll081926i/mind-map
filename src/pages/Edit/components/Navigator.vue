@@ -31,6 +31,7 @@
 
 <script>
 import { mapState } from 'pinia'
+import { onToggleMiniMap } from '@/services/appEvents'
 import { useThemeStore } from '@/stores/theme'
 
 export default {
@@ -68,7 +69,7 @@ export default {
   mounted() {
     this.setSize()
     window.addEventListener('resize', this.setSize)
-    this.$bus.$on('toggle_mini_map', this.toggle_mini_map)
+    this.removeToggleMiniMapListener = onToggleMiniMap(this.toggle_mini_map)
     this.$bus.$on('data_change', this.data_change)
     this.$bus.$on('view_data_change', this.data_change)
     this.$bus.$on('node_tree_render_end', this.data_change)
@@ -80,7 +81,7 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.setSize)
-    this.$bus.$off('toggle_mini_map', this.toggle_mini_map)
+    this.removeToggleMiniMapListener && this.removeToggleMiniMapListener()
     this.$bus.$off('data_change', this.data_change)
     this.$bus.$off('view_data_change', this.data_change)
     this.$bus.$off('node_tree_render_end', this.data_change)

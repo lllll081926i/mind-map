@@ -149,6 +149,7 @@ export default {
       isLoopRendering: false,
       uidMap: {},
       latestUid: '',
+      activeAiRequestId: 0,
 
       clientTipDialogVisible: false,
       createDialogVisible: false,
@@ -231,12 +232,48 @@ export default {
       }, 500)
     },
 
-    resetAiRequestState({ abort = false } = {}) {
+    resetAiRequestState({ abort = false, invalidate = true } = {}) {
       if (abort && this.aiInstance) {
         this.aiInstance.stop()
       }
+      if (invalidate) {
+        this.activeAiRequestId += 1
+      }
       this.isAiCreating = false
       this.aiInstance = null
+    },
+
+    beginAiRequest() {
+      this.activeAiRequestId += 1
+      return this.activeAiRequestId
+    },
+
+    isCurrentAiRequest(requestId) {
+      return requestId === this.activeAiRequestId
+    },
+
+    updateStreamingAiContent(content) {
+      const rawContent = String(content || '')
+      if (!rawContent) {
+        this.aiCreatingContent = ''
+        return ''
+      }
+      const arr = rawContent.split(/\n+/)
+      this.aiCreatingContent = arr.splice(0, arr.length - 1).join('\n')
+      return this.aiCreatingContent
+    },
+
+    createAiTreeSnapshot() {
+      const content = String(this.aiCreatingContent || '').trim()
+      if (!content) {
+        return null
+      }
+      const treeData = transformMarkdownTo(content)
+      this.addUid(treeData)
+      return {
+        content,
+        treeData
+      }
     },
 
     createAiInstance() {
@@ -261,7 +298,7 @@ export default {
         this.clientTipDialogVisible = false
         this.createDialogVisible = true
       } catch (error) {
-        console.log(error)
+        console.error('testConnect failed', error)
         this.$message.error(this.$t('ai.connectFailed'))
       }
     },
@@ -290,7 +327,7 @@ export default {
         await this.aiTest()
         this.createDialogVisible = true
       } catch (error) {
-        console.log(error)
+        console.error('aiCrateAll failed', error)
       }
     },
 
@@ -314,6 +351,7 @@ export default {
       this.aiCreatingMaskVisible = true
       // 发起请求
       this.isAiCreating = true
+      const requestId = this.beginAiRequest()
       this.createAiInstance()
       this.mindMap.renderer.setRootNodeCenter()
       this.mindMap.setData(null)
@@ -325,17 +363,25 @@ export default {
           })
         },
         content => {
-          if (content) {
-            const arr = content.split(/\n+/)
-            this.aiCreatingContent = arr.splice(0, arr.length - 1).join('\n')
+          if (!this.isCurrentAiRequest(requestId)) {
+            return
           }
-          this.loopRenderOnAiCreating()
+          this.updateStreamingAiContent(content)
+          this.loopRenderOnAiCreating(requestId)
         },
         content => {
+          if (!this.isCurrentAiRequest(requestId)) {
+            return
+          }
           this.aiCreatingContent = content
-          this.resetOnAiCreatingStop()
+          this.resetOnAiCreatingStop({
+            invalidateRequest: false
+          })
         },
         error => {
+          if (!this.isCurrentAiRequest(requestId)) {
+            return
+          }
           this.resetOnAiCreatingStop()
           this.resetOnRenderEnd()
           this.$message.error(error?.message || this.$t('ai.generationFailed'))
@@ -344,9 +390,11 @@ export default {
     },
 
     // AI请求完成或出错后需要复位的数据
-    resetOnAiCreatingStop() {
+    resetOnAiCreatingStop({ invalidateRequest = true } = {}) {
       this.aiCreatingMaskVisible = false
-      this.resetAiRequestState()
+      this.resetAiRequestState({
+        invalidate: invalidateRequest
+      })
     },
 
     // 渲染结束后需要复位的数据
@@ -371,15 +419,20 @@ export default {
     },
 
     // 轮询进行渲染
-    loopRenderOnAiCreating() {
-      if (!this.aiCreatingContent.trim() || this.isLoopRendering) return
+    loopRenderOnAiCreating(requestId) {
+      if (!this.isCurrentAiRequest(requestId) || this.isLoopRendering) return
+      const snapshot = this.createAiTreeSnapshot()
+      if (!snapshot) return
       this.isLoopRendering = true
-      const treeData = transformMarkdownTo(this.aiCreatingContent)
-      this.addUid(treeData)
+      const treeData = snapshot.treeData
       let lastTreeData = JSON.stringify(treeData)
 
       // 在当前渲染完成时再进行下一次渲染
       const onRenderEnd = () => {
+        if (!this.isCurrentAiRequest(requestId)) {
+          this.resetOnRenderEnd()
+          return
+        }
         // 处理超出画布的节点
         this.checkNodeOuter()
 
@@ -389,8 +442,12 @@ export default {
           return
         }
 
-        const treeData = transformMarkdownTo(this.aiCreatingContent)
-        this.addUid(treeData)
+        const nextSnapshot = this.createAiTreeSnapshot()
+        if (!nextSnapshot) {
+          this.resetOnRenderEnd()
+          return
+        }
+        const treeData = nextSnapshot.treeData
         // 正在生成中
         if (this.isAiCreating) {
           // 如果和上次数据一样则不触发重新渲染
@@ -507,6 +564,7 @@ export default {
         this.aiCreatingMaskVisible = true
         // 发起请求
         this.isAiCreating = true
+        const requestId = this.beginAiRequest()
         this.createAiInstance()
         this.aiInstance.request(
           {
@@ -516,19 +574,26 @@ export default {
             })
           },
           content => {
-            if (content) {
-              const arr = content.split(/\n+/)
-              this.aiCreatingContent = arr.splice(0, arr.length - 1).join('\n')
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
             }
-
-            this.loopRenderOnAiCreatingPart()
+            this.updateStreamingAiContent(content)
+            this.loopRenderOnAiCreatingPart(requestId)
           },
           content => {
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
+            }
             this.aiCreatingContent = content
-            this.resetOnAiCreatingStop()
+            this.resetOnAiCreatingStop({
+              invalidateRequest: false
+            })
             this.resetAiCreatePartDialog()
           },
           error => {
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
+            }
             this.resetOnAiCreatingStop()
             this.resetAiCreatePartDialog()
             this.resetOnRenderEnd()
@@ -538,7 +603,7 @@ export default {
           }
         )
       } catch (error) {
-        console.log(error)
+        console.error('aiCreatePart failed', error)
       }
     },
 
@@ -564,16 +629,21 @@ export default {
     },
 
     // 轮询进行部分渲染
-    loopRenderOnAiCreatingPart() {
-      if (!this.aiCreatingContent.trim() || this.isLoopRendering) return
+    loopRenderOnAiCreatingPart(requestId) {
+      if (!this.isCurrentAiRequest(requestId) || this.isLoopRendering) return
+      const snapshot = this.createAiTreeSnapshot()
+      if (!snapshot) return
       this.isLoopRendering = true
-      const partData = transformMarkdownTo(this.aiCreatingContent)
-      this.addUid(partData)
+      const partData = snapshot.treeData
       let lastPartData = JSON.stringify(partData)
       const treeData = this.addToTargetNode(partData.children || [])
 
       // 在当前渲染完成时再进行下一次渲染
       const onRenderEnd = () => {
+        if (!this.isCurrentAiRequest(requestId)) {
+          this.resetOnRenderEnd()
+          return
+        }
         // 处理超出画布的节点
         this.checkNodeOuter()
 
@@ -583,8 +653,12 @@ export default {
           return
         }
 
-        const partData = transformMarkdownTo(this.aiCreatingContent)
-        this.addUid(partData)
+        const nextSnapshot = this.createAiTreeSnapshot()
+        if (!nextSnapshot) {
+          this.resetOnRenderEnd()
+          return
+        }
+        const partData = nextSnapshot.treeData
         const treeData = this.addToTargetNode(partData.children || [])
 
         if (this.isAiCreating) {
@@ -620,25 +694,35 @@ export default {
         await this.aiTest()
         // 发起请求
         this.isAiCreating = true
+        const requestId = this.beginAiRequest()
         this.createAiInstance()
         this.aiInstance.request(
           {
             messages: normalizeAiMessages(messageList)
           },
           content => {
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
+            }
             progress(content)
           },
           content => {
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
+            }
             this.resetAiRequestState()
             end(content)
           },
           error => {
+            if (!this.isCurrentAiRequest(requestId)) {
+              return
+            }
             this.resetAiRequestState()
             err(error)
           }
         )
       } catch (error) {
-        console.log(error)
+        console.error('aiChat failed', error)
         this.resetAiRequestState()
         err(error)
       }

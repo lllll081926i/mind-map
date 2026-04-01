@@ -10,13 +10,26 @@ import {
   normalizeAiConfig
 } from '@/utils/aiProviders.mjs'
 
-const appStore = useAppStore(pinia)
-const editorStore = useEditorStore(pinia)
-const settingsStore = useSettingsStore(pinia)
-const themeStore = useThemeStore(pinia)
-const aiStore = useAiStore(pinia)
+let runtimeStores = null
+
+const ensureRuntimeStores = () => {
+  if (!runtimeStores) {
+    runtimeStores = {
+      appStore: useAppStore(pinia),
+      editorStore: useEditorStore(pinia),
+      settingsStore: useSettingsStore(pinia),
+      themeStore: useThemeStore(pinia),
+      aiStore: useAiStore(pinia)
+    }
+    runtimeStores.themeStore.syncFromLocalConfig(
+      runtimeStores.settingsStore.localConfig
+    )
+  }
+  return runtimeStores
+}
 
 const persistCompositeConfig = () => {
+  const { settingsStore, aiStore } = ensureRuntimeStores()
   persistLocalConfig({
     ...settingsStore.localConfig,
     ...aiStore.config
@@ -24,10 +37,12 @@ const persistCompositeConfig = () => {
 }
 
 const syncThemeFromLocalConfig = () => {
+  const { themeStore, settingsStore } = ensureRuntimeStores()
   themeStore.syncFromLocalConfig(settingsStore.localConfig)
 }
 
 const applyCompositeConfig = (data, persist = true) => {
+  const { settingsStore, aiStore, appStore } = ensureRuntimeStores()
   const nextLocalConfig = {
     ...settingsStore.localConfig
   }
@@ -52,13 +67,7 @@ const applyCompositeConfig = (data, persist = true) => {
   }
 }
 
-export const getRuntimeStores = () => ({
-  appStore,
-  editorStore,
-  settingsStore,
-  themeStore,
-  aiStore
-})
+export const getRuntimeStores = () => ensureRuntimeStores()
 
 export const applyLocalConfigPatch = data => {
   applyCompositeConfig(data, true)
@@ -91,51 +100,52 @@ export const syncRuntimeFromBootstrapState = state => {
 }
 
 export const setActiveSidebar = value => {
-  if (value === 'ai' && !settingsStore.localConfig.enableAi) {
+  const { settingsStore, appStore } = ensureRuntimeStores()
+  const normalizedValue = typeof value === 'string' ? value : ''
+  if (normalizedValue === 'ai' && !settingsStore.localConfig.enableAi) {
     appStore.setActiveSidebar('')
     return
   }
-  appStore.setActiveSidebar(value)
+  appStore.setActiveSidebar(normalizedValue)
 }
 
-export const setIsHandleLocalFile = value => {
-  appStore.setIsHandleLocalFile(value)
+const createStoreSetter = (store, methodName) => {
+  return value => {
+    const runtime = ensureRuntimeStores()
+    runtime[store][methodName](value)
+  }
 }
 
-export const setIsOutlineEdit = value => {
-  appStore.setIsOutlineEdit(value)
-}
-
-export const setIsReadonly = value => {
-  appStore.setIsReadonly(value)
-}
-
-export const setIsSourceCodeEdit = value => {
-  appStore.setIsSourceCodeEdit(value)
-}
-
-export const setExtraTextOnExport = value => {
-  appStore.setExtraTextOnExport(value)
-}
-
-export const setIsDragOutlineTreeNode = value => {
-  appStore.setIsDragOutlineTreeNode(value)
-}
-
-export const setExtendThemeGroupList = value => {
-  themeStore.setExtendThemeGroupList(value)
-}
-
-export const setBgList = value => {
-  themeStore.setBgList(value)
-}
+export const setIsHandleLocalFile = createStoreSetter(
+  'appStore',
+  'setIsHandleLocalFile'
+)
+export const setIsOutlineEdit = createStoreSetter('appStore', 'setIsOutlineEdit')
+export const setIsReadonly = createStoreSetter('appStore', 'setIsReadonly')
+export const setIsSourceCodeEdit = createStoreSetter(
+  'appStore',
+  'setIsSourceCodeEdit'
+)
+export const setExtraTextOnExport = createStoreSetter(
+  'appStore',
+  'setExtraTextOnExport'
+)
+export const setIsDragOutlineTreeNode = createStoreSetter(
+  'appStore',
+  'setIsDragOutlineTreeNode'
+)
+export const setExtendThemeGroupList = createStoreSetter(
+  'themeStore',
+  'setExtendThemeGroupList'
+)
+export const setBgList = createStoreSetter('themeStore', 'setBgList')
 
 export const syncEditorFileSession = payload => {
+  const { editorStore } = ensureRuntimeStores()
   editorStore.syncFileSession(payload)
 }
 
 export const setRecentFiles = list => {
+  const { editorStore } = ensureRuntimeStores()
   editorStore.setRecentFiles(list)
 }
-
-syncThemeFromLocalConfig()

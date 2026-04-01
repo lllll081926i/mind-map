@@ -829,6 +829,7 @@ import {
 import ImgUpload from '@/components/ImgUpload/index.vue'
 import { storeData, storeConfig } from '@/api'
 import { mapState } from 'pinia'
+import { emitShowLoading } from '@/services/appEvents'
 import {
   supportLineStyleLayoutsMap,
   supportLineRadiusLayouts,
@@ -981,11 +982,6 @@ export default {
           this.initOuterFramePadding()
           this.currentLayout = this.mindMap.getLayout()
         }
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'baseStyle'
-          }
-        })
       }
     },
     lineStyleListShow: {
@@ -1091,7 +1087,7 @@ export default {
         this.data.theme.config = {}
       }
       this.data.theme.config[key] = value
-      this.$bus.$emit('showLoading')
+      emitShowLoading()
       this.mindMap.setThemeConfig(this.data.theme.config)
       storeData({
         theme: {
@@ -1105,17 +1101,14 @@ export default {
     updateRainbowLinesConfig(item) {
       this.rainbowLinesPopoverVisible = false
       this.curRainbowLineColorList = item.list || null
-      let newConfig = null
-      if (item.list) {
-        newConfig = {
+      const newConfig = item.list
+        ? {
           open: true,
           colorsList: item.list
         }
-      } else {
-        newConfig = {
+        : {
           open: false
         }
-      }
       this.configData.rainbowLinesConfig = newConfig
       this.mindMap.rainbowLines.updateRainLinesConfig(newConfig)
       storeConfig(this.configData)

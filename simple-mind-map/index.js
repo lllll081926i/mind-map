@@ -29,6 +29,24 @@ import defaultTheme, {
 } from './src/theme/default'
 import { defaultOpt } from './src/constants/defaultOptions'
 
+const mergeOptionsPreservingEl = (...sources) => {
+  const preservedEl = [...sources]
+    .reverse()
+    .find(source => source && typeof source === 'object' && source.el)?.el
+  const normalizedSources = sources.map(source => {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      return source
+    }
+    const { el, ...rest } = source
+    return rest
+  })
+  const merged = merge.all(normalizedSources)
+  if (!isUndef(preservedEl)) {
+    merged.el = preservedEl
+  }
+  return merged
+}
+
 //  思维导图
 class MindMap {
   //  构造函数
@@ -39,7 +57,7 @@ class MindMap {
   constructor(opt = {}) {
     MindMap.instanceCount++
     // 合并选项
-    this.opt = this.handleOpt(merge(defaultOpt, opt))
+    this.opt = this.handleOpt(mergeOptionsPreservingEl(defaultOpt, opt))
     // 预处理节点数据
     this.opt.data = this.handleData(this.opt.data)
 
@@ -423,7 +441,9 @@ class MindMap {
     const lastOpt = {
       ...this.opt
     }
-    this.opt = this.handleOpt(merge.all([defaultOpt, this.opt, opt]))
+    this.opt = this.handleOpt(
+      mergeOptionsPreservingEl(defaultOpt, this.opt, opt)
+    )
     this.emit('after_update_config', this.opt, lastOpt)
   }
 

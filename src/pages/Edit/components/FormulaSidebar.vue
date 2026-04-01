@@ -41,7 +41,6 @@ import { formulaList } from '@/config/constant'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
-import { setActiveSidebar } from '@/stores/runtime'
 
 export default {
   components: {
@@ -55,8 +54,7 @@ export default {
   data() {
     return {
       formulaText: '',
-      list: [],
-      activeNodes: []
+      list: []
     }
   },
   computed: {
@@ -70,29 +68,8 @@ export default {
       localConfig: 'localConfig'
     })
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'formulaSidebar'
-          }
-        })
-      }
-    }
-  },
-  created() {
-    this.$bus.$on('node_active', this.handleNodeActive)
-  },
-  beforeUnmount() {
-    this.$bus.$off('node_active', this.handleNodeActive)
-  },
   mounted() {
     this.init()
-    if (this.activeSidebar === 'formulaSidebar' && this.$refs.sidebar) {
-      this.$refs.sidebar.show = true
-    }
   },
   methods: {
     init() {
@@ -106,16 +83,6 @@ export default {
           text: item
         }
       })
-    },
-
-    handleNodeActive(...args) {
-      this.activeNodes = [...(args[1] || [])]
-      if (
-        this.activeNodes.length <= 0 &&
-        this.activeSidebar === 'formulaSidebar'
-      ) {
-        setActiveSidebar('')
-      }
     },
 
     confirm() {

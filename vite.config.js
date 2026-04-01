@@ -57,7 +57,7 @@ const createManualChunks = id => {
   return undefined
 }
 
-module.exports = defineConfig(({ command, mode }) => {
+module.exports = defineConfig(({ command, mode: _mode }) => {
   const isBuild = command === 'build'
   const defaultReleaseUrl = 'https://github.com/lllll081926i/mind-map/releases'
   const defaultUpdateManifestUrl =
@@ -105,7 +105,7 @@ module.exports = defineConfig(({ command, mode }) => {
     build: {
       outDir: 'dist-desktop',
       emptyOutDir: true,
-      chunkSizeWarningLimit: 4000,
+      chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
           manualChunks: createManualChunks

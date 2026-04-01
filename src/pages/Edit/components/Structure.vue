@@ -1,7 +1,7 @@
 <template>
   <Sidebar
     ref="sidebar"
-    :title="$t('strusture.title')"
+    :title="$t('structure.title')"
     :force-show="activeSidebar === 'structure'"
   >
     <div class="layoutGroupList" :class="{ isDark: isDark }">
@@ -80,11 +80,6 @@ export default {
         if (val === 'structure') {
           this.layout = this.mindMap.getLayout()
         }
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'structure'
-          }
-        })
       }
     }
   },

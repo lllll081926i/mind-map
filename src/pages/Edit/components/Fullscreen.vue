@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import { fullscrrenEvent, fullScreen } from '@/utils'
+import { fullscreenEvent, fullScreen } from '@/utils'
 
 // 全屏
 export default {
@@ -36,14 +36,14 @@ export default {
     return {}
   },
   created() {
-    document[fullscrrenEvent] = () => {
+    document[fullscreenEvent] = () => {
       setTimeout(() => {
         this.mindMap.resize()
       }, 1000)
     }
   },
   beforeUnmount() {
-    document[fullscrrenEvent] = null
+    document[fullscreenEvent] = null
   },
   methods: {
     // 全屏查看

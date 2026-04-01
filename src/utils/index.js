@@ -1,5 +1,7 @@
+import DOMPurify from 'dompurify'
+
 // 全屏事件检测
-const getOnfullscreEnevt = () => {
+const getOnFullscreenEvent = () => {
   if (document.documentElement.requestFullScreen) {
     return 'onfullscreenchange'
   } else if (document.documentElement.webkitRequestFullScreen) {
@@ -11,7 +13,7 @@ const getOnfullscreEnevt = () => {
   }
 }
 
-export const fullscrrenEvent = getOnfullscreEnevt()
+export const fullscreenEvent = getOnFullscreenEvent()
 
 // 全屏
 export const fullScreen = element => {
@@ -26,12 +28,37 @@ export const fullScreen = element => {
 
 // 文件转buffer
 export const fileToBuffer = file => {
-  return new Promise(r => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
-      r(reader.result)
+      resolve(reader.result)
+    }
+    reader.onerror = () => {
+      reject(reader.error || new Error('fileToBuffer failed'))
     }
     reader.readAsArrayBuffer(file)
+  })
+}
+
+export const sanitizeRichTextFragment = html => {
+  return DOMPurify.sanitize(String(html || ''), {
+    ALLOWED_TAGS: [
+      'br',
+      'strong',
+      'b',
+      'em',
+      'i',
+      'u',
+      's',
+      'span',
+      'font',
+      'sub',
+      'sup',
+      'mark',
+      'code'
+    ],
+    ALLOWED_ATTR: ['style'],
+    KEEP_CONTENT: true
   })
 }
 

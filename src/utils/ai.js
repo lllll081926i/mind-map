@@ -5,136 +5,26 @@ import {
 } from './aiProviders.mjs'
 import platform, { isDesktopApp } from '@/platform'
 
-class Ai {
+const createAbortError = () => {
+  const abortError = new Error('AbortError')
+  abortError.name = 'AbortError'
+  return abortError
+}
+
+class BrowserAiTransport {
   constructor(options = {}) {
     this.options = options
-
-    this.baseData = {}
     this.controller = null
-    this.currentChunk = ''
-    this.content = ''
-    this.requestId = ''
-    this.unlistenList = []
-    this.desktopRequestReject = null
   }
 
-  init(type = {}, options = {}) {
-    const config = typeof type === 'string' ? options : type
-    this.baseData = buildAiRequestConfig(config)
-    this.content = ''
-    this.currentChunk = ''
-  }
-
-  async request(data, progress = () => {}, end = () => {}, err = () => {}) {
-    try {
-      this.content = ''
-      this.currentChunk = ''
-      this.requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
-      if (isDesktopApp()) {
-        await this.requestByDesktop(data, progress, end, err)
-        return
-      }
-      const res = await this.postMsg(data)
-      const decoder = new TextDecoder()
-      while (1) {
-        const { done, value } = await res.read()
-        if (done) {
-          this.flushPendingChunk(progress)
-          end(this.content)
-          return
-        }
-        // 拿到当前切片的数据
-        const text = decoder.decode(value, { stream: true })
-        const isEnd = this.handleChunkData(text, progress)
-        if (isEnd) {
-          end(this.content)
-          return
-        }
-      }
-    } catch (error) {
-      console.log(error)
-      // 手动停止请求不需要触发错误回调
-      if (!(error && error.name === 'AbortError')) {
-        err(error)
-      }
-    } finally {
-      this.clearDesktopListeners()
-    }
-  }
-
-  async requestByDesktop(data, progress = () => {}, end = () => {}, err = () => {}) {
-    return new Promise(async (resolve, reject) => {
-      const request = {
-        ...this.baseData,
-        data: {
-          ...this.baseData.data,
-          ...data
-        }
-      }
-      let finished = false
-
-      const finishSuccess = () => {
-        if (finished) return
-        finished = true
-        this.desktopRequestReject = null
-        this.requestId = ''
-        end(this.content)
-        resolve()
-      }
-
-      const finishError = nextError => {
-        if (finished) return
-        finished = true
-        this.desktopRequestReject = null
-        this.requestId = ''
-        err(nextError)
-        reject(nextError)
-      }
-      this.desktopRequestReject = finishError
-
-      const handleChunkText = text => {
-        const isEnd = this.handleChunkData(text, progress)
-        if (isEnd) {
-          finishSuccess()
-        }
-      }
-
-      const chunkUnlisten = await platform.listen('ai-proxy://chunk', event => {
-        if (!event.payload || event.payload.requestId !== this.requestId) return
-        try {
-          handleChunkText(event.payload.chunk || '')
-        } catch (error) {
-          void platform.stopAiProxyRequest({
-            requestId: this.requestId
-          })
-          finishError(error)
-        }
-      })
-      const doneUnlisten = await platform.listen('ai-proxy://done', event => {
-        if (!event.payload || event.payload.requestId !== this.requestId) return
-        this.flushPendingChunk(progress)
-        finishSuccess()
-      })
-      const errorUnlisten = await platform.listen('ai-proxy://error', event => {
-        if (!event.payload || event.payload.requestId !== this.requestId) return
-        const nextError = new Error(event.payload.message || '请求失败')
-        nextError.status = event.payload.status
-        finishError(nextError)
-      })
-      this.unlistenList = [chunkUnlisten, doneUnlisten, errorUnlisten]
-
-      try {
-        await platform.startAiProxyRequest({
-          requestId: this.requestId,
-          request
-        })
-      } catch (error) {
-        finishError(error)
-      }
-    })
-  }
-
-  async postMsg(data) {
+  async request({
+    request,
+    handleChunkData,
+    flushPendingChunk,
+    getContent,
+    progress = () => {},
+    end = () => {}
+  }) {
     this.controller = new AbortController()
     const res = await fetch(`http://localhost:${this.options.port}/ai/chat`, {
       signal: this.controller.signal,
@@ -142,13 +32,7 @@ class Ai {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        ...this.baseData,
-        data: {
-          ...this.baseData.data,
-          ...data
-        }
-      })
+      body: JSON.stringify(request)
     })
     if (!res.ok) {
       let message = '请求失败'
@@ -173,7 +57,209 @@ class Ai {
     if (!res.body) {
       throw new Error('响应体为空')
     }
-    return res.body.getReader()
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let reading = true
+    while (reading) {
+      const { done, value } = await reader.read()
+      if (done) {
+        flushPendingChunk(progress)
+        end(getContent())
+        return
+      }
+      const text = decoder.decode(value, { stream: true })
+      const isEnd = handleChunkData(text, progress)
+      if (isEnd) {
+        end(getContent())
+        return
+      }
+    }
+  }
+
+  stop() {
+    if (this.controller) {
+      this.controller.abort()
+    }
+  }
+
+  cleanup() {
+    this.controller = null
+  }
+}
+
+class DesktopAiTransport {
+  constructor() {
+    this.requestId = ''
+    this.requestReject = null
+    this.unlistenList = []
+  }
+
+  async request({
+    requestId,
+    request,
+    handleChunkData,
+    flushPendingChunk,
+    getContent,
+    progress = () => {},
+    end = () => {}
+  }) {
+    this.requestId = requestId
+    return new Promise((resolve, reject) => {
+      let finished = false
+
+      const finishSuccess = () => {
+        if (finished) return
+        finished = true
+        end(getContent())
+        this.cleanup()
+        resolve()
+      }
+
+      const finishError = error => {
+        if (finished) return
+        finished = true
+        this.cleanup()
+        reject(error)
+      }
+
+      this.requestReject = finishError
+
+      void (async () => {
+        try {
+          const chunkUnlisten = await platform.listen(
+            'ai-proxy://chunk',
+            event => {
+              if (!event.payload || event.payload.requestId !== this.requestId) {
+                return
+              }
+              try {
+                const isEnd = handleChunkData(event.payload.chunk || '', progress)
+                if (isEnd) {
+                  finishSuccess()
+                }
+              } catch (error) {
+                void platform.stopAiProxyRequest({
+                  requestId: this.requestId
+                })
+                finishError(error)
+              }
+            }
+          )
+          const doneUnlisten = await platform.listen(
+            'ai-proxy://done',
+            event => {
+              if (!event.payload || event.payload.requestId !== this.requestId) {
+                return
+              }
+              flushPendingChunk(progress)
+              finishSuccess()
+            }
+          )
+          const errorUnlisten = await platform.listen(
+            'ai-proxy://error',
+            event => {
+              if (!event.payload || event.payload.requestId !== this.requestId) {
+                return
+              }
+              const error = new Error(event.payload.message || '请求失败')
+              error.status = event.payload.status
+              finishError(error)
+            }
+          )
+          this.unlistenList = [chunkUnlisten, doneUnlisten, errorUnlisten]
+
+          await platform.startAiProxyRequest({
+            requestId: this.requestId,
+            request
+          })
+        } catch (error) {
+          finishError(error)
+        }
+      })()
+    })
+  }
+
+  stop() {
+    if (!this.requestId) return
+    void platform.stopAiProxyRequest({
+      requestId: this.requestId
+    })
+    if (typeof this.requestReject === 'function') {
+      this.requestReject(createAbortError())
+      return
+    }
+    this.cleanup()
+  }
+
+  cleanup() {
+    this.unlistenList.forEach(unlisten => {
+      if (typeof unlisten === 'function') {
+        unlisten()
+      }
+    })
+    this.unlistenList = []
+    this.requestReject = null
+    this.requestId = ''
+  }
+}
+
+const createAiTransport = options => {
+  return isDesktopApp()
+    ? new DesktopAiTransport()
+    : new BrowserAiTransport(options)
+}
+
+class Ai {
+  constructor(options = {}) {
+    this.options = options
+    this.baseData = {}
+    this.currentChunk = ''
+    this.content = ''
+    this.transport = createAiTransport(options)
+  }
+
+  init(type = {}, options = {}) {
+    const config = typeof type === 'string' ? options : type
+    this.baseData = buildAiRequestConfig(config)
+    this.content = ''
+    this.currentChunk = ''
+    this.transport.cleanup()
+    this.transport = createAiTransport(this.options)
+  }
+
+  buildRequest(data) {
+    return {
+      ...this.baseData,
+      data: {
+        ...this.baseData.data,
+        ...data
+      }
+    }
+  }
+
+  async request(data, progress = () => {}, end = () => {}, err = () => {}) {
+    try {
+      this.content = ''
+      this.currentChunk = ''
+      await this.transport.request({
+        requestId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        request: this.buildRequest(data),
+        handleChunkData: (chunk, nextProgress) =>
+          this.handleChunkData(chunk, nextProgress),
+        flushPendingChunk: nextProgress => this.flushPendingChunk(nextProgress),
+        getContent: () => this.content,
+        progress,
+        end
+      })
+    } catch (error) {
+      console.error('Ai.request failed', error)
+      if (!(error && error.name === 'AbortError')) {
+        err(error)
+      }
+    } finally {
+      this.transport.cleanup()
+    }
   }
 
   appendChunkContent(list) {
@@ -202,33 +288,7 @@ class Ai {
   }
 
   stop() {
-    if (isDesktopApp() && this.requestId) {
-      void platform.stopAiProxyRequest({
-        requestId: this.requestId
-      })
-      if (typeof this.desktopRequestReject === 'function') {
-        const abortError = new Error('AbortError')
-        abortError.name = 'AbortError'
-        this.desktopRequestReject(abortError)
-      } else {
-        this.clearDesktopListeners()
-        this.requestId = ''
-      }
-    }
-    if (this.controller) {
-      this.controller.abort()
-    }
-    this.controller = null
-  }
-
-  clearDesktopListeners() {
-    this.unlistenList.forEach(unlisten => {
-      if (typeof unlisten === 'function') {
-        unlisten()
-      }
-    })
-    this.unlistenList = []
-    this.desktopRequestReject = null
+    this.transport.stop()
   }
 }
 

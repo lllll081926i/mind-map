@@ -132,7 +132,7 @@ export const handleNodeImageFromXmind = async (
       }
       resolve()
     } catch (error) {
-      console.log(error)
+      console.error('handleNodeImageFromXmind failed', error)
       resolve()
     }
   }
@@ -173,7 +173,7 @@ export const handleNodeImageToXmind = async (
       }
       resolve()
     } catch (error) {
-      console.log(error)
+      console.error('handleNodeImageToXmind failed', error)
       resolve()
     }
   }

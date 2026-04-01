@@ -1,5 +1,9 @@
 <template>
-  <Sidebar ref="sidebar" :title="$t('baseStyle.associativeLineStyle')">
+  <Sidebar
+    ref="sidebar"
+    :title="$t('baseStyle.associativeLineStyle')"
+    :force-show="activeSidebar === 'associativeLineStyle'"
+  >
     <div class="sidebarContent" :class="{ isDark: isDark }">
       <div class="title noTop">{{ $t('baseStyle.associativeLine') }}</div>
       <div class="row">
@@ -276,29 +280,12 @@ export default {
       return borderDasharrayList[this.$i18n.locale] || borderDasharrayList.zh
     }
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'associativeLineStyle'
-          }
-        })
-      }
-    }
-  },
   created() {
     this.mindMap.on('associative_line_click', this.onAssociativeLineClick)
     this.mindMap.on(
       'associative_line_deactivate',
       this.associativeLineDeactivate
     )
-  },
-  mounted() {
-    if (this.activeSidebar === 'associativeLineStyle' && this.$refs.sidebar) {
-      this.$refs.sidebar.show = true
-    }
   },
   beforeUnmount() {
     this.mindMap.off('associative_line_click', this.onAssociativeLineClick)

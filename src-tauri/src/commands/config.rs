@@ -1,4 +1,7 @@
-use crate::services::app_state::{self, DesktopState, RecentFileItem};
+use crate::services::app_state::{
+  self, DesktopMetaState, DesktopState, RecentFileItem,
+};
+use reqwest::Url;
 use std::process::Command;
 
 #[tauri::command]
@@ -9,7 +12,7 @@ pub async fn read_bootstrap_state(app: tauri::AppHandle) -> Result<DesktopState,
 #[tauri::command]
 pub async fn read_bootstrap_meta_state(
   app: tauri::AppHandle,
-) -> Result<DesktopState, String> {
+) -> Result<DesktopMetaState, String> {
   app_state::read_meta_state(&app).await
 }
 
@@ -31,7 +34,7 @@ pub async fn write_bootstrap_state(
 #[tauri::command]
 pub async fn write_bootstrap_meta_state(
   app: tauri::AppHandle,
-  state: DesktopState,
+  state: DesktopMetaState,
 ) -> Result<(), String> {
   app_state::write_meta_state(&app, &state).await
 }
@@ -51,30 +54,39 @@ pub async fn record_recent_file(
 ) -> Result<DesktopState, String> {
   let mut meta_state = app_state::read_meta_state_raw(&app).await?;
   meta_state.upsert_recent_file(item);
-  let next_state = DesktopState {
+  let meta_snapshot = DesktopMetaState {
     version: meta_state.version,
-    mind_map_data: serde_json::Value::Null,
-    mind_map_config: None,
     local_config: meta_state.local_config.clone(),
     ai_config: meta_state.ai_config.clone(),
     recent_files: meta_state.recent_files.clone(),
     last_directory: meta_state.last_directory.clone(),
     current_document: meta_state.current_document.clone(),
   };
-  app_state::write_meta_state(&app, &next_state).await?;
+  let next_state = DesktopState {
+    version: meta_snapshot.version,
+    mind_map_data: serde_json::Value::Null,
+    mind_map_config: None,
+    local_config: meta_snapshot.local_config.clone(),
+    ai_config: meta_snapshot.ai_config.clone(),
+    recent_files: meta_snapshot.recent_files.clone(),
+    last_directory: meta_snapshot.last_directory.clone(),
+    current_document: meta_snapshot.current_document.clone(),
+  };
+  app_state::write_meta_state(&app, &meta_snapshot).await?;
   Ok(next_state)
 }
 
 #[tauri::command]
 pub async fn open_external_url(url: String) -> Result<(), String> {
-  if !(url.starts_with("http://") || url.starts_with("https://")) {
+  let parsed_url = Url::parse(&url).map_err(|error| error.to_string())?;
+  if !matches!(parsed_url.scheme(), "http" | "https") {
     return Err("仅支持打开 http/https 链接".to_string());
   }
 
   #[cfg(target_os = "windows")]
   {
-    Command::new("cmd")
-      .args(["/C", "start", "", &url])
+    Command::new("rundll32")
+      .args(["url.dll,FileProtocolHandler", parsed_url.as_str()])
       .spawn()
       .map_err(|error| error.to_string())?;
     return Ok(());
@@ -83,7 +95,7 @@ pub async fn open_external_url(url: String) -> Result<(), String> {
   #[cfg(target_os = "macos")]
   {
     Command::new("open")
-      .arg(&url)
+      .arg(parsed_url.as_str())
       .spawn()
       .map_err(|error| error.to_string())?;
     return Ok(());
@@ -92,7 +104,7 @@ pub async fn open_external_url(url: String) -> Result<(), String> {
   #[cfg(target_os = "linux")]
   {
     Command::new("xdg-open")
-      .arg(&url)
+      .arg(parsed_url.as_str())
       .spawn()
       .map_err(|error| error.to_string())?;
     return Ok(());

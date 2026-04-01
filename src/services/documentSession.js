@@ -25,9 +25,11 @@ const syncBootstrapState = () => {
         dirty: !!sessionState.dirty
       }
     : null
-  return saveBootstrapStatePatch({
+  void saveBootstrapStatePatch({
     currentDocument,
     lastDirectory: currentDocument ? getParentDirectory(currentDocument.path) : ''
+  }).catch(error => {
+    console.error('syncBootstrapState failed', error)
   })
 }
 

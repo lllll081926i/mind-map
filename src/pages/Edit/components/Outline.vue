@@ -23,7 +23,7 @@
         <span
           class="nodeEdit"
           :contenteditable="!isReadonly"
-          :key="getKey()"
+          :key="`${data.uid}-${outlineVersion}`"
           @keydown.stop="onNodeInputKeydown($event, node)"
           @keyup.stop
           @blur="onBlur($event, node)"
@@ -44,6 +44,7 @@ import {
   htmlEscape,
   handleInputPasteText
 } from 'simple-mind-map/src/utils'
+import { sanitizeRichTextFragment } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { setIsDragOutlineTreeNode } from '@/stores/runtime'
@@ -67,7 +68,9 @@ export default {
       beInsertNodeUid: '',
       insertType: '',
       isInTreArea: false,
-      isAfterCreateNewNode: false
+      isAfterCreateNewNode: false,
+      refreshFrameId: 0,
+      outlineVersion: 0
     }
   },
   computed: {
@@ -85,19 +88,33 @@ export default {
     this.$bus.$on('hide_text_edit', this.handleHideTextEdit)
   },
   mounted() {
-    this.refresh()
+    this.scheduleRefresh()
   },
   beforeUnmount() {
     window.removeEventListener('keydown', this.onKeyDown)
     this.$bus.$off('data_change', this.handleDataChange)
     this.$bus.$off('node_tree_render_end', this.handleNodeTreeRenderEnd)
     this.$bus.$off('hide_text_edit', this.handleHideTextEdit)
+    if (this.refreshFrameId) {
+      cancelAnimationFrame(this.refreshFrameId)
+      this.refreshFrameId = 0
+    }
   },
   methods: {
+    scheduleRefresh() {
+      if (this.refreshFrameId) {
+        return
+      }
+      this.refreshFrameId = requestAnimationFrame(() => {
+        this.refreshFrameId = 0
+        this.refresh()
+      })
+    },
+
     handleHideTextEdit() {
       if (this.notHandleDataChange) {
         this.notHandleDataChange = false
-        this.refresh()
+        this.scheduleRefresh()
       }
     },
 
@@ -112,7 +129,7 @@ export default {
         this.isAfterCreateNewNode = false
         return
       }
-      this.refresh()
+      this.scheduleRefresh()
     },
 
     handleNodeTreeRenderEnd() {
@@ -153,6 +170,7 @@ export default {
       }
       walk(data)
       this.data = [data]
+      this.outlineVersion += 1
     },
 
     // 插入了新节点之后
@@ -182,7 +200,7 @@ export default {
             this.$emit('scrollTo', offsetTop)
           }
         } catch (error) {
-          console.log(error)
+          console.error('afterCreateNewNode failed', error)
         }
       }
       this.beInsertNodeUid = ''
@@ -195,8 +213,9 @@ export default {
 
     // 失去焦点更新节点文本
     onBlur(e, node) {
+      const nextHtml = sanitizeRichTextFragment(e.target.innerHTML)
       // 节点数据没有修改
-      if (node.data.textCache === e.target.innerHTML) {
+      if (node.data.textCache === nextHtml) {
         // 如果存在未执行的插入新节点操作，那么直接执行
         if (this.insertType) {
           this[this.insertType]()
@@ -206,7 +225,7 @@ export default {
       }
       // 否则插入新节点操作需要等待当前修改事件渲染完成后再执行
       const richText = node.data.data.richText
-      const text = richText ? e.target.innerHTML : e.target.innerText
+      const text = richText ? nextHtml : e.target.innerText
       const targetNode = this.mindMap.renderer.findNodeByUid(node.data.uid)
       if (!targetNode) return
       this.notHandleDataChange = true
@@ -221,12 +240,6 @@ export default {
     onPaste(e) {
       handleInputPasteText(e)
     },
-
-    // 生成唯一的key
-    getKey() {
-      return Math.random()
-    },
-
     // 节点输入区域按键事件
     onNodeInputKeydown(e) {
       if (e.keyCode === 13 && !e.shiftKey) {

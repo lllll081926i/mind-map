@@ -1,6 +1,8 @@
 import { getDefaultAiConfig } from '@/utils/aiProviders.mjs'
 
 export const DESKTOP_STATE_VERSION = 1
+export const DEFAULT_MIND_MAP_THEME_TEMPLATE = 'classic4'
+export const DEFAULT_MIND_MAP_LAYOUT = 'logicalStructure'
 
 export const DEFAULT_LOCAL_CONFIG = {
   isZenMode: false,
@@ -13,6 +15,20 @@ export const DEFAULT_LOCAL_CONFIG = {
   enableAi: false,
   enableDragImport: false
 }
+
+export const createDefaultMindMapData = (title = '思维导图') => ({
+  root: {
+    data: {
+      text: String(title || '思维导图')
+    },
+    children: []
+  },
+  theme: {
+    template: DEFAULT_MIND_MAP_THEME_TEMPLATE,
+    config: {}
+  },
+  layout: DEFAULT_MIND_MAP_LAYOUT
+})
 
 export const DEFAULT_BOOTSTRAP_STATE = () => ({
   version: DESKTOP_STATE_VERSION,

@@ -6,11 +6,27 @@
         :content="$t('navigatorToolbar.backToRoot')"
         placement="top"
       >
-        <div class="btn iconfont icondingwei" @click="backToRoot"></div>
+        <div
+          class="btn iconfont icondingwei"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('navigatorToolbar.backToRoot')"
+          @click="backToRoot"
+          @keydown.enter.prevent="backToRoot"
+          @keydown.space.prevent="backToRoot"
+        ></div>
       </el-tooltip>
     </div>
     <div class="item">
-      <div class="btn iconfont iconsousuo" @click="showSearch"></div>
+      <div
+        class="btn iconfont iconsousuo"
+        role="button"
+        tabindex="0"
+        :aria-label="$t('search.searchPlaceholder')"
+        @click="showSearch"
+        @keydown.enter.prevent="showSearch"
+        @keydown.space.prevent="showSearch"
+      ></div>
     </div>
     <div class="item">
       <MouseAction :isDark="isDark" :mindMap="mindMap"></MouseAction>
@@ -25,7 +41,19 @@
         "
         placement="top"
       >
-        <div class="btn iconfont icondaohang1" @click="toggleMiniMap"></div>
+        <div
+          class="btn iconfont icondaohang1"
+          role="button"
+          tabindex="0"
+          :aria-label="
+            openMiniMap
+              ? $t('navigatorToolbar.closeMiniMap')
+              : $t('navigatorToolbar.openMiniMap')
+          "
+          @click="toggleMiniMap"
+          @keydown.enter.prevent="toggleMiniMap"
+          @keydown.space.prevent="toggleMiniMap"
+        ></div>
       </el-tooltip>
     </div>
     <div class="item">
@@ -48,7 +76,16 @@
         <div
           class="btn iconfont"
           :class="[isReadonly ? 'iconyanjing' : 'iconbianji1']"
+          role="button"
+          tabindex="0"
+          :aria-label="
+            isReadonly
+              ? $t('navigatorToolbar.edit')
+              : $t('navigatorToolbar.readonly')
+          "
           @click="readonlyChange"
+          @keydown.enter.prevent="readonlyChange"
+          @keydown.space.prevent="readonlyChange"
         ></div>
       </el-tooltip>
     </div>
@@ -62,7 +99,14 @@
       <div
         class="btn iconfont"
         :class="[isDark ? 'iconmoon_line' : 'iconlieri']"
+        role="button"
+        tabindex="0"
+        :aria-label="
+          isDark ? $t('navigatorToolbar.lightMode') : $t('navigatorToolbar.darkMode')
+        "
         @click="toggleDark"
+        @keydown.enter.prevent="toggleDark"
+        @keydown.space.prevent="toggleDark"
       ></div>
     </div>
     <!-- <div class="item">
@@ -79,7 +123,14 @@
     </div>
     <div class="item">
       <el-dropdown @command="handleCommand">
-        <div class="btn moreBtn">...</div>
+        <div
+          class="btn moreBtn"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('toolbar.more')"
+        >
+          ...
+        </div>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="shortcutKey">
@@ -120,6 +171,11 @@ import pkg from 'simple-mind-map/package.json'
 import Demonstrate from './Demonstrate.vue'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
 import { useAppStore } from '@/stores/app'
+import {
+  emitShowLoading,
+  emitShowSearch,
+  emitToggleMiniMap
+} from '@/services/appEvents'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import {
@@ -169,11 +225,11 @@ export default {
 
     toggleMiniMap() {
       this.openMiniMap = !this.openMiniMap
-      this.$bus.$emit('toggle_mini_map', this.openMiniMap)
+      emitToggleMiniMap(this.openMiniMap)
     },
 
     showSearch() {
-      this.$bus.$emit('show_search')
+      emitShowSearch()
     },
 
     getAllThemes() {
@@ -183,7 +239,7 @@ export default {
       })
       return [
         {
-          name: '默认主题',
+          name: this.$t('theme.default'),
           value: 'default',
           dark: false
         },
@@ -239,7 +295,7 @@ export default {
       } else {
         nextLocalConfig.lastLightTheme = nextTheme
       }
-      this.$bus.$emit('showLoading')
+      emitShowLoading()
       this.mindMap.setTheme(nextTheme)
       storeData({
         theme: {
@@ -301,7 +357,7 @@ export default {
 
 <style lang="less" scoped>
 .navigatorContainer {
-  padding: 0 12px;
+  padding: 0 10px;
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -332,7 +388,7 @@ export default {
     align-items: center;
     height: 100%;
     flex: 0 0 auto;
-    margin-right: 20px;
+    margin-right: 8px;
 
     &:last-of-type {
       margin-right: 0;

@@ -13,6 +13,8 @@ export const persistLocalConfig = config => {
       ...state.aiConfig,
       ...aiConfig
     }
+  }).catch(error => {
+    console.error('persistLocalConfig failed', error)
   })
 }
 

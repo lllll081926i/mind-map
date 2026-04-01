@@ -1,6 +1,5 @@
-import exampleData from 'simple-mind-map/example/exampleData'
-import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
 import { getBootstrapState, saveBootstrapStatePatch } from '@/platform'
+import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import { emitWriteLocalFile } from '@/services/appEvents'
 import {
   loadLocalConfig,
@@ -17,7 +16,7 @@ export const getData = () => {
     return currentData
   }
   const state = getBootstrapState()
-  return state.mindMapData || simpleDeepClone(exampleData)
+  return state.mindMapData || createDefaultMindMapData()
 }
 
 // 存储思维导图数据
@@ -33,6 +32,8 @@ export const storeData = data => {
     }
     void saveBootstrapStatePatch({
       mindMapData: originData
+    }).catch(error => {
+      console.error('storeData persist failed', error)
     })
     emitWriteLocalFile(originData)
   } catch (error) {
@@ -50,6 +51,8 @@ export const storeConfig = config => {
   try {
     void saveBootstrapStatePatch({
       mindMapConfig: config
+    }).catch(error => {
+      console.error('storeConfig persist failed', error)
     })
   } catch (error) {
     console.error('storeConfig failed', error)

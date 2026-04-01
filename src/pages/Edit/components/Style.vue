@@ -649,11 +649,6 @@ export default {
           this.activeNodes = [...this.mindMap.renderer.activeNodeList]
           this.initNodeStyle()
         }
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'nodeStyle'
-          }
-        })
       }
     }
   },

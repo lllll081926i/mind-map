@@ -250,9 +250,8 @@ pub async fn read_state(app: &tauri::AppHandle) -> Result<DesktopState, String> 
   Ok(merge_state(meta_state, document_state))
 }
 
-pub async fn read_meta_state(app: &tauri::AppHandle) -> Result<DesktopState, String> {
-  let meta_state = read_meta_state_raw(app).await?;
-  Ok(merge_state(meta_state, default_document_state()))
+pub async fn read_meta_state(app: &tauri::AppHandle) -> Result<DesktopMetaState, String> {
+  read_meta_state_raw(app).await
 }
 
 pub async fn read_document_state(app: &tauri::AppHandle) -> Result<DesktopState, String> {
@@ -260,9 +259,11 @@ pub async fn read_document_state(app: &tauri::AppHandle) -> Result<DesktopState,
   Ok(merge_state(default_meta_state(), document_state))
 }
 
-pub async fn write_meta_state(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), String> {
-  let (meta_state, _) = split_state(state);
-  write_json_file(meta_state_file_path(app)?, &meta_state).await
+pub async fn write_meta_state(
+  app: &tauri::AppHandle,
+  state: &DesktopMetaState,
+) -> Result<(), String> {
+  write_json_file(meta_state_file_path(app)?, state).await
 }
 
 pub async fn write_document_state(

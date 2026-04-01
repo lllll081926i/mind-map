@@ -37,7 +37,8 @@ function formatValue(value, seen = new WeakSet()) {
     if (inspectCustom && typeof value[inspectCustom] === 'function') {
       try {
         return String(value[inspectCustom]())
-      } catch (error) {
+      } catch (_error) {
+        // inspect 自定义实现失败时退回通用格式化，避免调试输出再次抛错。
         return seenTag
       }
     }

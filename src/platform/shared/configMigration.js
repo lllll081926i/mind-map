@@ -1,5 +1,3 @@
-import exampleData from 'simple-mind-map/example/exampleData'
-import { simpleDeepClone } from 'simple-mind-map/src/utils/index'
 import {
   AI_CONFIG_KEYS,
   normalizeAiConfig,
@@ -8,6 +6,7 @@ import {
 import {
   DEFAULT_BOOTSTRAP_STATE,
   DEFAULT_LOCAL_CONFIG,
+  createDefaultMindMapData,
   DESKTOP_STATE_VERSION
 } from './configSchema'
 import { normalizeRecentFiles } from './recentFiles'
@@ -36,7 +35,7 @@ export const createDefaultBootstrapState = () => {
   const defaults = DEFAULT_BOOTSTRAP_STATE()
   return {
     ...defaults,
-    mindMapData: simpleDeepClone(exampleData)
+    mindMapData: createDefaultMindMapData()
   }
 }
 

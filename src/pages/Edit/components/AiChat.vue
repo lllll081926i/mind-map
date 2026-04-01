@@ -62,6 +62,7 @@
 import Sidebar from './Sidebar.vue'
 import { createUid } from 'simple-mind-map/src/utils'
 import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
@@ -74,48 +75,40 @@ import {
 let md = null
 
 const sanitizeHtml = html => {
-  if (typeof DOMPurify !== 'undefined') {
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [
-        'p',
-        'br',
-        'strong',
-        'em',
-        'u',
-        's',
-        'code',
-        'pre',
-        'ul',
-        'ol',
-        'li',
-        'h1',
-        'h2',
-        'h3',
-        'h4',
-        'h5',
-        'h6',
-        'a',
-        'blockquote',
-        'table',
-        'thead',
-        'tbody',
-        'tr',
-        'th',
-        'td',
-        'span',
-        'div',
-        'hr'
-      ],
-      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style']
-    })
-  }
-  return html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
-    .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, '')
-    .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'p',
+      'br',
+      'strong',
+      'em',
+      'u',
+      's',
+      'code',
+      'pre',
+      'ul',
+      'ol',
+      'li',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'a',
+      'blockquote',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td',
+      'span',
+      'div',
+      'hr'
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+  })
 }
 
 export default {
@@ -138,30 +131,12 @@ export default {
       activeSidebar: 'activeSidebar'
     })
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'ai'
-          }
-        })
-      }
-    }
-  },
-  mounted() {
-    if (this.activeSidebar === 'ai' && this.$refs.sidebar) {
-      this.$refs.sidebar.show = true
-    }
-  },
   methods: {
     onKeydown(e) {
       if (e.keyCode === 13) {
         if (!e.shiftKey) {
           e.preventDefault()
           this.send()
-        } else {
         }
       }
     },

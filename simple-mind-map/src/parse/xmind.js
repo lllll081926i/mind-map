@@ -143,7 +143,7 @@ const transformOldXmind = content => {
           notesElement.elements[0].elements[0].elements[0].text
       }
     } catch (error) {
-      console.log(error)
+      console.error('transformOldXmind notes parse failed', error)
     }
     // 超链接
     try {
@@ -155,7 +155,7 @@ const transformOldXmind = content => {
         newNode.data.hyperlink = node.attributes['xlink:href']
       }
     } catch (error) {
-      console.log(error)
+      console.error('transformOldXmind hyperlink parse failed', error)
     }
     // 标签
     try {
@@ -166,7 +166,7 @@ const transformOldXmind = content => {
         })
       }
     } catch (error) {
-      console.log(error)
+      console.error('transformOldXmind labels parse failed', error)
     }
     const childrenItem = getItemByName(nodeElements, 'children')
     // 概要
@@ -194,7 +194,7 @@ const transformOldXmind = content => {
         })
       }
     } catch (error) {
-      console.log(error)
+      console.error('transformOldXmind summaries parse failed', error)
     }
     newNode.data.generalization = selfSummary
     // 子节点

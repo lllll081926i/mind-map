@@ -144,7 +144,7 @@ export default {
         })
         this.cancel()
       } catch (error) {
-        console.log(error)
+        console.error('NodeImage confirm failed', error)
       }
     }
   }

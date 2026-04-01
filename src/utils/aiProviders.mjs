@@ -151,7 +151,8 @@ const parseLegacyApi = api => {
       baseUrl: `${url.protocol}//${url.host}`,
       apiPath: `${url.pathname}${url.search || ''}`
     }
-  } catch (error) {
+  } catch (_error) {
+    // 历史配置里也可能只保存了路径片段，这里按路径回退是预期行为。
     return {
       baseUrl: '',
       apiPath: normalizeApiPath(value)

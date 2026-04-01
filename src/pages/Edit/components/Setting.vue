@@ -509,11 +509,6 @@ export default {
           this.initConfig()
           this.initWatermark()
         }
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'setting'
-          }
-        })
       }
     }
   },
@@ -587,7 +582,7 @@ export default {
     updateWatermarkConfig() {
       clearTimeout(this.updateWatermarkTimer)
       this.updateWatermarkTimer = setTimeout(() => {
-        let { show, ...config } = this.watermarkConfig
+        let { show: _show, ...config } = this.watermarkConfig
         this.mindMap.watermark.updateWatermark({
           ...config
         })
@@ -722,7 +717,7 @@ export default {
         }
         this.$message.info(this.$t('setting.updateSourceNotConfigured'))
       } catch (error) {
-        console.log(error)
+        console.error('checkForUpdates failed', error)
         this.$message.error(
           error?.message || this.$t('setting.updateCheckFailed')
         )
@@ -789,7 +784,7 @@ export default {
         }
         this.$message.success(this.$t('setting.updateWindowsInstalling'))
       } catch (error) {
-        console.log(error)
+        console.error('installUpdate failed', error)
         loading.close()
         this.$message.error(
           error?.message || this.$t('setting.updateInstallFailed')

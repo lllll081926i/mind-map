@@ -2,12 +2,18 @@
   <div
     class="sidebarTriggerContainer"
     @click.stop
-    :class="{ hasActive: show && activeSidebar, show: show, isDark: isDark }"
-    :style="{ maxHeight: maxHeight + 'px' }"
+    :class="{ show: show, isDark: isDark }"
+    :style="containerStyle"
   >
-    <div class="toggleShowBtn" :class="{ hide: !show }" @click="show = !show">
+    <button
+      class="toggleShowBtn"
+      :class="{ hide: !show }"
+      type="button"
+      :aria-label="show ? '收起侧边栏入口' : '展开侧边栏入口'"
+      @click="show = !show"
+    >
       <span class="iconfont iconjiantouyou"></span>
-    </div>
+    </button>
     <div class="trigger customScrollbar">
       <div
         class="triggerItem"
@@ -32,6 +38,11 @@ import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar } from '@/stores/runtime'
 
 // 侧边栏触发器
+const SIDEBAR_PANEL_WIDTH = 300
+const SIDEBAR_TRIGGER_GAP = 8
+const SIDEBAR_COLLAPSED_OFFSET = 46
+const READONLY_ALLOWED_SIDEBARS = ['outline', 'shortcutKey', 'ai']
+
 export default {
   data() {
     return {
@@ -50,12 +61,23 @@ export default {
     ...mapState(useSettingsStore, {
       enableAi: store => store.localConfig.enableAi
     }),
+    containerStyle() {
+      const translateX = this.show
+        ? this.activeSidebar
+          ? -(SIDEBAR_PANEL_WIDTH + SIDEBAR_TRIGGER_GAP)
+          : 0
+        : SIDEBAR_COLLAPSED_OFFSET
+      return {
+        maxHeight: this.maxHeight + 'px',
+        transform: `translateX(${translateX}px)`
+      }
+    },
 
     triggerList() {
       let list = sidebarTriggerList[this.$i18n.locale] || sidebarTriggerList.zh
       if (this.isReadonly) {
         list = list.filter(item => {
-          return ['outline', 'shortcutKey', 'ai'].includes(item.value)
+          return READONLY_ALLOWED_SIDEBARS.includes(item.value)
         })
       }
       if (!this.enableAi) {
@@ -67,8 +89,17 @@ export default {
     }
   },
   watch: {
+    activeSidebar(val) {
+      if (val && !this.show) {
+        this.show = true
+      }
+    },
     isReadonly(val) {
-      if (val) {
+      if (
+        val &&
+        this.activeSidebar &&
+        !READONLY_ALLOWED_SIDEBARS.includes(this.activeSidebar)
+      ) {
         setActiveSidebar('')
       }
     }
@@ -103,9 +134,11 @@ export default {
   position: fixed;
   top: 110px;
   bottom: 80px;
-  right: -60px;
-  z-index: 1101;
-  transition: all 0.3s;
+  right: 0;
+  z-index: 1201;
+  transition:
+    transform 0.3s ease,
+    max-height 0.2s ease;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -124,14 +157,6 @@ export default {
     }
   }
 
-  &.show {
-    right: 0;
-  }
-
-  &.hasActive {
-    right: 305px;
-  }
-
   .toggleShowBtn {
     position: absolute;
     left: -6px;
@@ -143,6 +168,7 @@ export default {
     cursor: pointer;
     transition: left 0.1s linear;
     z-index: 0;
+    border: none;
     border-top-left-radius: 10px;
     border-bottom-left-radius: 10px;
     display: flex;

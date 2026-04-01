@@ -416,7 +416,7 @@ export default {
       this.left = -9999
       this.top = -9999
       this.type = ''
-      this.node = ''
+      this.node = null
       this.numberType = ''
       this.numberLevel = ''
     },
@@ -462,10 +462,11 @@ export default {
             this.node
           )
           break
-        case 'UNEXPAND_ALL':
+        case 'UNEXPAND_ALL': {
           const uid = this.node ? this.node.uid : ''
           this.$bus.$emit('execCommand', key, !uid, uid)
           break
+        }
         case 'EXPAND_ALL':
           this.$bus.$emit('execCommand', key, this.node ? this.node.uid : '')
           break
@@ -496,11 +497,12 @@ export default {
             data = this.mindMap.getData()
             str = transformToTxt(data)
             break
-          case 'png':
+          case 'png': {
             const png = await this.mindMap.export('png', false)
             const blob = await imgToDataUrl(png, true)
             setImgToClipboard(blob)
             break
+          }
           default:
             break
         }
@@ -513,7 +515,7 @@ export default {
         }
         this.$message.success(this.$t('contextmenu.copySuccess'))
       } catch (error) {
-        console.log(error)
+        console.error('copyToClipboard failed', error)
         this.$message.error(this.$t('contextmenu.copyFail'))
       }
     },

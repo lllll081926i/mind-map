@@ -3,13 +3,17 @@ const listenersMap = new Map()
 export const APP_EVENTS = {
   WRITE_LOCAL_FILE: 'write_local_file',
   LOCAL_STORAGE_EXCEEDED: 'localStorageExceeded',
+  BOOTSTRAP_STATE_READY: 'bootstrapStateReady',
   AI_CREATE_ALL: 'ai_create_all',
   AI_CREATE_PART: 'ai_create_part',
   AI_CHAT: 'ai_chat',
   AI_CHAT_STOP: 'ai_chat_stop',
   SHOW_AI_CONFIG_DIALOG: 'showAiConfigDialog',
+  SHOW_LOADING: 'showLoading',
   SHOW_IMPORT: 'showImport',
   SHOW_EXPORT: 'showExport',
+  SHOW_SEARCH: 'showSearch',
+  TOGGLE_MINI_MAP: 'toggleMiniMap',
   SHOW_NODE_IMAGE: 'showNodeImage',
   SHOW_NODE_LINK: 'showNodeLink',
   SHOW_NODE_NOTE: 'showNodeNote',
@@ -54,6 +58,12 @@ export const onWriteLocalFile = handler =>
 export const emitWriteLocalFile = payload =>
   emitAppEvent(APP_EVENTS.WRITE_LOCAL_FILE, payload)
 
+export const onBootstrapStateReady = handler =>
+  onAppEvent(APP_EVENTS.BOOTSTRAP_STATE_READY, handler)
+
+export const emitBootstrapStateReady = payload =>
+  emitAppEvent(APP_EVENTS.BOOTSTRAP_STATE_READY, payload)
+
 export const onLocalStorageExceeded = handler =>
   onAppEvent(APP_EVENTS.LOCAL_STORAGE_EXCEEDED, handler)
 
@@ -86,6 +96,11 @@ export const onShowAiConfigDialog = handler =>
 export const emitShowAiConfigDialog = () =>
   emitAppEvent(APP_EVENTS.SHOW_AI_CONFIG_DIALOG)
 
+export const onShowLoading = handler =>
+  onAppEvent(APP_EVENTS.SHOW_LOADING, handler)
+
+export const emitShowLoading = () => emitAppEvent(APP_EVENTS.SHOW_LOADING)
+
 export const onShowImport = handler => onAppEvent(APP_EVENTS.SHOW_IMPORT, handler)
 
 export const emitShowImport = payload =>
@@ -95,6 +110,16 @@ export const onShowExport = handler => onAppEvent(APP_EVENTS.SHOW_EXPORT, handle
 
 export const emitShowExport = payload =>
   emitAppEvent(APP_EVENTS.SHOW_EXPORT, payload)
+
+export const onShowSearch = handler => onAppEvent(APP_EVENTS.SHOW_SEARCH, handler)
+
+export const emitShowSearch = () => emitAppEvent(APP_EVENTS.SHOW_SEARCH)
+
+export const onToggleMiniMap = handler =>
+  onAppEvent(APP_EVENTS.TOGGLE_MINI_MAP, handler)
+
+export const emitToggleMiniMap = payload =>
+  emitAppEvent(APP_EVENTS.TOGGLE_MINI_MAP, payload)
 
 export const onShowNodeImage = handler =>
   onAppEvent(APP_EVENTS.SHOW_NODE_IMAGE, handler)

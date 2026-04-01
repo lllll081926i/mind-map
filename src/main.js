@@ -68,6 +68,7 @@ import { bootstrapPlatformState } from '@/platform'
 import pinia from '@/stores'
 import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
+import { emitBootstrapStateReady } from '@/services/appEvents'
 import legacyBus from '@/services/legacyBus'
 // import VConsole from 'vconsole'
 // const vConsole = new VConsole()
@@ -116,6 +117,13 @@ const initApp = () => {
       }
       console.warn(`[Vue warn]: ${msg}${trace || ''}`)
     }
+    app.config.errorHandler = (error, instance, info) => {
+      console.error('Vue runtime error', {
+        error,
+        info,
+        component: instance?.type?.name || 'anonymous'
+      })
+    }
     app.config.globalProperties.$bus = legacyBus
     app.config.globalProperties.$appEvents = appEvents
     app.config.globalProperties.$message = ElMessage
@@ -135,9 +143,10 @@ const initApp = () => {
     console.error('initApp failed', error)
     const root = document.querySelector('#app')
     if (root) {
+      const bootFailedMessage = i18n.global.t('app.initFailed')
       root.innerHTML = `
         <div style="padding:24px;font-size:14px;line-height:1.6;color:#c0392b;background:#fff4f2;">
-          应用初始化失败，请刷新后重试。
+          ${bootFailedMessage}
         </div>
       `
     }
@@ -149,6 +158,7 @@ const bootstrapApp = () => {
   void bootstrapPlatformState()
     .then(state => {
       syncRuntimeFromBootstrapState(state)
+      emitBootstrapStateReady(state)
       legacyBus.$emit('bootstrap_state_ready', state)
     })
     .catch(error => {

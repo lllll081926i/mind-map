@@ -1,23 +1,39 @@
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Component, Path};
 
 const ALLOWED_EXTENSIONS: &[&str] = &[".smm", ".xmind", ".md", ".json"];
+const RESERVED_WINDOWS_NAMES: &[&str] = &[
+  "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
+  "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6",
+  "lpt7", "lpt8", "lpt9",
+];
 
 fn is_path_safe(path: &str) -> bool {
-  let path_lower = path.to_lowercase();
-  let dangerous_patterns = [
-    "..\\", "../", "\\\\?\\", "con", "prn", "aux", "nul",
-    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-  ];
-  if dangerous_patterns.iter().any(|p| path_lower.contains(p)) {
+  if path.trim().is_empty() || path.contains('\0') || path.contains("\\\\?\\") {
     return false;
   }
-  true
+
+  let candidate_path = Path::new(path);
+  !candidate_path.components().any(|component| {
+    if matches!(component, Component::ParentDir) {
+      return true;
+    }
+    match component {
+      Component::Normal(value) => {
+        let normalized = value
+          .to_string_lossy()
+          .trim_end_matches([' ', '.'])
+          .to_lowercase();
+        RESERVED_WINDOWS_NAMES.contains(&normalized.as_str())
+      }
+      _ => false,
+    }
+  })
 }
 
 fn has_allowed_extension(path: &str) -> bool {
-  ALLOWED_EXTENSIONS.iter().any(|ext| path.ends_with(ext))
+  let lower_path = path.to_lowercase();
+  ALLOWED_EXTENSIONS.iter().any(|ext| lower_path.ends_with(ext))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -62,6 +78,9 @@ pub async fn write_text_file(path: &str, content: &str) -> Result<(), String> {
 }
 
 pub async fn list_directory_entries(path: &str) -> Result<Vec<DirectoryEntry>, String> {
+  if !is_path_safe(path) {
+    return Err("无效的路径".into());
+  }
   let mut entries = tokio::fs::read_dir(path)
     .await
     .map_err(|error| error.to_string())?;
@@ -73,7 +92,7 @@ pub async fn list_directory_entries(path: &str) -> Result<Vec<DirectoryEntry>, S
     let metadata = entry.metadata().await.map_err(|error| error.to_string())?;
     let name = entry.file_name().to_string_lossy().to_string();
     let is_file = metadata.is_file();
-    if is_file && !name.ends_with(".smm") && !name.ends_with(".xmind") && !name.ends_with(".md") && !name.ends_with(".json") {
+    if is_file && !has_allowed_extension(&name) {
       continue;
     }
     let data = DirectoryEntry {
@@ -83,7 +102,10 @@ pub async fn list_directory_entries(path: &str) -> Result<Vec<DirectoryEntry>, S
       mode: "desktop".into(),
       path: entry_path.to_string_lossy().to_string(),
       leaf: is_file,
-      enable_edit: is_file && (name.ends_with(".smm") || name.ends_with(".json")),
+      enable_edit: is_file && {
+        let lower_name = name.to_lowercase();
+        lower_name.ends_with(".smm") || lower_name.ends_with(".json")
+      },
     };
     if is_file {
       file_list.push(data);

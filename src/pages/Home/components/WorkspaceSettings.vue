@@ -1,0 +1,701 @@
+<template>
+  <div class="workspaceSettings" :class="{ isDark: isDark }">
+    <aside class="settingsNav">
+      <button
+        v-for="section in sections"
+        :key="section.key"
+        type="button"
+        class="settingsNavItem"
+        :class="{ active: currentSection === section.key }"
+        @click="currentSection = section.key"
+      >
+        {{ section.label }}
+      </button>
+    </aside>
+    <section class="settingsPanel customScrollbar">
+      <div v-if="currentSection === 'basic'" class="settingsSection">
+        <h3>基础</h3>
+        <div class="settingRow">
+          <span>是否开启节点富文本编辑</span>
+          <el-switch
+            :model-value="localConfig.openNodeRichText"
+            @change="updateLocalConfig('openNodeRichText', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>是否显示滚动条</span>
+          <el-switch
+            :model-value="localConfig.isShowScrollbar"
+            @change="updateLocalConfig('isShowScrollbar', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>是否允许直接拖拽文件到页面进行导入</span>
+          <el-switch
+            :model-value="localConfig.enableDragImport"
+            @change="updateLocalConfig('enableDragImport', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>是否开启AI功能</span>
+          <el-switch
+            :model-value="localConfig.enableAi"
+            @change="updateLocalConfig('enableAi', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>左键框选 / 右键拖动画布</span>
+          <el-switch
+            :model-value="localConfig.useLeftKeySelectionRightKeyDrag"
+            @change="
+              updateLocalConfig('useLeftKeySelectionRightKeyDrag', $event)
+            "
+          />
+        </div>
+        <div class="settingRow">
+          <span>开启性能模式</span>
+          <el-switch
+            :model-value="docConfig.openPerformance"
+            @change="updateDocConfig('openPerformance', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>节点自由拖拽</span>
+          <el-switch
+            :model-value="docConfig.enableFreeDrag"
+            @change="updateDocConfig('enableFreeDrag', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>文本编辑实时渲染</span>
+          <el-switch
+            :model-value="docConfig.openRealtimeRenderOnNodeTextEdit"
+            @change="
+              updateDocConfig('openRealtimeRenderOnNodeTextEdit', $event)
+            "
+          />
+        </div>
+        <div class="settingRow">
+          <span>始终显示展开收起按钮</span>
+          <el-switch
+            :model-value="docConfig.alwaysShowExpandBtn"
+            @change="updateDocConfig('alwaysShowExpandBtn', $event)"
+          />
+        </div>
+        <div class="settingRow">
+          <span>键盘输入时自动进入文本编辑</span>
+          <el-switch
+            :model-value="docConfig.enableAutoEnterTextEditWhenKeydown"
+            @change="
+              updateDocConfig('enableAutoEnterTextEditWhenKeydown', $event)
+            "
+          />
+        </div>
+        <div class="settingRow">
+          <span>节点连线样式继承祖先节点的样式</span>
+          <el-switch
+            :model-value="docConfig.enableInheritAncestorLineStyle"
+            @change="
+              updateDocConfig('enableInheritAncestorLineStyle', $event)
+            "
+          />
+        </div>
+        <div class="settingRow sliderRow">
+          <span>节点图片和文本间隔</span>
+          <el-slider
+            :model-value="docConfig.imgTextMargin"
+            :min="0"
+            :max="100"
+            @change="updateDocConfig('imgTextMargin', $event)"
+          />
+        </div>
+        <div class="settingRow sliderRow">
+          <span>节点各种内容间隔</span>
+          <el-slider
+            :model-value="docConfig.textContentMargin"
+            :min="0"
+            :max="100"
+            @change="updateDocConfig('textContentMargin', $event)"
+          />
+        </div>
+        <div class="settingRow inlineRow">
+          <span>鼠标滚轮行为</span>
+          <el-select
+            :model-value="docConfig.mousewheelAction"
+            style="width: 180px"
+            @change="updateDocConfig('mousewheelAction', $event)"
+          >
+            <el-option label="缩放视图" value="zoom" />
+            <el-option label="上下移动视图" value="move" />
+          </el-select>
+        </div>
+        <div class="settingRow inlineRow" v-if="docConfig.mousewheelAction === 'zoom'">
+          <span>鼠标滚轮缩放</span>
+          <el-select
+            :model-value="docConfig.mousewheelZoomActionReverse"
+            style="width: 180px"
+            @change="updateDocConfig('mousewheelZoomActionReverse', $event)"
+          >
+            <el-option label="向前缩小向后放大" :value="false" />
+            <el-option label="向前放大向后缩小" :value="true" />
+          </el-select>
+        </div>
+        <div class="settingRow inlineRow">
+          <span>创建新节点的行为</span>
+          <el-select
+            :model-value="docConfig.createNewNodeBehavior"
+            style="width: 180px"
+            @change="updateDocConfig('createNewNodeBehavior', $event)"
+          >
+            <el-option label="激活新节点及进入编辑" value="default" />
+            <el-option label="不激活新节点" value="notActive" />
+            <el-option label="只激活新节点，不进入编辑" value="activeOnly" />
+          </el-select>
+        </div>
+        <div class="appInfoCard">
+          <div class="appInfoRow">
+            <span>运行时</span>
+            <strong>桌面版</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>平台</span>
+            <strong>{{ appPlatformLabel }}</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>版本</span>
+            <strong>v{{ appVersion }}</strong>
+          </div>
+          <div class="appInfoActions">
+            <el-button
+              size="small"
+              :loading="checkingForUpdates || installingUpdate"
+              @click="checkForUpdates"
+            >
+              {{ $t('setting.checkUpdate') }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="currentSection === 'font'" class="settingsSection">
+        <h3>字体</h3>
+        <p class="sectionDesc">桌面版当前没有独立的全局字体方案，编辑器字体跟随节点样式与主题设置。</p>
+        <div class="chipList">
+          <span v-for="item in fontFamilyOptions" :key="item.value" class="chip">
+            {{ item.name }}
+          </span>
+        </div>
+      </div>
+
+      <div v-else-if="currentSection === 'shortcut'" class="settingsSection">
+        <h3>快捷键</h3>
+        <div
+          v-for="group in shortcutGroups"
+          :key="group.type"
+          class="shortcutGroup"
+        >
+          <h4>{{ group.type }}</h4>
+          <div
+            v-for="item in group.list"
+            :key="item.name"
+            class="shortcutRow"
+          >
+            <span>{{ item.name }}</span>
+            <code>{{ item.value }}</code>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="currentSection === 'contextmenu'" class="settingsSection">
+        <h3>右键菜单</h3>
+        <p class="sectionDesc">右键菜单项当前跟随编辑器能力集，桌面工作台仅做说明，不提供单独裁剪配置。</p>
+        <div class="chipList">
+          <span v-for="item in contextMenuTips" :key="item" class="chip">
+            {{ item }}
+          </span>
+        </div>
+      </div>
+
+      <div v-else-if="currentSection === 'ai'" class="settingsSection">
+        <h3>AI</h3>
+        <div class="settingRow">
+          <span>AI 能力开关</span>
+          <el-switch
+            :model-value="localConfig.enableAi"
+            @change="updateLocalConfig('enableAi', $event)"
+          />
+        </div>
+        <div class="appInfoCard">
+          <div class="appInfoRow">
+            <span>Provider</span>
+            <strong>{{ aiConfig.provider || '未设置' }}</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>Base URL</span>
+            <strong>{{ aiConfig.baseUrl || '未设置' }}</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>模型</span>
+            <strong>{{ aiConfig.model || '未设置' }}</strong>
+          </div>
+          <div class="appInfoActions">
+            <el-button size="small" @click="showAiConfig = true">
+              修改 AI 配置
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="currentSection === 'image-bed'" class="settingsSection">
+        <h3>图床</h3>
+        <p class="sectionDesc">桌面版图床配置尚未抽离为独立设置页，本期先保留扩展位。</p>
+      </div>
+
+      <div v-else-if="currentSection === 'sync'" class="settingsSection">
+        <h3>同步空间</h3>
+        <p class="sectionDesc">同步空间能力后续进入桌面工作台统一接入，本期先保留页面结构与导航位置。</p>
+      </div>
+    </section>
+    <AiConfigDialog v-model:visible="showAiConfig" />
+  </div>
+</template>
+
+<script>
+import { defineAsyncComponent } from 'vue'
+import { mapState } from 'pinia'
+import { getConfig, storeConfig } from '@/api'
+import { fontFamilyList, shortcutKeyList } from '@/config'
+import { useAiStore } from '@/stores/ai'
+import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
+import {
+  checkForUpdates as runUpdateCheck,
+  canUseDesktopUpdater,
+  downloadAndInstallUpdate,
+  relaunchAfterUpdate
+} from '@/services/updateService'
+import { openExternalUrl } from '@/platform'
+
+const AiConfigDialog = defineAsyncComponent(() =>
+  import('@/pages/Edit/components/AiConfigDialog.vue')
+)
+
+const defaultDocConfig = () => ({
+  openPerformance: false,
+  enableFreeDrag: false,
+  mousewheelAction: 'zoom',
+  mousewheelZoomActionReverse: false,
+  createNewNodeBehavior: 'default',
+  openRealtimeRenderOnNodeTextEdit: true,
+  alwaysShowExpandBtn: false,
+  enableAutoEnterTextEditWhenKeydown: true,
+  imgTextMargin: 0,
+  textContentMargin: 0,
+  enableInheritAncestorLineStyle: false
+})
+
+export default {
+  components: {
+    AiConfigDialog
+  },
+  data() {
+    return {
+      currentSection: 'basic',
+      sections: [
+        { key: 'basic', label: '基础' },
+        { key: 'font', label: '字体' },
+        { key: 'shortcut', label: '快捷键' },
+        { key: 'contextmenu', label: '右键菜单' },
+        { key: 'ai', label: 'AI' },
+        { key: 'image-bed', label: '图床' },
+        { key: 'sync', label: '同步空间' }
+      ],
+      docConfig: defaultDocConfig(),
+      checkingForUpdates: false,
+      installingUpdate: false,
+      showAiConfig: false,
+      contextMenuTips: [
+        '插入同级节点',
+        '插入子级节点',
+        '插入父节点',
+        '复制节点',
+        '粘贴节点',
+        '一键整理布局',
+        '导出该节点为图片'
+      ]
+    }
+  },
+  computed: {
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
+    ...mapState(useAiStore, {
+      aiConfig: 'config'
+    }),
+    appVersion() {
+      return __APP_VERSION__
+    },
+    appPlatformLabel() {
+      const platformMap = {
+        win32: 'Windows',
+        darwin: 'macOS',
+        linux: 'Linux'
+      }
+      return platformMap[__APP_PLATFORM__] || __APP_PLATFORM__
+    },
+    fontFamilyOptions() {
+      return fontFamilyList.zh || []
+    },
+    shortcutGroups() {
+      return shortcutKeyList.zh || []
+    }
+  },
+  created() {
+    this.initDocConfig()
+  },
+  methods: {
+    initDocConfig() {
+      this.docConfig = {
+        ...defaultDocConfig(),
+        ...(getConfig() || {})
+      }
+    },
+
+    updateLocalConfig(key, value) {
+      applyLocalConfigPatch({
+        [key]: value
+      })
+    },
+
+    updateDocConfig(key, value) {
+      this.docConfig = {
+        ...this.docConfig,
+        [key]: value
+      }
+      storeConfig(this.docConfig)
+    },
+
+    async checkForUpdates() {
+      if (this.checkingForUpdates || this.installingUpdate) return
+      this.checkingForUpdates = true
+      try {
+        const result = await runUpdateCheck(this.appVersion)
+        if (result.status === 'update-available') {
+          const notes = result.notes ? `\n\n${result.notes}` : ''
+          if (canUseDesktopUpdater()) {
+            this.$confirm(
+              `发现新版本 v${result.latestVersion}，是否立即下载并安装？${notes}`,
+              this.$t('setting.updateAvailableTitle'),
+              {
+                confirmButtonText: this.$t('setting.updateInstallNow'),
+                cancelButtonText: this.$t('setting.updateLater'),
+                type: 'info'
+              }
+            )
+              .then(() => this.installUpdate(result.latestVersion))
+              .catch(() => {})
+            return
+          }
+          if (result.url) {
+            this.$confirm(
+              `发现新版本 v${result.latestVersion}，当前环境仅支持打开发布页处理。${notes}`,
+              this.$t('setting.updateAvailableTitle'),
+              {
+                confirmButtonText: this.$t('setting.openReleasePage'),
+                cancelButtonText: this.$t('setting.updateLater'),
+                type: 'info'
+              }
+            )
+              .then(() => openExternalUrl(result.url))
+              .catch(() => {})
+            return
+          }
+          this.$message.info(
+            this.$t('setting.updateFoundWithoutUrl', {
+              version: result.latestVersion
+            })
+          )
+          return
+        }
+        if (result.status === 'up-to-date') {
+          this.$message.success(
+            this.$t('setting.updateAlreadyLatest', {
+              version: result.latestVersion
+            })
+          )
+          return
+        }
+        if (result.status === 'release-page-only') {
+          this.$confirm(
+            this.$t('setting.updateReleasePageOnly'),
+            this.$t('setting.checkUpdate'),
+            {
+              confirmButtonText: this.$t('setting.openReleasePage'),
+              cancelButtonText: this.$t('dialog.cancel'),
+              type: 'info'
+            }
+          )
+            .then(() => openExternalUrl(result.url))
+            .catch(() => {})
+          return
+        }
+        this.$message.info(this.$t('setting.updateSourceNotConfigured'))
+      } catch (error) {
+        this.$message.error(error?.message || this.$t('setting.updateCheckFailed'))
+      } finally {
+        this.checkingForUpdates = false
+      }
+    },
+
+    async installUpdate(latestVersion) {
+      this.installingUpdate = true
+      const loading = this.$loading({
+        lock: true,
+        text: this.$t('setting.updatePreparing'),
+        background: 'rgba(0, 0, 0, 0.35)'
+      })
+      try {
+        let downloadedBytes = 0
+        const result = await downloadAndInstallUpdate(event => {
+          if (event.event === 'Started') {
+            const totalBytes = Number(event.data.contentLength || 0)
+            if (totalBytes > 0) {
+              loading.setText?.(
+                this.$t('setting.updateDownloadingWithSize', {
+                  current: '0.0',
+                  total: (totalBytes / 1024 / 1024).toFixed(1)
+                })
+              )
+            }
+            return
+          }
+          if (event.event === 'Progress') {
+            downloadedBytes += Number(event.data.chunkLength || 0)
+            loading.setText?.(
+              this.$t('setting.updateDownloadingProgress', {
+                current: (downloadedBytes / 1024 / 1024).toFixed(1)
+              })
+            )
+            return
+          }
+          if (event.event === 'Finished') {
+            loading.setText?.(this.$t('setting.updateInstalling'))
+          }
+        })
+        loading.close()
+        if (result.shouldRelaunch) {
+          this.$confirm(
+            this.$t('setting.updateInstallCompleted', {
+              version: latestVersion
+            }),
+            this.$t('setting.updateRestartTitle'),
+            {
+              confirmButtonText: this.$t('setting.updateRestartNow'),
+              cancelButtonText: this.$t('setting.updateRestartLater'),
+              type: 'success'
+            }
+          )
+            .then(async () => {
+              await relaunchAfterUpdate()
+            })
+            .catch(() => {})
+          return
+        }
+        this.$message.success(this.$t('setting.updateWindowsInstalling'))
+      } catch (error) {
+        loading.close()
+        this.$message.error(error?.message || this.$t('setting.updateInstallFailed'))
+      } finally {
+        this.installingUpdate = false
+      }
+    }
+  }
+}
+</script>
+
+<style lang="less" scoped>
+.workspaceSettings {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: 100%;
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+
+  &.isDark {
+    background: #111827;
+    border-color: rgba(255, 255, 255, 0.08);
+
+    .settingsNav {
+      background: #0f172a;
+      border-right-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .settingsNavItem {
+      color: rgba(255, 255, 255, 0.72);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      &.active {
+        background: #3b82f6;
+        color: #fff;
+      }
+    }
+
+    .settingsPanel {
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    .settingRow,
+    .appInfoCard,
+    .shortcutGroup,
+    .chip {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .sectionDesc,
+    .shortcutRow span {
+      color: rgba(255, 255, 255, 0.68);
+    }
+  }
+}
+
+.settingsNav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 16px;
+  background: #f8fafc;
+  border-right: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.settingsNavItem {
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.78);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(59, 130, 246, 0.08);
+  }
+
+  &.active {
+    background: #3b82f6;
+    color: #fff;
+  }
+}
+
+.settingsPanel {
+  padding: 28px 32px;
+  overflow: auto;
+}
+
+.settingsSection {
+  h3 {
+    font-size: 28px;
+    margin-bottom: 10px;
+  }
+
+  h4 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+}
+
+.sectionDesc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(15, 23, 42, 0.62);
+  margin-bottom: 18px;
+}
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  background: #f8fafc;
+  margin-bottom: 14px;
+
+  span {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  &.sliderRow {
+    display: block;
+
+    span {
+      display: block;
+      margin-bottom: 12px;
+    }
+  }
+
+  &.inlineRow {
+    span {
+      white-space: nowrap;
+    }
+  }
+}
+
+.appInfoCard,
+.shortcutGroup {
+  margin-top: 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  background: #f8fafc;
+  padding: 18px;
+}
+
+.appInfoRow,
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.appInfoActions {
+  padding-top: 12px;
+}
+
+.shortcutRow code {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  font-size: 13px;
+}
+</style>

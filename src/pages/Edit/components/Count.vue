@@ -16,7 +16,6 @@ import { mapState } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 
 // 字数及节点数量统计
-let countEl = document.createElement('div')
 export default {
   props: {
     mindMap: {
@@ -25,7 +24,6 @@ export default {
   },
   data() {
     return {
-      textStr: '',
       words: 0,
       num: 0
     }
@@ -45,24 +43,36 @@ export default {
     this.$bus.$off('data_change', this.onDataChange)
   },
   methods: {
+    extractText(value) {
+      const source = String(value || '')
+      if (!source) return ''
+      if (!/[<&]/.test(source)) {
+        return source
+      }
+      return (
+        new DOMParser().parseFromString(source, 'text/html').body.textContent ||
+        ''
+      )
+    },
+
     // 监听数据变化
     onDataChange(data) {
-      this.textStr = ''
-      this.words = 0
+      let totalText = ''
       this.num = 0
-      this.walk(data)
-      countEl.innerHTML = this.textStr
-      this.words = countEl.textContent.length
+      this.walk(data, text => {
+        totalText += text
+      })
+      this.words = totalText.length
     },
 
     // 遍历
-    walk(data) {
+    walk(data, collectText) {
       if (!data) return
       this.num++
-      this.textStr += String(data.data.text) || ''
+      collectText(this.extractText(data?.data?.text))
       if (data.children && data.children.length > 0) {
         data.children.forEach(item => {
-          this.walk(item)
+          this.walk(item, collectText)
         })
       }
     }

@@ -41,6 +41,8 @@
       <div class="input">
         <input
           type="text"
+          name="demonstrateStep"
+          aria-label="跳转演示步骤"
           v-model="inputStep"
           @keyup.enter.stop="onEnter"
           @keydown.stop

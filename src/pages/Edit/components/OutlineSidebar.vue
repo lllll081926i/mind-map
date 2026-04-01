@@ -67,18 +67,6 @@ export default {
       activeSidebar: 'activeSidebar'
     })
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'outline'
-          }
-        })
-      }
-    }
-  },
   methods: {
     onChangeToOutlineEdit() {
       setActiveSidebar('')

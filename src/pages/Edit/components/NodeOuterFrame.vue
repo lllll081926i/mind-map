@@ -438,18 +438,6 @@ export default {
       return fontFamilyList[this.$i18n.locale] || fontFamilyList.zh
     }
   },
-  watch: {
-    activeSidebar: {
-      immediate: true,
-      handler(val) {
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'nodeOuterFrameStyle'
-          }
-        })
-      }
-    }
-  },
   created() {
     this.mindMap.on('outer_frame_active', this.onOuterFrameActive)
     this.mindMap.on('outer_frame_delete', this.hide)
@@ -459,11 +447,6 @@ export default {
     this.mindMap.off('outer_frame_active', this.onOuterFrameActive)
     this.mindMap.off('outer_frame_delete', this.hide)
     this.mindMap.off('outer_frame_deactivate', this.hide)
-  },
-  mounted() {
-    if (this.activeSidebar === 'nodeOuterFrameStyle' && this.$refs.sidebar) {
-      this.$refs.sidebar.show = true
-    }
   },
   methods: {
     onOuterFrameActive(el, parentNode, range) {

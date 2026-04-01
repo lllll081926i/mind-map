@@ -1,6 +1,6 @@
 <template>
   <div
-    class="sidebarContainer"
+    class="sidebarContainer sidebarPanel"
     @click.stop
     :class="{ isDark: isDark }"
     :style="sidebarStyle"
@@ -8,10 +8,13 @@
     <button class="closeBtn" type="button" @click="close">
       <span class="iconfont iconguanbi"></span>
     </button>
-    <div class="sidebarHeader" v-if="title">
+    <div class="sidebarHeader sidebarPanelHeader" v-if="title">
       {{ title }}
     </div>
-    <div class="sidebarContent customScrollbar" ref="sidebarContent">
+    <div
+      class="sidebarContent sidebarPanelBody customScrollbar"
+      ref="sidebarContent"
+    >
       <slot></slot>
     </div>
   </div>
@@ -37,7 +40,6 @@ export default {
   },
   data() {
     return {
-      show: this.forceShow || false,
       zIndex: 1100
     }
   },
@@ -46,7 +48,7 @@ export default {
       isDark: 'isDark'
     }),
     isShown() {
-      return this.forceShow || this.show
+      return this.forceShow
     },
     sidebarStyle() {
       return {
@@ -72,11 +74,13 @@ export default {
   },
   methods: {
     handleCloseSidebar() {
+      if (!this.isShown) {
+        return
+      }
       this.close()
     },
 
     close() {
-      this.show = false
       setActiveSidebar('')
     },
 
@@ -99,7 +103,9 @@ export default {
   border-left: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s;
+  transition:
+    right 0.3s ease,
+    opacity 0.3s ease;
 
   &.isDark {
     background-color: #262a2e;

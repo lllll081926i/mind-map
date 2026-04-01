@@ -86,6 +86,7 @@
 <script>
 import { mapState } from 'pinia'
 import { isUndef, getTextFromHtml } from 'simple-mind-map/src/utils/index'
+import { onShowSearch } from '@/services/appEvents'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 
@@ -128,7 +129,7 @@ export default {
     }
   },
   created() {
-    this.$bus.$on('show_search', this.showSearch)
+    this.removeShowSearchListener = onShowSearch(this.showSearch)
     this.mindMap.on('search_info_change', this.handleSearchInfoChange)
     this.mindMap.on('node_click', this.blur)
     this.mindMap.on('draw_click', this.blur)
@@ -145,7 +146,7 @@ export default {
     this.setSearchResultListHeight()
   },
   beforeUnmount() {
-    this.$bus.$off('show_search', this.showSearch)
+    this.removeShowSearchListener && this.removeShowSearchListener()
     this.mindMap.off('search_info_change', this.handleSearchInfoChange)
     this.mindMap.off('node_click', this.blur)
     this.mindMap.off('draw_click', this.blur)

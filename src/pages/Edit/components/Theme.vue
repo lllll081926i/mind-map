@@ -22,11 +22,16 @@
           class="themeItem"
           v-for="item in currentList"
           :key="item.value"
+          role="button"
+          tabindex="0"
+          :aria-label="item.name"
           @click="useTheme(item)"
+          @keydown.enter.prevent="useTheme(item)"
+          @keydown.space.prevent="useTheme(item)"
           :class="{ active: item.value === theme }"
         >
           <div class="imgBox">
-            <img :src="item.img || themeImgMap[item.value]" alt="" />
+            <img :src="item.img || themeImgMap[item.value]" :alt="item.name" />
           </div>
           <div class="name">{{ item.name }}</div>
         </div>
@@ -39,6 +44,7 @@
 import Sidebar from './Sidebar.vue'
 import { storeData } from '@/api'
 import { mapState } from 'pinia'
+import { emitShowLoading } from '@/services/appEvents'
 import themeImgMap from 'simple-mind-map-plugin-themes/themeImgMap'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
 import { useAppStore } from '@/stores/app'
@@ -64,7 +70,7 @@ export default {
     return {
       themeList: [
         {
-          name: '默认主题',
+          name: this.$t('theme.default'),
           value: 'default',
           dark: false
         },
@@ -106,11 +112,6 @@ export default {
         if (val === 'theme') {
           this.theme = this.mindMap.getTheme()
         }
-        this.$nextTick(() => {
-          if (this.$refs.sidebar) {
-            this.$refs.sidebar.show = val === 'theme'
-          }
-        })
       }
     }
   },
@@ -218,7 +219,7 @@ export default {
     },
 
     changeTheme(theme, config) {
-      this.$bus.$emit('showLoading')
+      emitShowLoading()
       this.mindMap.setTheme(theme.value)
       storeData({
         theme: {

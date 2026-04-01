@@ -12,5 +12,10 @@ export const getCurrentData = () => {
   if (typeof currentDataGetter !== 'function') {
     return null
   }
-  return currentDataGetter()
+  try {
+    return currentDataGetter()
+  } catch (error) {
+    console.error('getCurrentData failed', error)
+    return null
+  }
 }

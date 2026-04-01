@@ -1,4 +1,5 @@
 import { isDesktopRuntime } from '@/platform/runtime.mjs'
+import i18n from '@/i18n'
 import {
   createManualUpdateResult,
   parseUpdateManifest
@@ -73,7 +74,7 @@ export const checkForUpdates = async currentVersion => {
 
 export const downloadAndInstallUpdate = async onEvent => {
   if (!pendingDesktopUpdate) {
-    throw new Error('当前没有可安装的更新')
+    throw new Error(i18n.global.t('setting.updateInstallMissing'))
   }
   await pendingDesktopUpdate.downloadAndInstall(onEvent)
   pendingDesktopUpdate = null

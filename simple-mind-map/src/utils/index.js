@@ -1553,7 +1553,7 @@ export const getNodeListBoundingRect = (
 }
 
 // 全屏事件检测
-const getOnfullscreEnevt = () => {
+const getOnFullscreenEvent = () => {
   if (document.documentElement.requestFullScreen) {
     return 'fullscreenchange'
   } else if (document.documentElement.webkitRequestFullScreen) {
@@ -1564,7 +1564,8 @@ const getOnfullscreEnevt = () => {
     return 'msfullscreenchange'
   }
 }
-export const fullscrrenEvent = getOnfullscreEnevt()
+export const fullscreenEvent = getOnFullscreenEvent()
+export const fullscrrenEvent = fullscreenEvent
 
 // 全屏
 export const fullScreen = element => {

@@ -2,13 +2,21 @@
   "name": "mind-map-app",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "simple-mind-map",
+    "simple-mind-map-plugin-themes"
+  ],
   "engines": {
-    "node": ">=25.0.0"
+    "node": ">=22.0.0"
   },
   "license": "MIT",
   "scripts": {
     "dev": "npm run desktop:dev",
     "check": "npm run desktop:check",
+    "lint": "eslint . --ext .js,.mjs,.cjs,.vue --cache --cache-location .eslintcache",
+    "lint:fix": "npm run lint -- --fix",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "prepare": "husky",
     "test:update": "node --test tests/update-service-core.test.mjs",
     "test:desktop-runtime": "node --test tests/platform-runtime.test.mjs",
     "frontend:dev": "vite",
@@ -38,31 +46,52 @@
     "buffer": "^6.0.3",
     "codemirror": "^5.65.21",
     "core-js": "^3.49.0",
+    "dompurify": "^3.3.3",
     "element-plus": "^2.13.6",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
     "pinia": "^3.0.4",
     "punycode": "^2.3.1",
-    "simple-mind-map": "file:./simple-mind-map",
-    "simple-mind-map-plugin-themes": "^1.0.1",
+    "simple-mind-map": "workspace:*",
+    "simple-mind-map-plugin-themes": "workspace:*",
     "viewerjs": "^1.11.7",
     "vue": "^3.5.31",
     "vue-i18n": "^9.14.5",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.10.1",
+    "@types/node": "^25.5.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "chokidar": "^3.6.0",
     "esbuild": "^0.27.4",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.8.0",
     "events": "^3.3.0",
-    "express": "^4.22.1",
+    "express": "^5.2.1",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
     "less": "^4.6.4",
     "markdown-it": "^14.1.1",
     "markdown-it-checkbox": "^1.1.0",
     "prettier": "^3.8.1",
     "stream-browserify": "^3.0.0",
+    "typescript": "^6.0.2",
     "vconsole": "^3.15.1",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vue-eslint-parser": "^10.4.0"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "overrides": {
+    "dompurify": "^3.3.3",
+    "quill": "2.0.2"
   }
 }

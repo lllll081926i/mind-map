@@ -9,7 +9,7 @@ const handleZHIXI = async data => {
         data = JSON.parse(data)
       }
     } catch (error) {
-      console.log(error)
+      console.error('handleZHIXI parse failed', error)
     }
     if (!Array.isArray(data)) {
       data = []
@@ -17,7 +17,7 @@ const handleZHIXI = async data => {
     const newNodeList = []
     const waitLoadImageList = []
     const walk = (list, newList) => {
-      list.forEach(async item => {
+      list.forEach(item => {
         let newRoot = {}
         newList.push(newRoot)
         newRoot.data = {
@@ -33,13 +33,15 @@ const handleZHIXI = async data => {
             resolve = _resolve
           })
           waitLoadImageList.push(promise)
-          try {
-            newRoot.data.image = await imgToDataUrl(item.data.image)
-            newRoot.data.imageSize = item.data.imageSize
-            resolve()
-          } catch (error) {
-            resolve()
-          }
+          imgToDataUrl(item.data.image)
+            .then(url => {
+              newRoot.data.image = url
+              newRoot.data.imageSize = item.data.imageSize
+            })
+            .catch(() => {})
+            .finally(() => {
+              resolve()
+            })
         }
         // 子节点
         newRoot.children = []
@@ -68,19 +70,25 @@ const handleZHIXI = async data => {
       data: newNodeList
     }
   } catch (error) {
+    console.error('handleZHIXI failed', error)
     return ''
   }
 }
 
 const handleClipboardText = async text => {
   // 知犀数据格式1
-  try {
-    let parsedData = JSON.parse(text)
-    if (parsedData.__c_zx_v !== undefined) {
-      const res = await handleZHIXI(parsedData.children)
-      return res
+  const parsedData = (() => {
+    try {
+      return JSON.parse(text)
+    } catch (error) {
+      console.error('handleClipboardText parse failed', error)
+      return undefined
     }
-  } catch (error) {}
+  })()
+  if (parsedData?.__c_zx_v !== undefined) {
+    const res = await handleZHIXI(parsedData.children)
+    return res
+  }
   // 知犀数据格式2
   if (text.includes('￿﻿')) {
     const res = await handleZHIXI(text)

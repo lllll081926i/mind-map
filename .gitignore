@@ -1,4 +1,5 @@
 node_modules
+.eslintcache
 .DS_Store
 dist_electron
 dist-desktop
@@ -10,9 +11,13 @@ simple-mind-map/node_modules
 utools/dist
 vite-dev.log
 vite-dev.err
+vite-headless.log
+vite-headless.err
+.husky/_/
 .tmp-build*.log
 .tmp-desktop*.log
 .tmp-frontend*.log
+test-results/
 docs/plans/
 .keys/
 .env

@@ -47,7 +47,7 @@
               <span
                 class="nodeEdit"
                 :contenteditable="!isReadonly"
-                :key="getKey()"
+                :key="`${data.uid}-${outlineVersion}`"
                 @blur="onBlur($event, node)"
                 @keydown.stop="onNodeInputKeydown($event, node)"
                 @keyup.stop
@@ -74,7 +74,7 @@ import {
   handleInputPasteText
 } from 'simple-mind-map/src/utils'
 import { storeData } from '@/api'
-import { printOutline } from '@/utils'
+import { printOutline, sanitizeRichTextFragment } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { setIsOutlineEdit } from '@/stores/runtime'
@@ -92,7 +92,8 @@ export default {
       defaultProps: {
         label: 'label'
       },
-      currentData: null
+      currentData: null,
+      outlineVersion: 0
     }
   },
   computed: {
@@ -139,6 +140,7 @@ export default {
       }
       walk(data)
       this.data = [data]
+      this.outlineVersion += 1
     },
 
     // 根节点不允许拖拽
@@ -158,14 +160,15 @@ export default {
 
     // 失去焦点更新节点文本
     onBlur(e, node) {
+      const nextHtml = sanitizeRichTextFragment(e.target.innerHTML)
       // 节点数据没有修改
-      if (node.data.textCache === e.target.innerHTML) {
+      if (node.data.textCache === nextHtml) {
         return
       }
       const richText = node.data.data.richText
-      const text = richText ? e.target.innerHTML : e.target.innerText
+      const text = richText ? nextHtml : e.target.innerText
       node.data.data.text = richText ? textToNodeRichTextWithWrap(text) : text
-      node.data.textCache = e.target.innerHTML
+      node.data.textCache = nextHtml
       this.save()
     },
 
@@ -235,12 +238,6 @@ export default {
     onPaste(e) {
       handleInputPasteText(e)
     },
-
-    // 生成唯一的key
-    getKey() {
-      return this.data[0]?.uid || 'outline'
-    },
-
     // 打印
     onPrint() {
       printOutline(this.$refs.outlineEditBox)
