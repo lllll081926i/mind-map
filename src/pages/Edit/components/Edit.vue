@@ -465,10 +465,13 @@ export default {
     }
     clearTimeout(this.storeConfigTimer)
     clearCurrentDataGetter()
-    if (this.mindMap) {
-      this.unbindMindMapEvents()
+    this.unbindMindMapEvents()
+  },
+  unmounted() {
+    if (this.mindMap && typeof this.mindMap.destroy === 'function') {
       this.mindMap.destroy()
     }
+    this.mindMap = null
   },
   methods: {
     handleStartTextEdit() {

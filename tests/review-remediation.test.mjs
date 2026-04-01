@@ -90,6 +90,10 @@ const countSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Count.vue'),
   'utf8'
 )
+const nodeNoteContentShowSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/NodeNoteContentShow.vue'),
+  'utf8'
+)
 const scaleSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Scale.vue'),
   'utf8'
@@ -183,6 +187,27 @@ test('运行时 store 改为惰性初始化，不在模块顶层直接创建实�
   assert.doesNotMatch(runtimeSource, /const editorStore = useEditorStore\(pinia\)/)
   assert.match(runtimeSource, /const ensureRuntimeStores = \(\) =>/)
   assert.match(runtimeSource, /const normalizedValue = typeof value === 'string' \? value : ''/)
+})
+
+test('编辑页在子组件卸载后再销毁 mindMap 实例，避免路由切换时 beforeUnmount 清理互相打架', () => {
+  assert.match(editSource, /beforeUnmount\(\)[\s\S]*this\.unbindMindMapEvents\(\)/)
+  const beforeUnmountSection = editSource.match(
+    /beforeUnmount\(\)\s*\{[\s\S]*?\n\s{2}\},\n\s{2}unmounted/
+  )
+  assert.ok(beforeUnmountSection)
+  assert.doesNotMatch(beforeUnmountSection[0], /this\.mindMap\.destroy\(\)/)
+  assert.match(editSource, /unmounted\(\)[\s\S]*this\.mindMap && typeof this\.mindMap\.destroy === 'function'/)
+  assert.match(editSource, /unmounted\(\)[\s\S]*this\.mindMap\.destroy\(\)/)
+})
+
+test('备注浮层卸载时按真实父节点安全移除 DOM，避免返回首页时读取已销毁的 mindMap.el', () => {
+  assert.match(nodeNoteContentShowSource, /const viewerEl = this\.\$refs\.noteContentViewer/)
+  assert.match(nodeNoteContentShowSource, /const parentEl = viewerEl\?\.parentNode/)
+  assert.match(nodeNoteContentShowSource, /parentEl\.removeChild\(viewerEl\)/)
+  assert.doesNotMatch(
+    nodeNoteContentShowSource,
+    /this\.mindMap\.el\.removeChild\(this\.\$refs\.noteContentViewer\)/
+  )
 })
 
 test('文档会话同步 bootstrap 状态时会兜底捕获持久化异常', () => {

@@ -71,8 +71,14 @@ export default {
     this.$bus.$off('translate', this.onScale)
     this.$bus.$off('svg_mousedown', this.hideNoteContent)
     this.$bus.$off('expand_btn_click', this.hideNoteContent)
-    if (this.$refs.noteContentViewer?.parentNode === this.mindMap.el) {
-      this.mindMap.el.removeChild(this.$refs.noteContentViewer)
+    const viewerEl = this.$refs.noteContentViewer
+    const parentEl = viewerEl?.parentNode
+    if (
+      viewerEl &&
+      parentEl &&
+      typeof parentEl.removeChild === 'function'
+    ) {
+      parentEl.removeChild(viewerEl)
     }
   },
   methods: {
