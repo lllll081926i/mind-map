@@ -48,13 +48,14 @@ jobs:
       - name: Show build context
         shell: bash
         run: |
+          PACKAGE_VERSION=$(node -p 'require("./package.json").version')
           echo "event=${{ github.event_name }}"
           echo "github.ref=${{ github.ref }}"
           echo "github.sha=${{ github.sha }}"
           echo "inputs.tag_name=${{ inputs.tag_name || '' }}"
           echo "inputs.build_ref=${{ inputs.build_ref || '' }}"
           echo "checked_out_commit=$(git rev-parse HEAD)"
-          echo "package_version=$(node -p \"require('./package.json').version\")"
+          echo "package_version=$PACKAGE_VERSION"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -76,7 +77,7 @@ jobs:
       - name: Verify release tag matches package version
         shell: bash
         run: |
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          PACKAGE_VERSION=$(node -p 'require("./package.json").version')
           EXPECTED_TAG="v${PACKAGE_VERSION}"
           RELEASE_TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_type == 'tag' && github.ref_name || '' }}"
 
@@ -260,13 +261,14 @@ jobs:
       - name: Show build context
         shell: bash
         run: |
+          PACKAGE_VERSION=$(node -p 'require("./package.json").version')
           echo "matrix.label=${{ matrix.label }}"
           echo "github.ref=${{ github.ref }}"
           echo "github.sha=${{ github.sha }}"
           echo "inputs.tag_name=${{ inputs.tag_name || '' }}"
           echo "inputs.build_ref=${{ inputs.build_ref || '' }}"
           echo "checked_out_commit=$(git rev-parse HEAD)"
-          echo "package_version=$(node -p \"require('./package.json').version\")"
+          echo "package_version=$PACKAGE_VERSION"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
