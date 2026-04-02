@@ -138,7 +138,7 @@ jobs:
             args: --no-bundle
             release_args: --no-bundle
             include_updater_json: false
-            upload_plain_binary: false
+            upload_plain_binary: true
             target_triple: ''
             portable_asset_suffix: windows_x64
             portable_source_path: src-tauri/target/release/mind-map-desktop.exe
@@ -160,7 +160,7 @@ jobs:
             args: --no-bundle --target aarch64-pc-windows-msvc
             release_args: --no-bundle --target aarch64-pc-windows-msvc
             include_updater_json: false
-            upload_plain_binary: false
+            upload_plain_binary: true
             target_triple: aarch64-pc-windows-msvc
             portable_asset_suffix: windows_arm64
             portable_source_path: src-tauri/target/aarch64-pc-windows-msvc/release/mind-map-desktop.exe
@@ -343,17 +343,9 @@ jobs:
           "path=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$(Split-Path $target -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Upload Windows portable release asset
-        if: matrix.portable_asset_suffix != '' && needs.create_release.outputs.release_id != ''
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ needs.create_release.outputs.tag_name }}" "${{ steps.portable_asset.outputs.path }}" --clobber
-
       - name: Upload workflow artifact
         if: success() && matrix.portable_asset_suffix == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           if-no-files-found: error
@@ -362,7 +354,7 @@ jobs:
 
       - name: Upload Windows portable workflow artifact
         if: success() && matrix.portable_asset_suffix != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           if-no-files-found: error

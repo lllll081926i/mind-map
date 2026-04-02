@@ -2,11 +2,17 @@
   <div class="workspacePage" :class="{ isDark: isDark }">
     <header class="workspaceHeader">
       <div class="workspaceBrand">
-        <div class="brandTitle">{{ $t('home.brandTitle') }}</div>
-        <div class="brandMeta">{{ $t('home.brandMeta') }}</div>
+        <div class="brandIcon">
+          <span class="iconfont iconwenjian1"></span>
+        </div>
+        <div class="brandInfo">
+          <div class="brandTitle">{{ $t('home.brandTitle') }}</div>
+          <div class="brandMeta">{{ $t('home.brandMeta') }}</div>
+        </div>
       </div>
       <div class="workspaceHeaderActions">
         <button type="button" class="ghostBtn" @click="refreshRecent">
+          <span class="iconfont iconshuaxin"></span>
           {{ $t('home.refresh') }}
         </button>
       </div>
@@ -15,19 +21,23 @@
     <div class="workspaceBody">
       <aside class="workspaceSidebar">
         <div class="quickActionsCard">
+          <h3 class="sidebarTitle">{{ $t('home.quickActions') }}</h3>
           <button type="button" class="primaryAction" @click="createNewFile">
-            {{ $t('home.createNew') }}
+            <span class="actionIcon">+</span>
+            <span>{{ $t('home.createNew') }}</span>
           </button>
           <button
             type="button"
             class="secondaryAction"
             @click="templateDialogVisible = true"
           >
-            {{ $t('home.createFromTemplate') }}
+            <span class="actionIcon">&#x2605;</span>
+            <span>{{ $t('home.createFromTemplate') }}</span>
           </button>
         </div>
 
         <div class="sidebarSection">
+          <div class="sectionLabel">{{ $t('home.openLocal') }}</div>
           <button type="button" class="sideAction" @click="openLocalFile">
             <span class="iconfont iconwenjian1"></span>
             <span>{{ $t('home.openLocalFile') }}</span>
@@ -39,6 +49,7 @@
         </div>
 
         <div v-if="folders.length" class="sidebarSection folderSection">
+          <div class="sectionLabel">{{ $t('home.folders') }}</div>
           <div
             v-for="folder in folders"
             :key="folder.path"
@@ -84,26 +95,41 @@
 
           <div class="workspaceTable">
             <div class="tableHead">
-              <span class="cell checkboxCell"></span>
               <span class="cell nameCell">{{ $t('home.tableName') }}</span>
               <span class="cell pathCell">{{ $t('home.tablePath') }}</span>
               <span class="cell actionCell">{{ $t('home.tableAction') }}</span>
             </div>
             <div v-if="displayItems.length === 0" class="emptyState">
+              <div class="emptyIcon">
+                <span class="iconfont iconwenjian1"></span>
+              </div>
               {{ $t('home.empty') }}
             </div>
             <div
               v-for="item in displayItems"
               :key="item.path"
               class="tableRow"
+              role="button"
+              tabindex="0"
+              @click="openItem(item)"
+              @keydown.enter.prevent="openItem(item)"
+              @keydown.space.prevent="openItem(item)"
             >
-              <span class="cell checkboxCell">
-                <span class="checkboxStub"></span>
+              <span class="cell nameCell">
+                <span class="fileIcon">
+                  <span class="iconfont iconwenjian1"></span>
+                </span>
+                <span class="fileName">{{ item.name }}</span>
               </span>
-              <span class="cell nameCell">{{ item.name }}</span>
-              <span class="cell pathCell" :title="item.path">{{ item.path }}</span>
+              <span class="cell pathCell" :title="item.path">{{
+                item.path
+              }}</span>
               <span class="cell actionCell">
-                <button type="button" class="rowAction" @click="openItem(item)">
+                <button
+                  type="button"
+                  class="rowAction"
+                  @click.stop="openItem(item)"
+                >
                   {{ $t('home.open') }}
                 </button>
               </span>
@@ -173,10 +199,14 @@ export default {
       }))
     },
     activeFolder() {
-      return this.folders.find(item => item.path === this.activeFolderPath) || null
+      return (
+        this.folders.find(item => item.path === this.activeFolderPath) || null
+      )
     },
     panelTitle() {
-      return this.activeFolder ? this.activeFolder.name : this.$t('home.recentTitle')
+      return this.activeFolder
+        ? this.activeFolder.name
+        : this.$t('home.recentTitle')
     },
     panelDescription() {
       return this.activeFolder
@@ -191,7 +221,9 @@ export default {
       if (!keyword) return sourceList
       return sourceList.filter(item => {
         return [item.name, item.path].some(value => {
-          return String(value || '').toLowerCase().includes(keyword)
+          return String(value || '')
+            .toLowerCase()
+            .includes(keyword)
         })
       })
     }
@@ -259,7 +291,9 @@ export default {
           name: folderPayload.directoryRef.name,
           entries: folderPayload.entries || []
         }
-        const nextFolders = this.folders.filter(item => item.path !== target.path)
+        const nextFolders = this.folders.filter(
+          item => item.path !== target.path
+        )
         this.folders = [target, ...nextFolders]
         this.activeFolderPath = target.path
       })
@@ -278,12 +312,12 @@ export default {
 <style lang="less" scoped>
 .workspacePage {
   min-height: 100vh;
-  padding: 18px;
-  background: #f5f5f5;
+  padding: 24px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   color: rgba(26, 26, 26, 0.88);
 
   &.isDark {
-    background: #1f2329;
+    background: linear-gradient(180deg, #1a1d23 0%, #1f2329 100%);
     color: hsla(0, 0%, 100%, 0.88);
 
     .workspaceSidebar,
@@ -316,6 +350,20 @@ export default {
     .emptyState {
       color: hsla(0, 0%, 100%, 0.54);
     }
+
+    .sidebarTitle,
+    .sectionLabel {
+      color: hsla(0, 0%, 100%, 0.72);
+    }
+
+    .fileIcon {
+      background: rgba(64, 158, 255, 0.12);
+      color: #409eff;
+    }
+
+    .emptyIcon span {
+      color: hsla(0, 0%, 100%, 0.24);
+    }
   }
 }
 
@@ -323,16 +371,42 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.workspaceBrand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brandIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.brandInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .brandTitle {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .brandMeta {
-  margin-top: 6px;
   font-size: 13px;
   color: rgba(15, 23, 42, 0.56);
 }
@@ -346,13 +420,25 @@ export default {
 .ghostBtn,
 .iconBtn,
 .rowAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.82);
   color: inherit;
-  border-radius: 14px;
-  padding: 10px 14px;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(15, 23, 42, 0.15);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .ghostBtn.danger {
@@ -367,9 +453,9 @@ export default {
 
 .workspaceBody {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 16px;
-  min-height: calc(100vh - 96px);
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  min-height: calc(100vh - 120px);
 }
 
 .workspaceSidebar {
@@ -381,33 +467,70 @@ export default {
 
 .quickActionsCard,
 .sidebarSection {
-  padding: 14px;
-  border-radius: 8px;
+  padding: 16px;
+  border-radius: 12px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
-  margin-bottom: 0;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.08);
+  }
+}
+
+.sidebarTitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(26, 26, 26, 0.6);
+}
+
+.sectionLabel {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(26, 26, 26, 0.5);
 }
 
 .primaryAction,
 .secondaryAction {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 12px 14px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.actionIcon {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .primaryAction {
-  margin-bottom: 12px;
-  background: #3b82f6;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: #fff;
 }
 
 .secondaryAction {
-  background: #84cc16;
+  background: linear-gradient(135deg, #84cc16, #65a30d);
   color: #fff;
 }
 
@@ -419,10 +542,17 @@ export default {
   gap: 10px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   background: #fff;
-  border-radius: 6px;
-  padding: 11px 12px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #f8fafc;
+    border-color: rgba(64, 158, 255, 0.2);
+    transform: translateX(2px);
+  }
 
   & + & {
     margin-top: 8px;
@@ -445,12 +575,12 @@ export default {
 }
 
 .workspacePanel {
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
   min-height: 100%;
-  padding: 18px;
+  padding: 24px;
 }
 
 .panelHeader {
@@ -458,16 +588,19 @@ export default {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 
   h2 {
-    font-size: 24px;
-    margin-bottom: 6px;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
   }
 
   p {
     font-size: 13px;
     color: rgba(26, 26, 26, 0.56);
+    margin: 0;
   }
 }
 
@@ -478,7 +611,7 @@ export default {
 }
 
 .workspaceTable {
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
@@ -486,22 +619,31 @@ export default {
 .tableHead,
 .tableRow {
   display: grid;
-  grid-template-columns: 44px minmax(160px, 1fr) minmax(260px, 2fr) 120px;
+  grid-template-columns: 1fr minmax(260px, 2fr) 100px;
   align-items: center;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   background: #fff;
 }
 
 .tableHead {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: rgba(26, 26, 26, 0.56);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(26, 26, 26, 0.5);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafbfc;
 }
 
 .tableRow {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f8fafc;
+  }
 
   &:last-child {
     border-bottom: none;
@@ -514,18 +656,50 @@ export default {
   white-space: nowrap;
 }
 
-.checkboxStub {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  border-radius: 4px;
-  border: 1px solid rgba(148, 163, 184, 0.8);
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileIcon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(64, 158, 255, 0.08);
+  color: #409eff;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.fileName {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pathCell {
+  color: rgba(26, 26, 26, 0.56);
+  font-size: 13px;
 }
 
 .emptyState {
-  padding: 56px 24px;
+  padding: 64px 24px;
   text-align: center;
   color: rgba(26, 26, 26, 0.48);
+  font-size: 14px;
+}
+
+.emptyIcon {
+  margin-bottom: 12px;
+
+  span {
+    font-size: 48px;
+    color: rgba(26, 26, 26, 0.12);
+  }
 }
 
 .templateGrid {
@@ -537,10 +711,18 @@ export default {
 .templateCard {
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #f8f8f8;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 18px;
   text-align: left;
   cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(64, 158, 255, 0.3);
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 
   strong {
     display: block;
