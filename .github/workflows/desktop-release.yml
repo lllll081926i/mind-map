@@ -344,6 +344,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Build frontend
+        run: npm run frontend:build
+
       - name: Warn when updater signing secrets are missing
         if: needs.create_release.outputs.release_id != '' && matrix.include_updater_json && env.HAS_UPDATER_SECRETS != 'true'
         shell: bash
@@ -528,25 +531,29 @@ jobs:
       - build
     if: ${{ needs.create_release.outputs.release_id != '' }}
     runs-on: ubuntu-latest
+    env:
+      HAS_UPDATER_SECRETS: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
 
     steps:
-      - name: Ensure updater signing secrets are configured
+      - name: Check updater signing secrets
+        id: check_secrets
         shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD are required for updater releases."
-            exit 1
+          if [ "$HAS_UPDATER_SECRETS" != "true" ]; then
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PASSWORD is not configured. Skipping updater manifest."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
+        if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ref != '' && inputs.build_ref || github.sha }}
 
       - name: Generate and upload latest.json
+        if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
