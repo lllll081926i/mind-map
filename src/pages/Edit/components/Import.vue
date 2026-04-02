@@ -77,6 +77,7 @@ import { setActiveSidebar, setIsHandleLocalFile } from '@/stores/runtime'
 
 const MAX_IMPORT_FILE_SIZE = 25 * 1024 * 1024
 const ALLOWED_REMOTE_PROTOCOLS = new Set(['http:', 'https:'])
+const REMOTE_IMPORT_TIMEOUT_MS = 10000
 
 // 导入
 export default {
@@ -173,6 +174,21 @@ export default {
       }
     },
 
+    async fetchRemoteImportFile(url) {
+      const controller =
+        typeof AbortController === 'function' ? new AbortController() : null
+      const timer = setTimeout(() => {
+        controller?.abort()
+      }, REMOTE_IMPORT_TIMEOUT_MS)
+      try {
+        return await fetch(url, {
+          signal: controller?.signal
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+
     // 检查url中是否操作需要打开的文件
     async handleFileURL() {
       try {
@@ -187,7 +203,7 @@ export default {
           return
         }
         const type = macth[1]
-        const res = await fetch(safeURL)
+        const res = await this.fetchRemoteImportFile(safeURL)
         if (!res.ok) {
           throw new Error('文件请求失败')
         }
@@ -214,6 +230,7 @@ export default {
         }
       } catch (error) {
         console.error('handleFileURL failed', error)
+        this.$message.error(this.$t('import.fileParsingFailed'))
       }
     },
 

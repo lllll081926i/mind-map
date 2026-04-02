@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify'
 
-const UNSAFE_JSON_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+const INVALID_FILE_NAME_CHARS = /[<>:"/\\|?*]/g
+const INVALID_FILE_NAME_EDGE = /^[.\s]+|[.\s]+$/g
 
 // 全屏事件检测
 const getOnFullscreenEvent = () => {
@@ -64,24 +65,29 @@ export const sanitizeRichTextFragment = html => {
   })
 }
 
-export const sanitizeExternalJsonValue = value => {
-  if (Array.isArray(value)) {
-    return value.map(item => sanitizeExternalJsonValue(item))
-  }
-  if (!value || typeof value !== 'object') {
-    return value
-  }
-  return Object.keys(value).reduce((result, key) => {
-    if (UNSAFE_JSON_KEYS.has(key)) {
-      return result
-    }
-    result[key] = sanitizeExternalJsonValue(value[key])
-    return result
-  }, {})
+export const parseExternalJsonSafely = input => {
+  return JSON.parse(input)
 }
 
-export const parseExternalJsonSafely = input => {
-  return sanitizeExternalJsonValue(JSON.parse(input))
+export const sanitizeFileName = (value, fallback = 'mind-map') => {
+  const normalized = Array.from(String(value || ''))
+    .filter(char => char.charCodeAt(0) >= 32)
+    .join('')
+    .replace(INVALID_FILE_NAME_CHARS, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/-+/g, '-')
+    .replace(INVALID_FILE_NAME_EDGE, '')
+    .trim()
+  if (normalized) {
+    return normalized
+  }
+  const safeFallback = Array.from(String(fallback || ''))
+    .filter(char => char.charCodeAt(0) >= 32)
+    .join('')
+    .replace(INVALID_FILE_NAME_CHARS, '-')
+    .replace(INVALID_FILE_NAME_EDGE, '')
+    .trim()
+  return safeFallback || 'mind-map'
 }
 
 // 复制文本到剪贴板

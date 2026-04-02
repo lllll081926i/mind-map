@@ -141,6 +141,9 @@ export default {
 
     // 渲染小地图
     drawMiniMap() {
+      if (!this.mindMap?.miniMap) {
+        return
+      }
       let {
         getImgUrl,
         viewBoxStyle,
@@ -160,12 +163,12 @@ export default {
 
     // 小地图鼠标按下事件
     onMousedown(e) {
-      this.mindMap.miniMap.onMousedown(e)
+      this.mindMap?.miniMap?.onMousedown(e)
     },
 
     // 小地图鼠标移动事件
     onMousemove(e) {
-      this.mindMap.miniMap.onMousemove(e)
+      this.mindMap?.miniMap?.onMousemove(e)
     },
 
     // 鼠标松开事件，最好绑定要window
@@ -178,12 +181,12 @@ export default {
 
     // 视口框的鼠标按下事件
     onViewBoxMousedown(e) {
-      this.mindMap.miniMap.onViewBoxMousedown(e)
+      this.mindMap?.miniMap?.onViewBoxMousedown(e)
     },
 
     // 视口框的鼠标移动事件
     onViewBoxMousemove(e) {
-      this.mindMap.miniMap.onViewBoxMousemove(e)
+      this.mindMap?.miniMap?.onViewBoxMousemove(e)
     },
 
     // 视口框的位置大小改变了，需要更新

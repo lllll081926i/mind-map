@@ -35,12 +35,44 @@
 </template>
 
 <script>
+import DOMPurify from 'dompurify'
 import Sidebar from './Sidebar.vue'
 import { mapState } from 'pinia'
 import { formulaList } from '@/config/constant'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
+
+const sanitizeFormulaOverview = html => {
+  return DOMPurify.sanitize(String(html || ''), {
+    USE_PROFILES: {
+      html: true,
+      svg: true,
+      mathMl: true
+    },
+    ALLOWED_ATTR: [
+      'class',
+      'style',
+      'xmlns',
+      'viewBox',
+      'width',
+      'height',
+      'fill',
+      'stroke',
+      'stroke-width',
+      'd',
+      'x',
+      'y',
+      'cx',
+      'cy',
+      'r',
+      'transform',
+      'aria-hidden',
+      'focusable'
+    ],
+    KEEP_CONTENT: true
+  })
+}
 
 export default {
   components: {
@@ -110,14 +142,26 @@ export default {
         this.scheduleKatexRetry()
         return
       }
+      const katexConfig = this.mindMap?.formula?.getKatexConfig?.()
+      if (!katexConfig) {
+        this.scheduleKatexRetry()
+        return
+      }
       this.clearKatexRetry()
       this.katexRetryCount = 0
       this.list = formulaList.map(item => {
+        const overview = (() => {
+          try {
+            return sanitizeFormulaOverview(
+              window.katex.renderToString(item, katexConfig)
+            )
+          } catch (error) {
+            console.error('render formula overview failed', error)
+            return sanitizeFormulaOverview(item)
+          }
+        })()
         return {
-          overview: window.katex.renderToString(
-            item,
-            this.mindMap.formula.getKatexConfig()
-          ),
+          overview,
           text: item
         }
       })

@@ -49,6 +49,8 @@ import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { setIsDragOutlineTreeNode } from '@/stores/runtime'
 
+const OUTLINE_INSERT_ACTIONS = new Set(['insertNode', 'insertChildNode', 'moveUp'])
+
 // 大纲树
 export default {
   props: {
@@ -134,7 +136,7 @@ export default {
 
     handleNodeTreeRenderEnd() {
       // 当前存在未完成的节点插入操作
-      if (this.insertType) {
+      if (OUTLINE_INSERT_ACTIONS.has(this.insertType)) {
         this[this.insertType]()
         this.insertType = ''
         return
@@ -217,7 +219,7 @@ export default {
       // 节点数据没有修改
       if (node.data.textCache === nextHtml) {
         // 如果存在未执行的插入新节点操作，那么直接执行
-        if (this.insertType) {
+        if (OUTLINE_INSERT_ACTIONS.has(this.insertType)) {
           this[this.insertType]()
           this.insertType = ''
         }

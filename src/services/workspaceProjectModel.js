@@ -1,91 +1,79 @@
-const DEFAULT_PROJECT_TITLE = '思维导图'
+const DEFAULT_PROJECT_NAME = '思维导图'
 
-const getSafeText = value => String(value || '').trim()
-
-const getPathSegments = filePath => {
-  return getSafeText(filePath)
+const getBaseName = filePath => {
+  return String(filePath || '')
     .split(/[\\/]/)
-    .filter(Boolean)
+    .pop()
 }
 
-export const getProjectDisplayName = input => {
-  const explicitName = getSafeText(input?.name || input?.title)
-  if (explicitName) {
-    return explicitName
-  }
-  const segments = getPathSegments(input?.path)
-  return segments.length > 0 ? segments[segments.length - 1] : DEFAULT_PROJECT_TITLE
+const stripExtension = fileName => {
+  return String(fileName || '').replace(/\.[^.]+$/u, '')
 }
 
-export const normalizeProjectFileRef = (input = {}, fallback = {}) => {
-  const path = getSafeText(input.path || fallback.path)
-  const title = getSafeText(input.title || fallback.title)
-  const name = getProjectDisplayName({
-    ...fallback,
-    ...input,
-    title
-  })
+const normalizeTitle = value => {
+  const title = String(value || '').trim()
+  return title || DEFAULT_PROJECT_NAME
+}
+
+const normalizeFileName = value => {
+  const fileName = String(value || '').trim()
+  return fileName || `${DEFAULT_PROJECT_NAME}.smm`
+}
+
+export const createBlankProjectRef = title => {
+  const normalizedTitle = normalizeTitle(title)
   return {
-    id: path || `memory://${Date.now()}/${name || DEFAULT_PROJECT_TITLE}`,
-    kind: 'file',
-    mode: getSafeText(input.mode || fallback.mode) || 'desktop',
-    source: getSafeText(input.source || fallback.source) || 'local',
+    kind: 'blank',
+    mode: 'desktop',
+    title: normalizedTitle,
+    name: `${normalizedTitle}.smm`,
+    path: ''
+  }
+}
+
+export const createTemplateProjectRef = title => {
+  const normalizedTitle = normalizeTitle(title)
+  return {
+    kind: 'template',
+    mode: 'desktop',
+    title: normalizedTitle,
+    name: `${normalizedTitle}.smm`,
+    path: ''
+  }
+}
+
+export const createRecentProjectRef = fileRef => {
+  const path = String(fileRef?.path || '').trim()
+  const name = normalizeFileName(fileRef?.name || getBaseName(path))
+  return {
+    kind: 'recent',
+    mode: fileRef?.mode || 'desktop',
     path,
     name,
-    title: title || name.replace(/\.[^./\\]+$/, ''),
-    updatedAt: Number(input.updatedAt || fallback.updatedAt || Date.now())
+    title: normalizeTitle(stripExtension(name)),
+    updatedAt: Number(fileRef?.updatedAt || Date.now())
   }
 }
 
-export const createBlankProjectRef = (title = DEFAULT_PROJECT_TITLE) => {
-  const normalizedTitle = getSafeText(title) || DEFAULT_PROJECT_TITLE
-  return normalizeProjectFileRef({
-    name: `${normalizedTitle}.smm`,
-    title: normalizedTitle,
-    source: 'blank'
-  })
-}
-
-export const createTemplateProjectRef = template => {
-  const templateName = getSafeText(template?.name || template) || DEFAULT_PROJECT_TITLE
-  return normalizeProjectFileRef({
-    name: `${templateName}.smm`,
-    title: templateName,
-    source: 'template'
-  })
-}
-
-export const createRecentProjectRef = input => {
-  return normalizeProjectFileRef(input, {
-    source: 'recent'
-  })
-}
-
-export const createDirectoryWorkspaceRef = (directoryRef = {}, entries = []) => {
-  const path = getSafeText(directoryRef.path)
+export const createDirectoryWorkspaceRef = (directoryRef, entries = []) => {
+  const path = String(directoryRef?.path || '').trim()
+  const name = normalizeTitle(directoryRef?.name || getBaseName(path))
   return {
-    id: path || `workspace://${Date.now()}`,
     kind: 'directory',
-    mode: getSafeText(directoryRef.mode) || 'desktop',
-    source: 'directory',
+    mode: directoryRef?.mode || 'desktop',
     path,
-    name: getProjectDisplayName(directoryRef),
-    entries: Array.isArray(entries) ? entries : [],
-    updatedAt: Number(directoryRef.updatedAt || Date.now())
+    name,
+    title: name,
+    entries: Array.isArray(entries) ? entries : []
   }
 }
 
 export const createExportContext = fileRef => {
-  const normalizedFileRef = normalizeProjectFileRef(fileRef, {
-    name: `${DEFAULT_PROJECT_TITLE}.smm`,
-    title: DEFAULT_PROJECT_TITLE,
-    source: 'export'
-  })
+  const recentProjectRef = fileRef
+    ? createRecentProjectRef(fileRef)
+    : createBlankProjectRef(DEFAULT_PROJECT_NAME)
   return {
-    fileRef: normalizedFileRef,
-    fileName: normalizedFileRef.title || DEFAULT_PROJECT_TITLE,
-    extension: normalizedFileRef.name.includes('.')
-      ? normalizedFileRef.name.split('.').pop()
-      : 'smm'
+    fileRef: recentProjectRef,
+    fileName: normalizeTitle(stripExtension(recentProjectRef.name))
   }
 }

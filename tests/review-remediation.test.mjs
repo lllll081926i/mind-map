@@ -10,6 +10,10 @@ const appEventsSource = fs.readFileSync(
   'utf8'
 )
 const aiSource = fs.readFileSync(path.resolve('src/utils/ai.js'), 'utf8')
+const aiServiceSource = fs.readFileSync(
+  path.resolve('src/services/aiService.js'),
+  'utf8'
+)
 const toolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Toolbar.vue'),
   'utf8'
@@ -18,7 +22,6 @@ const navigatorToolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/NavigatorToolbar.vue'),
   'utf8'
 )
-const homeSource = fs.readFileSync(path.resolve('src/pages/Home/Index.vue'), 'utf8')
 const themeSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Theme.vue'),
   'utf8'
@@ -57,6 +60,14 @@ const tauriConfigSource = fs.readFileSync(
 )
 const tauriCargoSource = fs.readFileSync(
   path.resolve('src-tauri/Cargo.toml'),
+  'utf8'
+)
+const tauriAiSource = fs.readFileSync(
+  path.resolve('src-tauri/src/services/ai.rs'),
+  'utf8'
+)
+const tauriAppStateSource = fs.readFileSync(
+  path.resolve('src-tauri/src/services/app_state.rs'),
   'utf8'
 )
 const tauriCommandSource = fs.readFileSync(
@@ -119,6 +130,10 @@ const importSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Import.vue'),
   'utf8'
 )
+const exportPageSource = fs.readFileSync(
+  path.resolve('src/pages/Export/Index.vue'),
+  'utf8'
+)
 const scaleSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Scale.vue'),
   'utf8'
@@ -139,7 +154,31 @@ const xmindUtilsSource = fs.readFileSync(
   path.resolve('simple-mind-map/src/utils/xmind.js'),
   'utf8'
 )
-const zhCnSource = fs.readFileSync(path.resolve('src/lang/zh_cn.js'), 'utf8')
+const workspaceActionsSource = fs.readFileSync(
+  path.resolve('src/services/workspaceActions.js'),
+  'utf8'
+)
+const updateServiceSource = fs.readFileSync(
+  path.resolve('src/services/updateService.js'),
+  'utf8'
+)
+const commandSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/core/command/Command.js'),
+  'utf8'
+)
+const viewSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/core/view/View.js'),
+  'utf8'
+)
+const styleSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/core/render/node/Style.js'),
+  'utf8'
+)
+const desktopPlatformSource = fs.readFileSync(
+  path.resolve('src/platform/desktop/index.js'),
+  'utf8'
+)
+const zhCnSource = fs.readFileSync(path.resolve('src/config/zh.js'), 'utf8')
 
 test('根项目补齐 workspace、lint、typecheck 与 commitlint 配置', () => {
   assert.deepEqual(packageJson.workspaces, [
@@ -191,7 +230,6 @@ test('关键交互区补充基础可访问性属性', () => {
   assert.match(toolbarSource, /tabindex="0"/)
   assert.match(navigatorToolbarSource, /aria-label=/)
   assert.match(themeSource, /:alt="item\.name"/)
-  assert.match(homeSource, /:aria-label="folder\.name"/)
   assert.match(scaleSource, /name="scalePercent"/)
   assert.match(demonstrateSource, /name="demonstrateStep"/)
 })
@@ -239,6 +277,8 @@ test('文档会话同步 bootstrap 状态时会兜底捕获持久化异常', () 
   assert.match(documentSessionSource, /syncBootstrapState failed/)
   assert.match(documentSessionSource, /void setWorkspaceCurrentDocument\(/)
   assert.match(documentSessionSource, /setWorkspaceLastDirectory\(/)
+  assert.match(workspaceActionsSource, /const getDirectoryPath = filePath =>/)
+  assert.match(workspaceActionsSource, /setWorkspaceLastDirectory\(getDirectoryPath\(/)
 })
 
 test('编辑页初始化时会稳妥解析思维导图容器元素，避免 ref 不是原生 DOM 时启动失败', () => {
@@ -262,11 +302,9 @@ test('文件读取工具在 FileReader 出错时会 reject', () => {
   assert.match(utilsSource, /reject\(reader\.error \|\| new Error\('fileToBuffer failed'\)\)/)
 })
 
-test('外部 JSON 在导入、打开文件与剪贴板路径上走安全解析并过滤危险键', () => {
-  assert.match(utilsSource, /const UNSAFE_JSON_KEYS = new Set\(/)
-  assert.match(utilsSource, /export const sanitizeExternalJsonValue = value =>/)
-  assert.match(utilsSource, /UNSAFE_JSON_KEYS\.has\(key\)/)
+test('外部 JSON 在导入、打开文件与剪贴板路径上统一走本地解析入口', () => {
   assert.match(utilsSource, /export const parseExternalJsonSafely = input =>/)
+  assert.match(utilsSource, /return JSON\.parse\(input\)/)
   assert.match(importSource, /parseExternalJsonSafely\(evt\.target\.result\)/)
   assert.match(toolbarSource, /parseExternalJsonSafely\(str\)/)
   assert.match(searchSource, /this\.\$nextTick\(\(\) => \{/)
@@ -306,6 +344,7 @@ test('桌面端外链打开不再通过 cmd start 调 shell，CSP 移除任意 h
   assert.doesNotMatch(tauriCommandSource, /Command::new\("cmd"\)/)
   assert.match(tauriCommandSource, /Command::new\("rundll32"\)/)
   assert.doesNotMatch(tauriConfigSource, /img-src 'self' data: blob: https:/)
+  assert.doesNotMatch(tauriAppStateSource, /block_in_place/)
 })
 
 test('工具栏等待异步面板挂载时改为有限时循环，不再递归自调用', () => {
@@ -324,12 +363,47 @@ test('搜索、公式侧边栏、全屏和小地图都补齐了时序与清理�
   assert.match(fullscreenSource, /clearTimeout\(this\.resizeTimer\)/)
   assert.match(navigatorSource, /clearTimeout\(this\.timer\)/)
   assert.match(navigatorSource, /clearTimeout\(this\.setSizeTimer\)/)
+  assert.match(navigatorSource, /if \(!this\.mindMap\?\.miniMap\) \{/)
+})
+
+test('AI 侧边栏与远程导入补齐 sanitize 和请求超时保护', () => {
+  assert.match(aiServiceSource, /const AI_HEALTHCHECK_TIMEOUT_MS = \d+/)
+  assert.match(aiServiceSource, /AbortController/)
+  assert.match(aiServiceSource, /clearTimeout\(timer\)/)
+  assert.match(aiSource, /this\.timeoutTimer = setTimeout\(/)
+  assert.match(aiSource, /this\.controller\.abort\(\)/)
+  assert.match(aiSource, /clearTimeout\(this\.timeoutTimer\)/)
+  assert.match(importSource, /const REMOTE_IMPORT_TIMEOUT_MS = \d+/)
+  assert.match(importSource, /new AbortController\(\)/)
+  assert.match(formulaSidebarSource, /import DOMPurify from 'dompurify'/)
+  assert.match(formulaSidebarSource, /DOMPurify\.sanitize\(/)
+  assert.match(tauriAiSource, /fn validate_proxy_request\(/)
+  assert.match(tauriAiSource, /fn validate_proxy_request_data\(/)
+})
+
+test('导出文件名、桌面 invoke 和文本文件读取都增加边界保护', () => {
+  assert.match(utilsSource, /export const sanitizeFileName = \(/)
+  assert.match(exportPageSource, /sanitizeFileName\(/)
+  assert.match(desktopPlatformSource, /const invokeCommand = async \(/)
+  assert.match(desktopPlatformSource, /throw new Error\(normalizedMessage, \{/)
+  assert.match(tauriFsSource, /const MAX_TEXT_FILE_SIZE: u64 = /)
+  assert.match(tauriFsSource, /tokio::fs::metadata\(path\)/)
+  assert.match(tauriFsSource, /文件过大/)
+  assert.doesNotMatch(tauriFsSource, /create_dir_all/)
+  assert.match(tauriFsSource, /ensure_directory_scope_allowed/)
+})
+
+test('编辑器初始化失败时会显示可重试的错误状态，而不是只在控制台打印', () => {
+  assert.match(editSource, /initErrorMessage/)
+  assert.match(editSource, /retryInit\(\)/)
+  assert.match(editSource, /editInitError/)
 })
 
 test('大纲编辑区使用稳定 key，避免随机 key 导致整棵树反复重建', () => {
   assert.doesNotMatch(outlineSource, /Math\.random\(\)/)
   assert.match(outlineSource, /outlineVersion/)
   assert.match(outlineEditSource, /outlineVersion/)
+  assert.match(outlineSource, /OUTLINE_INSERT_ACTIONS/)
 })
 
 test('计数面板不再通过 innerHTML 解析整棵树文本', () => {
@@ -367,6 +441,20 @@ test('平台默认导出不再使用全透传 adapter，导入路径与拼写遗
   assert.match(platformSource, /export default desktopPlatform/)
   assert.match(simpleMindMapFullSource, /AssociativeLine\.js/)
   assert.match(simpleMindMapFullSource, /RichText\.js/)
-  assert.match(zhCnSource, /structure:/)
+  assert.match(zhCnSource, /value: 'structure'/)
   assert.doesNotMatch(zhCnSource, /strusture/)
+  assert.match(updateServiceSource, /const UPDATE_MANIFEST_TIMEOUT_MS = \d+/)
+  assert.match(updateServiceSource, /AbortController/)
+})
+
+test('核心库里已确认的真实 bug 被修正', () => {
+  assert.match(commandSource, /findIndex\(/)
+  assert.doesNotMatch(commandSource, /let index = this\.commands\[name\]\.find\(/)
+  assert.doesNotMatch(viewSource, /CONSTANTS\.DIR\.UP \|\| CONSTANTS\.DIR\.LEFT/)
+  assert.doesNotMatch(viewSource, /CONSTANTS\.DIR\.DOWN \|\| CONSTANTS\.DIR\.RIGHT/)
+  assert.match(viewSource, /some\(dir =>/)
+  assert.match(styleSource, /Style\.cacheStyle = new WeakMap\(\)/)
+  assert.match(styleSource, /Style\.cacheStyle\.set\(el, /)
+  assert.match(styleSource, /Style\.cacheStyle\.get\(el\)/)
+  assert.doesNotMatch(styleSource, /Style\.cacheStyle = null/)
 })

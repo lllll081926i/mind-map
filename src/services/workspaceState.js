@@ -1,42 +1,41 @@
 import { getBootstrapState, saveBootstrapStatePatch } from '@/platform'
 
-const getMetaSnapshot = state => ({
-  recentFiles: Array.isArray(state?.recentFiles) ? state.recentFiles : [],
-  lastDirectory: String(state?.lastDirectory || ''),
-  currentDocument:
-    state?.currentDocument && typeof state.currentDocument === 'object'
-      ? {
-          path: String(state.currentDocument.path || ''),
-          name: String(state.currentDocument.name || ''),
-          source: String(state.currentDocument.source || ''),
-          dirty: !!state.currentDocument.dirty
-        }
-      : null
-})
+const normalizeRecentFiles = value => {
+  return Array.isArray(value) ? value.filter(Boolean) : []
+}
 
 export const getWorkspaceMetaState = () => {
-  return getMetaSnapshot(getBootstrapState())
-}
-
-export const patchWorkspaceMetaState = async patch => {
-  await saveBootstrapStatePatch(patch || {})
-  return getWorkspaceMetaState()
-}
-
-export const setWorkspaceCurrentDocument = async currentDocument => {
-  return patchWorkspaceMetaState({
-    currentDocument: currentDocument || null
-  })
+  return getBootstrapState()
 }
 
 export const setWorkspaceRecentFiles = async recentFiles => {
-  return patchWorkspaceMetaState({
-    recentFiles: Array.isArray(recentFiles) ? recentFiles : []
+  const nextState = await saveBootstrapStatePatch({
+    recentFiles: normalizeRecentFiles(recentFiles)
   })
+  return nextState.recentFiles || []
 }
 
 export const setWorkspaceLastDirectory = async lastDirectory => {
-  return patchWorkspaceMetaState({
-    lastDirectory: String(lastDirectory || '').trim()
+  const nextState = await saveBootstrapStatePatch({
+    lastDirectory: typeof lastDirectory === 'string' ? lastDirectory : ''
   })
+  return nextState.lastDirectory || ''
+}
+
+export const setWorkspaceCurrentDocument = async currentDocument => {
+  const normalizedCurrentDocument =
+    currentDocument &&
+    typeof currentDocument === 'object' &&
+    typeof currentDocument.path === 'string'
+      ? {
+          path: currentDocument.path,
+          name: String(currentDocument.name || ''),
+          source: String(currentDocument.source || ''),
+          dirty: !!currentDocument.dirty
+        }
+      : null
+  const nextState = await saveBootstrapStatePatch({
+    currentDocument: normalizedCurrentDocument
+  })
+  return nextState.currentDocument || null
 }
