@@ -6,6 +6,7 @@ import {
 } from './updateServiceCore.mjs'
 
 let pendingDesktopUpdate = null
+const UPDATE_MANIFEST_TIMEOUT_MS = 8000
 
 export const getReleasePageUrl = () => String(__APP_RELEASE_URL__ || '').trim()
 
@@ -19,14 +20,24 @@ export const canUseDesktopUpdater = () => {
 export const fetchUpdateManifest = async () => {
   const manifestUrl = getUpdateManifestUrl()
   if (!manifestUrl) return null
-  const response = await fetch(manifestUrl, {
-    cache: 'no-store'
-  })
-  if (!response.ok) {
-    throw new Error(`更新清单请求失败：${response.status}`)
+  const controller =
+    typeof AbortController === 'function' ? new AbortController() : null
+  const timer = setTimeout(() => {
+    controller?.abort()
+  }, UPDATE_MANIFEST_TIMEOUT_MS)
+  try {
+    const response = await fetch(manifestUrl, {
+      cache: 'no-store',
+      signal: controller?.signal
+    })
+    if (!response.ok) {
+      throw new Error(`更新清单请求失败：${response.status}`)
+    }
+    const data = await response.json()
+    return parseUpdateManifest(data, getReleasePageUrl())
+  } finally {
+    clearTimeout(timer)
   }
-  const data = await response.json()
-  return parseUpdateManifest(data, getReleasePageUrl())
 }
 
 const runDesktopUpdateCheck = async () => {

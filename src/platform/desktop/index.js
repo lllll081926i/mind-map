@@ -50,6 +50,13 @@ const normalizeSaveName = suggestedName => {
   return /\.smm$/i.test(baseName) ? baseName : `${baseName}.smm`
 }
 
+const normalizeInvokeErrorMessage = (error, fallbackMessage) => {
+  const rawMessage =
+    error?.message || error?.msg || error?.cause?.message || fallbackMessage
+  const normalizedMessage = String(rawMessage || '').trim()
+  return normalizedMessage || fallbackMessage
+}
+
 const pickBrowserFile = ({ accept = '' } = {}) => {
   return new Promise(resolve => {
     if (typeof document === 'undefined') {
@@ -198,39 +205,69 @@ const loadTauriModules = async () => {
   return tauriModulesPromise
 }
 
+const invokeCommand = async (
+  command,
+  payload = {},
+  fallbackMessage = '桌面命令执行失败'
+) => {
+  const { invoke } = await loadTauriModules()
+  try {
+    return await invoke(command, payload)
+  } catch (error) {
+    const normalizedMessage = normalizeInvokeErrorMessage(
+      error,
+      fallbackMessage
+    )
+    console.error(`invoke ${command} failed`, error)
+    throw new Error(normalizedMessage, {
+      cause: error
+    })
+  }
+}
+
 export const desktopPlatform = {
   async readBootstrapState() {
-    const { invoke } = await loadTauriModules()
-    return invoke('read_bootstrap_state')
+    return invokeCommand('read_bootstrap_state', {}, '读取应用状态失败')
   },
 
   async readBootstrapMetaState() {
-    const { invoke } = await loadTauriModules()
-    return invoke('read_bootstrap_meta_state')
+    return invokeCommand(
+      'read_bootstrap_meta_state',
+      {},
+      '读取工作区状态失败'
+    )
   },
 
   async readBootstrapDocumentState() {
-    const { invoke } = await loadTauriModules()
-    return invoke('read_bootstrap_document_state')
+    return invokeCommand(
+      'read_bootstrap_document_state',
+      {},
+      '读取文档状态失败'
+    )
   },
 
   async writeBootstrapState(state) {
-    const { invoke } = await loadTauriModules()
-    return invoke('write_bootstrap_state', { state })
+    return invokeCommand('write_bootstrap_state', { state }, '写入应用状态失败')
   },
 
   async writeBootstrapMetaState(state) {
-    const { invoke } = await loadTauriModules()
-    return invoke('write_bootstrap_meta_state', { state })
+    return invokeCommand(
+      'write_bootstrap_meta_state',
+      { state },
+      '写入工作区状态失败'
+    )
   },
 
   async writeBootstrapDocumentState(state) {
-    const { invoke } = await loadTauriModules()
-    return invoke('write_bootstrap_document_state', { state })
+    return invokeCommand(
+      'write_bootstrap_document_state',
+      { state },
+      '写入文档状态失败'
+    )
   },
 
   async openMindMapFile(options = {}) {
-    const { open, invoke } = await loadTauriModules()
+    const { open } = await loadTauriModules()
     const selectedPath = await open({
       multiple: false,
       directory: false,
@@ -245,9 +282,13 @@ export const desktopPlatform = {
     if (!selectedPath || Array.isArray(selectedPath)) {
       return null
     }
-    const content = await invoke('read_text_file', {
-      path: selectedPath
-    })
+    const content = await invokeCommand(
+      'read_text_file',
+      {
+        path: selectedPath
+      },
+      '读取思维导图文件失败'
+    )
     return {
       mode: 'desktop',
       path: selectedPath,
@@ -257,7 +298,7 @@ export const desktopPlatform = {
   },
 
   async saveMindMapFileAs({ suggestedName, content, defaultPath }) {
-    const { save, invoke } = await loadTauriModules()
+    const { save } = await loadTauriModules()
     const selectedPath = await save({
       defaultPath: defaultPath || suggestedName,
       filters: [
@@ -268,10 +309,14 @@ export const desktopPlatform = {
       ]
     })
     if (!selectedPath) return null
-    await invoke('write_text_file', {
-      path: selectedPath,
-      content
-    })
+    await invokeCommand(
+      'write_text_file',
+      {
+        path: selectedPath,
+        content
+      },
+      '保存思维导图文件失败'
+    )
     return {
       mode: 'desktop',
       path: selectedPath,
@@ -280,10 +325,13 @@ export const desktopPlatform = {
   },
 
   async readMindMapFile(fileRef) {
-    const { invoke } = await loadTauriModules()
-    const content = await invoke('read_text_file', {
-      path: fileRef.path
-    })
+    const content = await invokeCommand(
+      'read_text_file',
+      {
+        path: fileRef.path
+      },
+      '读取思维导图文件失败'
+    )
     return {
       ...fileRef,
       content
@@ -291,11 +339,14 @@ export const desktopPlatform = {
   },
 
   async writeMindMapFile(fileRef, content) {
-    const { invoke } = await loadTauriModules()
-    await invoke('write_text_file', {
-      path: fileRef.path,
-      content
-    })
+    await invokeCommand(
+      'write_text_file',
+      {
+        path: fileRef.path,
+        content
+      },
+      '写入思维导图文件失败'
+    )
     return fileRef
   },
 
@@ -317,44 +368,59 @@ export const desktopPlatform = {
   },
 
   async listDirectoryEntries(directoryRef) {
-    const { invoke } = await loadTauriModules()
-    return invoke('list_directory_entries', {
-      path: directoryRef.path
-    })
+    return invokeCommand(
+      'list_directory_entries',
+      {
+        path: directoryRef.path
+      },
+      '读取目录内容失败'
+    )
   },
 
   async recordRecentFile(fileRef) {
     if (!fileRef || !fileRef.path) return
-    const { invoke } = await loadTauriModules()
-    return invoke('record_recent_file', {
-      item: {
-        path: fileRef.path,
-        name: fileRef.name || getFileName(fileRef.path),
-        updatedAt: Date.now()
-      }
-    })
+    return invokeCommand(
+      'record_recent_file',
+      {
+        item: {
+          path: fileRef.path,
+          name: fileRef.name || getFileName(fileRef.path),
+          updatedAt: Date.now()
+        }
+      },
+      '记录最近文件失败'
+    )
   },
 
   async openExternalUrl(url) {
-    const { invoke } = await loadTauriModules()
-    return invoke('open_external_url', {
-      url
-    })
+    return invokeCommand(
+      'open_external_url',
+      {
+        url
+      },
+      '打开外部链接失败'
+    )
   },
 
   async startAiProxyRequest({ requestId, request }) {
-    const { invoke } = await loadTauriModules()
-    return invoke('start_ai_proxy_request', {
-      requestId,
-      request
-    })
+    return invokeCommand(
+      'start_ai_proxy_request',
+      {
+        requestId,
+        request
+      },
+      '启动 AI 请求失败'
+    )
   },
 
   async stopAiProxyRequest({ requestId }) {
-    const { invoke } = await loadTauriModules()
-    return invoke('stop_ai_proxy_request', {
-      requestId
-    })
+    return invokeCommand(
+      'stop_ai_proxy_request',
+      {
+        requestId
+      },
+      '停止 AI 请求失败'
+    )
   },
 
   async listen(eventName, handler) {

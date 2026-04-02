@@ -92,7 +92,7 @@ class Command {
       this.commands[name] = []
       delete this.commands[name]
     } else {
-      let index = this.commands[name].find(item => {
+      let index = this.commands[name].findIndex(item => {
         return item === fn
       })
       if (index !== -1) {

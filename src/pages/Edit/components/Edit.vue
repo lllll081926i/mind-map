@@ -6,6 +6,16 @@
     @dragover.stop.prevent
     @drop.stop.prevent
   >
+    <div v-if="initErrorMessage" class="editInitError">
+      <div class="editInitErrorCard">
+        <div class="editInitErrorTitle">{{ $t('edit.tip') }}</div>
+        <div class="editInitErrorMessage">{{ initErrorMessage }}</div>
+        <div class="editInitErrorActions">
+          <el-button @click="$router.push('/home')">返回首页</el-button>
+          <el-button type="primary" @click="retryInit">重试</el-button>
+        </div>
+      </div>
+    </div>
     <div
       class="mindMapContainer"
       id="mindMapContainer"
@@ -40,7 +50,7 @@
       :mindMap="mindMap"
     ></NodeIconSidebar>
     <NodeIconToolbar v-if="mindMap" :mindMap="mindMap"></NodeIconToolbar>
-    <OutlineEdit v-if="mindMap" :mindMap="mindMap"></OutlineEdit>
+    <OutlineEdit v-if="mindMap && isOutlineEdit" :mindMap="mindMap"></OutlineEdit>
     <Scrollbar v-if="isShowScrollbar && mindMap" :mindMap="mindMap"></Scrollbar>
     <FormulaSidebar
       v-if="mindMap && openNodeRichText && richTextPluginReady"
@@ -57,7 +67,7 @@
       :mindMap="mindMap"
     ></NodeNoteSidebar>
     <AiCreate v-if="mindMap && enableAi" :mindMap="mindMap"></AiCreate>
-    <AiChat v-if="enableAi"></AiChat>
+    <AiChat v-if="enableAi && activeSidebar === 'ai'"></AiChat>
     <div
       class="dragMask"
       v-if="showDragMask"
@@ -132,7 +142,9 @@ const NodeNoteSidebar = defineAsyncComponent(() =>
 )
 
 let richTextPluginsPromise = null
-let exportPluginsPromise = null
+let exportBasePluginPromise = null
+let exportPdfPluginPromise = null
+let exportXMindPluginPromise = null
 let scrollbarPluginPromise = null
 let handleClipboardTextPromise = null
 let mindMapRuntimePromise = null
@@ -317,19 +329,31 @@ const loadRichTextPlugins = async () => {
   return richTextPluginsPromise
 }
 
-const loadExportPlugins = async () => {
-  if (!exportPluginsPromise) {
-    exportPluginsPromise = Promise.all([
-      import('simple-mind-map/src/plugins/ExportPDF.js'),
-      import('simple-mind-map/src/plugins/ExportXMind.js'),
-      import('simple-mind-map/src/plugins/Export.js')
-    ]).then(([exportPdfModule, exportXMindModule, exportModule]) => ({
-      ExportPDF: exportPdfModule.default,
-      ExportXMind: exportXMindModule.default,
-      Export: exportModule.default
-    }))
+const loadExportBasePlugin = async () => {
+  if (!exportBasePluginPromise) {
+    exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js').then(
+      module => module.default
+    )
   }
-  return exportPluginsPromise
+  return exportBasePluginPromise
+}
+
+const loadExportPdfPlugin = async () => {
+  if (!exportPdfPluginPromise) {
+    exportPdfPluginPromise = import(
+      'simple-mind-map/src/plugins/ExportPDF.js'
+    ).then(module => module.default)
+  }
+  return exportPdfPluginPromise
+}
+
+const loadExportXMindPlugin = async () => {
+  if (!exportXMindPluginPromise) {
+    exportXMindPluginPromise = import(
+      'simple-mind-map/src/plugins/ExportXMind.js'
+    ).then(module => module.default)
+  }
+  return exportXMindPluginPromise
 }
 
 export default {
@@ -371,14 +395,22 @@ export default {
       mindMapConfig: {},
       prevImg: '',
       storeConfigTimer: null,
+      resizeFrame: 0,
       showDragMask: false,
       onDataChange: null,
       onViewDataChange: null,
       richTextPluginReady: false,
       richTextPluginLoadingPromise: null,
+      exportPluginState: {
+        base: false,
+        pdf: false,
+        xmind: false
+      },
       mindMapEventForwarders: {},
       extendedIconList: [],
-      extendedIconLoaded: false
+      extendedIconLoaded: false,
+      initErrorMessage: '',
+      editorEventsBound: false
     }
   },
   computed: {
@@ -475,6 +507,43 @@ export default {
       await ensureBootstrapDocumentState()
       this.getData()
       await this.init()
+      this.bindEditorEvents()
+    } catch (error) {
+      this.handleInitError(error)
+    }
+  },
+  beforeUnmount() {
+    this.unbindEditorEvents()
+    if (this.onDataChange) {
+      this.$bus.$off('data_change', this.onDataChange)
+    }
+    if (this.onViewDataChange) {
+      this.$bus.$off('view_data_change', this.onViewDataChange)
+    }
+    this.clearResizeFrame()
+    clearTimeout(this.storeConfigTimer)
+    clearCurrentDataGetter()
+    this.unbindMindMapEvents()
+  },
+  unmounted() {
+    if (this.mindMap && typeof this.mindMap.destroy === 'function') {
+      this.mindMap.destroy()
+    }
+    this.mindMap = null
+    richTextPluginsPromise = null
+    exportBasePluginPromise = null
+    exportPdfPluginPromise = null
+    exportXMindPluginPromise = null
+    scrollbarPluginPromise = null
+    handleClipboardTextPromise = null
+    mindMapRuntimePromise = null
+    extendedIconListPromise = null
+  },
+  methods: {
+    bindEditorEvents() {
+      if (this.editorEventsBound) {
+        return
+      }
       this.$bus.$on('execCommand', this.execCommand)
       this.$bus.$on('paddingChange', this.onPaddingChange)
       this.$bus.$on('export', this.export)
@@ -489,40 +558,53 @@ export default {
       this.$bus.$on('node_tree_render_end', this.handleHideLoading)
       this.removeShowLoadingListener = onShowLoading(this.handleShowLoading)
       window.addEventListener('resize', this.handleResize)
-    } catch (error) {
+      this.editorEventsBound = true
+    },
+
+    unbindEditorEvents() {
+      if (!this.editorEventsBound) {
+        return
+      }
+      this.$bus.$off('execCommand', this.execCommand)
+      this.$bus.$off('paddingChange', this.onPaddingChange)
+      this.$bus.$off('export', this.export)
+      this.$bus.$off('setData', this.setData)
+      this.$bus.$off('startTextEdit', this.handleStartTextEdit)
+      this.$bus.$off('endTextEdit', this.handleEndTextEdit)
+      this.$bus.$off('createAssociativeLine', this.handleCreateLineFromActiveNode)
+      this.$bus.$off('startPainter', this.handleStartPainter)
+      this.$bus.$off('node_tree_render_end', this.handleHideLoading)
+      this.removeShowLoadingListener && this.removeShowLoadingListener()
+      this.removeShowLoadingListener = null
+      window.removeEventListener('resize', this.handleResize)
+      this.editorEventsBound = false
+    },
+
+    handleInitError(error) {
       console.error('Edit view init failed', error)
+      this.initErrorMessage =
+        error?.message || '编辑器初始化失败，请检查当前文档后重试'
       hideLoading()
-    }
-  },
-  beforeUnmount() {
-    this.$bus.$off('execCommand', this.execCommand)
-    this.$bus.$off('paddingChange', this.onPaddingChange)
-    this.$bus.$off('export', this.export)
-    this.$bus.$off('setData', this.setData)
-    this.$bus.$off('startTextEdit', this.handleStartTextEdit)
-    this.$bus.$off('endTextEdit', this.handleEndTextEdit)
-    this.$bus.$off('createAssociativeLine', this.handleCreateLineFromActiveNode)
-    this.$bus.$off('startPainter', this.handleStartPainter)
-    this.$bus.$off('node_tree_render_end', this.handleHideLoading)
-    this.removeShowLoadingListener && this.removeShowLoadingListener()
-    window.removeEventListener('resize', this.handleResize)
-    if (this.onDataChange) {
-      this.$bus.$off('data_change', this.onDataChange)
-    }
-    if (this.onViewDataChange) {
-      this.$bus.$off('view_data_change', this.onViewDataChange)
-    }
-    clearTimeout(this.storeConfigTimer)
-    clearCurrentDataGetter()
-    this.unbindMindMapEvents()
-  },
-  unmounted() {
-    if (this.mindMap && typeof this.mindMap.destroy === 'function') {
-      this.mindMap.destroy()
-    }
-    this.mindMap = null
-  },
-  methods: {
+    },
+
+    async retryInit() {
+      showLoading()
+      this.initErrorMessage = ''
+      try {
+        this.enableShowLoading = true
+        this.unbindMindMapEvents()
+        if (this.mindMap && typeof this.mindMap.destroy === 'function') {
+          this.mindMap.destroy()
+        }
+        this.mindMap = null
+        this.getData()
+        await this.init()
+        this.bindEditorEvents()
+      } catch (error) {
+        this.handleInitError(error)
+      }
+    },
+
     handleStartTextEdit() {
       if (!this.mindMap?.renderer) return
       if (!this.openNodeRichText) {
@@ -555,7 +637,25 @@ export default {
     },
 
     handleResize() {
-      this.mindMap?.resize()
+      this.scheduleResize()
+    },
+
+    clearResizeFrame() {
+      if (!this.resizeFrame) {
+        return
+      }
+      cancelAnimationFrame(this.resizeFrame)
+      this.resizeFrame = 0
+    },
+
+    scheduleResize() {
+      if (!this.mindMap || this.resizeFrame) {
+        return
+      }
+      this.resizeFrame = requestAnimationFrame(() => {
+        this.resizeFrame = 0
+        this.mindMap?.resize()
+      })
     },
 
     // 显示loading
@@ -637,6 +737,36 @@ export default {
         return domEl
       }
       return null
+    },
+
+    getMindMapContainerReadyState() {
+      const containerEl = this.resolveMindMapContainerEl()
+      if (!containerEl) {
+        return null
+      }
+      const rect = containerEl.getBoundingClientRect()
+      if (!rect.width || !rect.height) {
+        return null
+      }
+      return {
+        containerEl,
+        rect
+      }
+    },
+
+    async waitForMindMapContainerReady(maxAttempts = 36) {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await this.$nextTick()
+        await new Promise(resolve => requestAnimationFrame(resolve))
+        const readyState = this.getMindMapContainerReadyState()
+        if (readyState) {
+          return readyState.containerEl
+        }
+      }
+      if (!this.resolveMindMapContainerEl()) {
+        throw new Error('mindMapContainer element unavailable')
+      }
+      throw new Error('mindMapContainer size is not ready')
     },
 
     createMindMapOptions({
@@ -768,7 +898,7 @@ export default {
       if (!this.mindMap) return
       const rawExport = this.mindMap.export.bind(this.mindMap)
       this.mindMap.export = async (...args) => {
-        await this.ensureExportPluginsLoaded()
+        await this.ensureExportPluginsLoaded(args[0])
         return rawExport(...args)
       }
     },
@@ -841,10 +971,7 @@ export default {
       if (hasExtendedNodeIcons(initialData)) {
         await this.ensureExtendedIconListLoaded(true)
       }
-      const containerEl = this.resolveMindMapContainerEl()
-      if (!containerEl) {
-        throw new Error('mindMapContainer element unavailable')
-      }
+      const containerEl = await this.waitForMindMapContainerReady()
       this.mindMap = new MindMap(
         this.createMindMapOptions({
           containerEl,
@@ -869,17 +996,24 @@ export default {
       this.registerCurrentDataGetter()
     },
 
-    async ensureExportPluginsLoaded() {
+    async ensureExportPluginsLoaded(exportType = 'smm') {
       if (!this.mindMap) return null
-      const { ExportPDF, ExportXMind, Export } = await loadExportPlugins()
-      this.mindMap.addPlugin(ExportPDF)
-      this.mindMap.addPlugin(ExportXMind)
-      this.mindMap.addPlugin(Export)
-      return {
-        ExportPDF,
-        ExportXMind,
-        Export
+      if (!this.exportPluginState.base) {
+        const ExportPlugin = await loadExportBasePlugin()
+        this.mindMap.addPlugin(ExportPlugin)
+        this.exportPluginState.base = true
       }
+      if (exportType === 'pdf' && !this.exportPluginState.pdf) {
+        const ExportPdfPlugin = await loadExportPdfPlugin()
+        this.mindMap.addPlugin(ExportPdfPlugin)
+        this.exportPluginState.pdf = true
+      }
+      if (exportType === 'xmind' && !this.exportPluginState.xmind) {
+        const ExportXMindPlugin = await loadExportXMindPlugin()
+        this.mindMap.addPlugin(ExportXMindPlugin)
+        this.exportPluginState.xmind = true
+      }
+      return this.exportPluginState
     },
 
     async ensureRichTextPluginsLoaded() {
@@ -1055,6 +1189,46 @@ export default {
   right: 0;
   top: 0;
   bottom: 0;
+
+  .editInitError {
+    position: absolute;
+    inset: 0;
+    z-index: 4001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .editInitErrorCard {
+    width: min(460px, 100%);
+    padding: 24px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 16px 48px rgba(15, 23, 42, 0.12);
+  }
+
+  .editInitErrorTitle {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .editInitErrorMessage {
+    margin-top: 10px;
+    color: rgba(31, 41, 55, 0.72);
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  .editInitErrorActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 18px;
+  }
 
   .dragMask {
     position: absolute;

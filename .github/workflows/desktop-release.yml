@@ -10,6 +10,10 @@ on:
         description: Existing release tag to rebuild, for example v0.2.3
         required: false
         type: string
+      build_ref:
+        description: Git ref to build from, for example main or a commit SHA
+        required: false
+        type: string
 
 concurrency:
   group: desktop-release-${{ inputs.tag_name != '' && inputs.tag_name || github.ref }}
@@ -32,7 +36,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name != '' && format('refs/tags/{0}', inputs.tag_name) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ref != '' && inputs.build_ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -40,6 +44,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
+
+      - name: Show build context
+        shell: bash
+        run: |
+          echo "event=${{ github.event_name }}"
+          echo "github.ref=${{ github.ref }}"
+          echo "github.sha=${{ github.sha }}"
+          echo "inputs.tag_name=${{ inputs.tag_name || '' }}"
+          echo "inputs.build_ref=${{ inputs.build_ref || '' }}"
+          echo "checked_out_commit=$(git rev-parse HEAD)"
+          echo "package_version=$(node -p \"require('./package.json').version\")"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -57,6 +72,25 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Verify release tag matches package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED_TAG="v${PACKAGE_VERSION}"
+          RELEASE_TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_type == 'tag' && github.ref_name || '' }}"
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "No release tag requested for this run."
+            exit 0
+          fi
+
+          if [ "$RELEASE_TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Release tag $RELEASE_TAG does not match package.json version $EXPECTED_TAG"
+            exit 1
+          fi
+
+          echo "Release tag check passed: $RELEASE_TAG"
 
       - name: Build frontend app
         run: npm run frontend:build
@@ -214,7 +248,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name != '' && format('refs/tags/{0}', inputs.tag_name) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ref != '' && inputs.build_ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -222,6 +256,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
+
+      - name: Show build context
+        shell: bash
+        run: |
+          echo "matrix.label=${{ matrix.label }}"
+          echo "github.ref=${{ github.ref }}"
+          echo "github.sha=${{ github.sha }}"
+          echo "inputs.tag_name=${{ inputs.tag_name || '' }}"
+          echo "inputs.build_ref=${{ inputs.build_ref || '' }}"
+          echo "checked_out_commit=$(git rev-parse HEAD)"
+          echo "package_version=$(node -p \"require('./package.json').version\")"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

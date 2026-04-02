@@ -15,6 +15,13 @@ class BrowserAiTransport {
   constructor(options = {}) {
     this.options = options
     this.controller = null
+    this.timeoutTimer = null
+  }
+
+  clearTimeoutTimer() {
+    if (!this.timeoutTimer) return
+    clearTimeout(this.timeoutTimer)
+    this.timeoutTimer = null
   }
 
   async request({
@@ -26,54 +33,61 @@ class BrowserAiTransport {
     end = () => {}
   }) {
     this.controller = new AbortController()
-    const res = await fetch(`http://localhost:${this.options.port}/ai/chat`, {
-      signal: this.controller.signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(request)
-    })
-    if (!res.ok) {
-      let message = '请求失败'
-      const contentType = res.headers.get('content-type') || ''
-      if (contentType.includes('application/json')) {
-        const errorData = await res.json()
-        message =
-          errorData.msg ||
-          errorData.message ||
-          errorData.error?.message ||
-          message
-      } else {
-        const errorText = await res.text()
-        if (errorText) {
-          message = errorText
+    this.timeoutTimer = setTimeout(() => {
+      this.controller.abort()
+    }, this.options.timeout || 300000)
+    try {
+      const res = await fetch(`http://localhost:${this.options.port}/ai/chat`, {
+        signal: this.controller.signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      })
+      if (!res.ok) {
+        let message = '请求失败'
+        const contentType = res.headers.get('content-type') || ''
+        if (contentType.includes('application/json')) {
+          const errorData = await res.json()
+          message =
+            errorData.msg ||
+            errorData.message ||
+            errorData.error?.message ||
+            message
+        } else {
+          const errorText = await res.text()
+          if (errorText) {
+            message = errorText
+          }
+        }
+        const error = new Error(message)
+        error.status = res.status
+        throw error
+      }
+      if (!res.body) {
+        throw new Error('响应体为空')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let reading = true
+      while (reading) {
+        const { done, value } = await reader.read()
+        if (done) {
+          flushPendingChunk(progress)
+          end(getContent())
+          return
+        }
+        const text = decoder.decode(value, { stream: true })
+        const isEnd = handleChunkData(text, progress)
+        if (isEnd) {
+          end(getContent())
+          return
         }
       }
-      const error = new Error(message)
-      error.status = res.status
-      throw error
-    }
-    if (!res.body) {
-      throw new Error('响应体为空')
-    }
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let reading = true
-    while (reading) {
-      const { done, value } = await reader.read()
-      if (done) {
-        flushPendingChunk(progress)
-        end(getContent())
-        return
-      }
-      const text = decoder.decode(value, { stream: true })
-      const isEnd = handleChunkData(text, progress)
-      if (isEnd) {
-        end(getContent())
-        return
-      }
+    } finally {
+      this.clearTimeoutTimer()
     }
   }
 
@@ -84,6 +98,7 @@ class BrowserAiTransport {
   }
 
   cleanup() {
+    this.clearTimeoutTimer()
     this.controller = null
   }
 }

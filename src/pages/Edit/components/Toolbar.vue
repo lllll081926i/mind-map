@@ -697,7 +697,7 @@ export default {
             return
           }
           this.rootDirName = directoryRef.name
-          setLastDirectory(directoryRef.path || '')
+          await setLastDirectory(directoryRef.path || '')
         } else {
           directoryRef = node.data
         }

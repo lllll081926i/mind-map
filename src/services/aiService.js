@@ -6,6 +6,8 @@ import {
   validateAiConfig
 } from '@/utils/aiProviders.mjs'
 
+const AI_HEALTHCHECK_TIMEOUT_MS = 5000
+
 const createAiError = (message, code = 'AI_ERROR', status) => {
   const error = new Error(message)
   error.code = code
@@ -13,6 +15,27 @@ const createAiError = (message, code = 'AI_ERROR', status) => {
     error.status = status
   }
   return error
+}
+
+const fetchWithTimeout = async (
+  fetcher,
+  url,
+  options = {},
+  timeoutMs = AI_HEALTHCHECK_TIMEOUT_MS
+) => {
+  const controller =
+    typeof AbortController === 'function' ? new AbortController() : null
+  const timer = setTimeout(() => {
+    controller?.abort()
+  }, timeoutMs)
+  try {
+    return await fetcher(url, {
+      ...options,
+      signal: controller?.signal
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export const normalizeAiMessages = messageList => {
@@ -80,11 +103,13 @@ export const checkAiAvailability = async ({
     return validation.config
   }
   try {
-    const response = await fetcher(
+    const response = await fetchWithTimeout(
+      fetcher,
       `http://localhost:${validation.config.port}/ai/test`,
       {
         method: 'GET'
-      }
+      },
+      AI_HEALTHCHECK_TIMEOUT_MS
     )
     if (!response || !response.ok) {
       throw createAiError(

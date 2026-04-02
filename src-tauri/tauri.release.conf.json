@@ -1,5 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://github.com https://api.github.com https://objects.githubusercontent.com https://*.githubusercontent.com; frame-src 'none'; object-src 'none'; media-src 'self'"
+    }
+  },
   "bundle": {
     "createUpdaterArtifacts": true
   }

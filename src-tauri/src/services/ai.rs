@@ -6,6 +6,12 @@ use tokio::sync::Mutex;
 
 const DEFAULT_TIMEOUT: u64 = 300_000;
 const MAX_TIMEOUT: u64 = 600_000;
+const MAX_API_LENGTH: usize = 2048;
+const MAX_HEADER_COUNT: usize = 8;
+const MAX_HEADER_VALUE_LENGTH: usize = 2048;
+const MAX_MODEL_LENGTH: usize = 256;
+const MAX_MESSAGE_COUNT: usize = 64;
+const MAX_MESSAGE_LENGTH: usize = 32_000;
 const ALLOWED_AI_DOMAINS: &[&str] = &[
   "api.openai.com",
   "ark.cn-beijing.volces.com",
@@ -41,6 +47,95 @@ struct AiEventPayload {
   chunk: Option<String>,
   message: Option<String>,
   status: Option<u16>,
+}
+
+fn validate_proxy_request(request: &AiProxyRequest) -> Result<(), String> {
+  if request.api.trim().is_empty() || request.api.len() > MAX_API_LENGTH {
+    return Err("AI 接口地址无效".into());
+  }
+  if let Some(timeout) = request.timeout {
+    if timeout == 0 {
+      return Err("AI 请求超时配置无效".into());
+    }
+  }
+  if let Some(headers) = request.headers.as_ref() {
+    if headers.len() > MAX_HEADER_COUNT {
+      return Err("AI 请求头数量过多".into());
+    }
+    for (key, value) in headers {
+      if key.trim().is_empty() || key.contains(['\r', '\n']) {
+        return Err("AI 请求头无效".into());
+      }
+      if value.len() > MAX_HEADER_VALUE_LENGTH {
+        return Err("AI 请求头过长".into());
+      }
+    }
+  }
+  validate_proxy_request_data(&request.data)
+}
+
+fn validate_proxy_request_data(data: &serde_json::Value) -> Result<(), String> {
+  let object = data
+    .as_object()
+    .ok_or_else(|| "AI 请求体必须是对象".to_string())?;
+  for key in object.keys() {
+    match key.as_str() {
+      "model"
+      | "stream"
+      | "messages"
+      | "temperature"
+      | "max_tokens"
+      | "top_p"
+      | "presence_penalty"
+      | "frequency_penalty"
+      | "stop" => {}
+      _ => return Err("AI 请求体包含不支持的字段".into()),
+    }
+  }
+  let model = object
+    .get("model")
+    .and_then(|value| value.as_str())
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+    .ok_or_else(|| "AI 模型配置无效".to_string())?;
+  if model.len() > MAX_MODEL_LENGTH {
+    return Err("AI 模型名称过长".into());
+  }
+  let stream = object
+    .get("stream")
+    .and_then(|value| value.as_bool())
+    .ok_or_else(|| "AI 流式参数无效".to_string())?;
+  if !stream {
+    return Err("仅支持流式 AI 请求".into());
+  }
+  let messages = object
+    .get("messages")
+    .and_then(|value| value.as_array())
+    .ok_or_else(|| "AI 消息列表无效".to_string())?;
+  if messages.is_empty() || messages.len() > MAX_MESSAGE_COUNT {
+    return Err("AI 消息数量超出限制".into());
+  }
+  for message in messages {
+    let item = message
+      .as_object()
+      .ok_or_else(|| "AI 消息项无效".to_string())?;
+    let role = item
+      .get("role")
+      .and_then(|value| value.as_str())
+      .unwrap_or("");
+    if !matches!(role, "system" | "user" | "assistant" | "tool") {
+      return Err("AI 消息角色无效".into());
+    }
+    let content = item
+      .get("content")
+      .and_then(|value| value.as_str())
+      .map(str::trim)
+      .ok_or_else(|| "AI 消息内容无效".to_string())?;
+    if content.is_empty() || content.len() > MAX_MESSAGE_LENGTH {
+      return Err("AI 消息内容超出限制".into());
+    }
+  }
+  Ok(())
 }
 
 fn build_error_payload(request_id: &str, message: String, status: Option<u16>) -> AiEventPayload {
@@ -111,6 +206,7 @@ pub async fn start_proxy_request(
   request_id: String,
   request: AiProxyRequest,
 ) -> Result<(), String> {
+  validate_proxy_request(&request)?;
   stop_proxy_request(registry, &request_id).await?;
 
   let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -273,5 +369,48 @@ mod tests {
     );
 
     assert_eq!(message, "invalid api key");
+  }
+
+  #[test]
+  fn should_reject_invalid_ai_request_payload() {
+    let request = AiProxyRequest {
+      api: "https://api.openai.com/v1/chat/completions".into(),
+      method: Some("POST".into()),
+      headers: None,
+      data: serde_json::json!({
+        "model": "",
+        "stream": true,
+        "messages": []
+      }),
+      timeout: Some(1000),
+    };
+
+    let error = validate_proxy_request(&request).expect_err("request should be invalid");
+    assert!(!error.is_empty());
+  }
+
+  #[test]
+  fn should_accept_valid_openai_compatible_request_payload() {
+    let request = AiProxyRequest {
+      api: "https://api.openai.com/v1/chat/completions".into(),
+      method: Some("POST".into()),
+      headers: Some(HashMap::from([(
+        "Authorization".into(),
+        "Bearer test".into(),
+      )])),
+      data: serde_json::json!({
+        "model": "gpt-4.1",
+        "stream": true,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ]
+      }),
+      timeout: Some(1000),
+    };
+
+    assert!(validate_proxy_request(&request).is_ok());
   }
 }

@@ -134,9 +134,7 @@ fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     .path()
     .app_data_dir()
     .map_err(|error| error.to_string())?;
-  tokio::task::block_in_place(|| {
-    std::fs::create_dir_all(&path)
-  }).map_err(|error| error.to_string())?;
+  std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
   Ok(path)
 }
 

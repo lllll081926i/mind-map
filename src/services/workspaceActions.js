@@ -27,6 +27,14 @@ import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/run
 export const createWorkspaceTemplateData = (title = '思维导图') =>
   createDefaultMindMapData(title)
 
+const getDirectoryPath = filePath => {
+  const value = String(filePath || '').trim()
+  if (!value) return ''
+  const parts = value.split(/[\\/]/)
+  parts.pop()
+  return parts.join('/')
+}
+
 export const normalizeWorkspaceMindMapData = data => {
   if (data && typeof data === 'object' && data.root) {
     return data
@@ -59,7 +67,7 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   storeData(normalizedData)
   setIsHandleLocalFile(true)
   markDocumentDirty(false)
-  await setWorkspaceLastDirectory(recentProjectRef.path || '')
+  await setWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || ''))
   await recordRecentFile(recentProjectRef)
   syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
   await enterEditor(router)
@@ -127,7 +135,7 @@ export const createWorkspaceLocalFile = async ({
       defaultPath: getLastDirectory()
     })
     if (!fileRef) return null
-    await setWorkspaceLastDirectory(fileRef.path || '')
+    await setWorkspaceLastDirectory(getDirectoryPath(fileRef.path || ''))
     return hydrateWorkspaceFileSession(fileRef, serialized, router)
   } catch (error) {
     throw createDesktopFsError(error)

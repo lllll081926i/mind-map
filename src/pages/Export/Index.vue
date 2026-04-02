@@ -204,6 +204,7 @@ import { getCurrentFileRef } from '@/services/documentSession'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
+import { sanitizeFileName } from '@/utils'
 import {
   createExportStateFromFileRef,
   getDesktopExportFormats,
@@ -213,7 +214,9 @@ import {
 } from '@/services/exportState'
 import defaultNodeImage from '@/assets/img/图片加载失败.svg'
 
-let exportPluginsPromise = null
+let exportBasePluginPromise = null
+let exportPdfPluginPromise = null
+let exportXMindPluginPromise = null
 let richTextPluginsPromise = null
 let mindMapRuntimePromise = null
 let extendedIconListPromise = null
@@ -319,19 +322,31 @@ const loadMindMapRuntime = async () => {
   return mindMapRuntimePromise
 }
 
-const loadExportPlugins = async () => {
-  if (!exportPluginsPromise) {
-    exportPluginsPromise = Promise.all([
-      import('simple-mind-map/src/plugins/ExportPDF.js'),
-      import('simple-mind-map/src/plugins/ExportXMind.js'),
-      import('simple-mind-map/src/plugins/Export.js')
-    ]).then(([exportPdfModule, exportXMindModule, exportModule]) => ({
-      ExportPDF: exportPdfModule.default,
-      ExportXMind: exportXMindModule.default,
-      Export: exportModule.default
-    }))
+const loadExportBasePlugin = async () => {
+  if (!exportBasePluginPromise) {
+    exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js').then(
+      module => module.default
+    )
   }
-  return exportPluginsPromise
+  return exportBasePluginPromise
+}
+
+const loadExportPdfPlugin = async () => {
+  if (!exportPdfPluginPromise) {
+    exportPdfPluginPromise = import(
+      'simple-mind-map/src/plugins/ExportPDF.js'
+    ).then(module => module.default)
+  }
+  return exportPdfPluginPromise
+}
+
+const loadExportXMindPlugin = async () => {
+  if (!exportXMindPluginPromise) {
+    exportXMindPluginPromise = import(
+      'simple-mind-map/src/plugins/ExportXMind.js'
+    ).then(module => module.default)
+  }
+  return exportXMindPluginPromise
 }
 
 const loadRichTextPlugins = async () => {
@@ -359,13 +374,18 @@ export default {
       previewLoading: true,
       exporting: false,
       mindMap: null,
-      exportPluginsInstalled: false,
+      exportPluginState: {
+        base: false,
+        pdf: false,
+        xmind: false
+      },
       extendedIconList: [],
       exportContext,
       exportState: createExportStateFromFileRef(exportContext.fileRef),
       exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat],
       boundExportKeydown: null,
-      boundPreviewResize: null
+      boundPreviewResize: null,
+      previewResizeFrame: 0
     }
   },
   computed: {
@@ -443,11 +463,50 @@ export default {
   beforeUnmount() {
     this.unbindExportKeydown()
     this.unbindPreviewResize()
+    this.clearPreviewResizeFrame()
     if (this.mindMap) {
       this.mindMap.destroy()
+      this.mindMap = null
     }
+    this.extendedIconList = []
+    exportBasePluginPromise = null
+    exportPdfPluginPromise = null
+    exportXMindPluginPromise = null
+    richTextPluginsPromise = null
+    mindMapRuntimePromise = null
+    extendedIconListPromise = null
   },
   methods: {
+    getPreviewContainerRect() {
+      const previewEl = this.$refs.previewRef
+      if (!previewEl || typeof previewEl.getBoundingClientRect !== 'function') {
+        return null
+      }
+      const rect = previewEl.getBoundingClientRect()
+      if (!rect.width || !rect.height) {
+        return null
+      }
+      return {
+        el: previewEl,
+        rect
+      }
+    },
+
+    async waitForPreviewContainerReady(maxAttempts = 24) {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await this.$nextTick()
+        await new Promise(resolve => requestAnimationFrame(resolve))
+        const result = this.getPreviewContainerRect()
+        if (result) {
+          return result.el
+        }
+      }
+      if (!this.$refs.previewRef) {
+        throw new Error(this.$t('exportPage.previewContainerMissing'))
+      }
+      throw new Error('导出预览容器尺寸尚未就绪')
+    },
+
     onMaskClick() {
       if (this.exporting) {
         return
@@ -505,20 +564,34 @@ export default {
       this.boundPreviewResize = null
     },
 
-    syncPreviewViewport() {
-      if (!this.mindMap) {
+    clearPreviewResizeFrame() {
+      if (!this.previewResizeFrame) {
         return
       }
-      this.$nextTick(() => {
-        if (!this.mindMap) {
-          return
-        }
-        if (typeof this.mindMap.emit === 'function') {
-          this.mindMap.emit('resize')
-        }
-        if (this.mindMap.view && typeof this.mindMap.view.fit === 'function') {
-          this.mindMap.view.fit()
-        }
+      cancelAnimationFrame(this.previewResizeFrame)
+      this.previewResizeFrame = 0
+    },
+
+    syncPreviewViewport() {
+      if (!this.mindMap || this.previewResizeFrame) {
+        return
+      }
+      this.previewResizeFrame = requestAnimationFrame(() => {
+        this.previewResizeFrame = 0
+        this.$nextTick(() => {
+          if (!this.mindMap) {
+            return
+          }
+          if (typeof this.mindMap.emit === 'function') {
+            this.mindMap.emit('resize')
+          }
+          if (
+            this.mindMap.view &&
+            typeof this.mindMap.view.fit === 'function'
+          ) {
+            this.mindMap.view.fit()
+          }
+        })
       })
     },
 
@@ -561,9 +634,10 @@ export default {
     async initPreview() {
       this.previewLoading = true
       try {
-        await this.$nextTick()
-        if (!this.$refs.previewRef) {
-          throw new Error(this.$t('exportPage.previewContainerMissing'))
+        const previewEl = await this.waitForPreviewContainerReady()
+        if (this.mindMap) {
+          this.mindMap.destroy()
+          this.mindMap = null
         }
         const { MindMap } = await loadMindMapRuntime()
         const fullData = normalizeMindMapData(getData())
@@ -574,7 +648,7 @@ export default {
         const config = getConfig() || {}
         const fallbackData = createFallbackData()
         this.mindMap = new MindMap({
-          el: this.$refs.previewRef,
+          el: previewEl,
           data: root,
           fit: true,
           layout,
@@ -601,29 +675,40 @@ export default {
       }
     },
 
-    async ensureExportPluginsInstalled() {
-      if (!this.mindMap || this.exportPluginsInstalled) return
-      const { ExportPDF, ExportXMind, Export } = await loadExportPlugins()
-      this.mindMap.addPlugin(ExportPDF)
-      this.mindMap.addPlugin(ExportXMind)
-      this.mindMap.addPlugin(Export)
-      this.exportPluginsInstalled = true
+    async ensureExportPluginsInstalled(exportType) {
+      if (!this.mindMap) return
+      if (!this.exportPluginState.base) {
+        const ExportPlugin = await loadExportBasePlugin()
+        this.mindMap.addPlugin(ExportPlugin)
+        this.exportPluginState.base = true
+      }
+      if (exportType === 'pdf' && !this.exportPluginState.pdf) {
+        const ExportPdfPlugin = await loadExportPdfPlugin()
+        this.mindMap.addPlugin(ExportPdfPlugin)
+        this.exportPluginState.pdf = true
+      }
+      if (exportType === 'xmind' && !this.exportPluginState.xmind) {
+        const ExportXMindPlugin = await loadExportXMindPlugin()
+        this.mindMap.addPlugin(ExportXMindPlugin)
+        this.exportPluginState.xmind = true
+      }
     },
 
     async handleExport() {
       if (!this.mindMap || this.isDisabledFormat || this.exporting) {
         return
       }
-      const safeFileName =
-        String(this.exportState.fileName || '').trim() ||
+      const safeFileName = sanitizeFileName(
+        this.exportState.fileName,
         this.$t('exportPage.fallbackFileName')
+      )
       const resolvedType =
         this.exportState.exportType === 'png'
           ? this.exportState.imageFormat
           : getResolvedExportType(this.exportState.exportType)
       this.exporting = true
       try {
-        await this.ensureExportPluginsInstalled()
+        await this.ensureExportPluginsInstalled(resolvedType)
         this.mindMap.updateConfig({
           exportPaddingX: Number(this.exportState.paddingX) || 0,
           exportPaddingY: Number(this.exportState.paddingY) || 0

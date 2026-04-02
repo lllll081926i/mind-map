@@ -101,13 +101,17 @@ class View {
         }
         switch (true) {
           // 鼠标滚轮，向上和向左，都是缩小
-          case dirs.includes(CONSTANTS.DIR.UP || CONSTANTS.DIR.LEFT):
+          case [CONSTANTS.DIR.UP, CONSTANTS.DIR.LEFT].some(dir =>
+            dirs.includes(dir)
+          ):
             mousewheelZoomActionReverse
               ? this.enlarge(cx, cy, isTouchPad)
               : this.narrow(cx, cy, isTouchPad)
             break
           // 鼠标滚轮，向下和向右，都是放大
-          case dirs.includes(CONSTANTS.DIR.DOWN || CONSTANTS.DIR.RIGHT):
+          case [CONSTANTS.DIR.DOWN, CONSTANTS.DIR.RIGHT].some(dir =>
+            dirs.includes(dir)
+          ):
             mousewheelZoomActionReverse
               ? this.narrow(cx, cy, isTouchPad)
               : this.enlarge(cx, cy, isTouchPad)

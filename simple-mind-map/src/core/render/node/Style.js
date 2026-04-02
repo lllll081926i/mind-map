@@ -26,12 +26,13 @@ class Style {
   static setBackgroundStyle(el, themeConfig) {
     if (!el) return
     // 缓存容器元素原本的样式
-    if (!Style.cacheStyle) {
-      Style.cacheStyle = {}
+    if (!Style.cacheStyle.get(el)) {
+      const cachedStyle = {}
       let style = window.getComputedStyle(el)
       backgroundStyleProps.forEach(prop => {
-        Style.cacheStyle[prop] = style[prop]
+        cachedStyle[prop] = style[prop]
       })
+      Style.cacheStyle.set(el, cachedStyle)
     }
     // 设置新样式
     let {
@@ -54,11 +55,13 @@ class Style {
 
   // 移除背景样式
   static removeBackgroundStyle(el) {
-    if (!Style.cacheStyle) return
+    if (!el) return
+    const cachedStyle = Style.cacheStyle.get(el)
+    if (!cachedStyle) return
     backgroundStyleProps.forEach(prop => {
-      el.style[prop] = Style.cacheStyle[prop]
+      el.style[prop] = cachedStyle[prop]
     })
-    Style.cacheStyle = null
+    Style.cacheStyle.delete(el)
   }
 
   //  构造函数
@@ -367,6 +370,6 @@ class Style {
   }
 }
 
-Style.cacheStyle = null
+Style.cacheStyle = new WeakMap()
 
 export default Style
