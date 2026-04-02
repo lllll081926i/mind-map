@@ -19,6 +19,7 @@
     "prepare": "husky",
     "test:update": "node --test tests/update-service-core.test.mjs",
     "test:desktop-runtime": "node --test tests/platform-runtime.test.mjs",
+    "test:desktop-flow": "node --test tests/desktop-file-flow.test.mjs tests/desktop-export-flow.test.mjs",
     "frontend:dev": "vite",
     "build": "npm run desktop:build",
     "frontend:build": "vite build --mode desktop",

@@ -288,18 +288,18 @@ import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import { parseExternalJsonSafely } from '@/utils'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
-  getCurrentFileRef,
-  getLastDirectory,
   getRecentFiles,
   isDesktopApp,
-  markDocumentDirty,
-  recordRecentFile,
-  setLastDirectory
+  recordRecentFile
 } from '@/platform'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import {
   createDesktopFsError,
+  getCurrentFileRef,
+  getLastDirectory,
+  markDocumentDirty,
   setCurrentFileRef,
+  setLastDirectory,
   updateCurrentFileRef
 } from '@/services/documentSession'
 import {
@@ -311,11 +311,8 @@ import {
   emitShowNodeTag,
   onWriteLocalFile
 } from '@/services/appEvents'
-import {
-  setIsHandleLocalFile,
-  setRecentFiles,
-  syncEditorFileSession
-} from '@/stores/runtime'
+import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
+import { getWorkspaceMetaState } from '@/services/workspaceState'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
@@ -572,7 +569,7 @@ export default {
 
     refreshRecentFiles() {
       this.recentFiles = this.isDesktopRuntime ? getRecentFiles() : []
-      setRecentFiles(this.recentFiles)
+      syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
     },
 
     // 计算工具按钮如何显示
@@ -730,7 +727,7 @@ export default {
     editLocalFile(data) {
       if (!data || data.mode !== 'desktop') return
       setCurrentFileRef(data, data.mode)
-      syncEditorFileSession(data)
+      syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
       this.readFile()
     },
 
@@ -757,7 +754,7 @@ export default {
     openRecentFile(item) {
       if (!item || !item.path) return
       setCurrentFileRef(item, item.mode || 'desktop')
-      syncEditorFileSession(item)
+      syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
       this.readFile()
     },
 
@@ -771,7 +768,7 @@ export default {
           return
         }
         setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
-        syncEditorFileSession(nextFileHandle)
+        syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
         this.readFile()
       } catch (error) {
         console.error('openLocalFile failed', error)
@@ -791,7 +788,6 @@ export default {
         setIsHandleLocalFile(true)
         this.setData(result.content)
         updateCurrentFileRef(result)
-        syncEditorFileSession(result)
         await recordRecentFile({
           ...currentFileRef,
           ...result
@@ -896,7 +892,7 @@ export default {
         try {
           setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
           setIsHandleLocalFile(true)
-          syncEditorFileSession(nextFileHandle)
+          syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
           this.isFullDataFile = true
           await recordRecentFile(nextFileHandle)
           markDocumentDirty(false)

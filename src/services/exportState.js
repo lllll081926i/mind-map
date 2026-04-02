@@ -1,4 +1,5 @@
 import { downTypeList } from '@/config'
+import { createExportContext } from '@/services/workspaceProjectModel'
 
 const baseFormats = [
   ...((downTypeList.zh || []).filter(item => !['mm', 'xlsx'].includes(item.type))),
@@ -44,6 +45,15 @@ export const createDefaultExportState = fileName => ({
   isFitBg: true,
   imageFormat: 'png'
 })
+
+export const createExportStateFromFileRef = fileRef => {
+  const exportContext = createExportContext(fileRef)
+  return createDefaultExportState(exportContext.fileName)
+}
+
+export const resolveExportContext = fileRef => {
+  return createExportContext(fileRef)
+}
 
 export const findExportFormat = type => {
   return getDesktopExportFormats().find(item => item.type === type) || null

@@ -453,7 +453,7 @@ export default {
 
 .workspaceBody {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 320px 1fr;
   gap: 20px;
   min-height: calc(100vh - 120px);
 }
@@ -468,10 +468,10 @@ export default {
 .quickActionsCard,
 .sidebarSection {
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   transition: box-shadow 0.2s ease;
 
   &:hover {
@@ -575,10 +575,10 @@ export default {
 }
 
 .workspacePanel {
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   min-height: 100%;
   padding: 24px;
 }

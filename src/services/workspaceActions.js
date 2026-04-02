@@ -1,25 +1,28 @@
 import { storeData } from '@/api'
 import platform, {
-  getLastDirectory,
   getRecentFiles,
   recordRecentFile
 } from '@/platform'
 import {
   createDesktopFsError,
   markDocumentDirty,
+  getLastDirectory,
   setCurrentFileRef
 } from '@/services/documentSession'
+import {
+  createBlankProjectRef,
+  createDirectoryWorkspaceRef,
+  createRecentProjectRef,
+  createTemplateProjectRef
+} from '@/services/workspaceProjectModel'
+import {
+  getWorkspaceMetaState,
+  setWorkspaceLastDirectory,
+  setWorkspaceRecentFiles
+} from '@/services/workspaceState'
 import { parseExternalJsonSafely } from '@/utils'
-import {
-  saveBootstrapStatePatch,
-  setLastDirectory
-} from '@/platform'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
-import {
-  setIsHandleLocalFile,
-  setRecentFiles,
-  syncEditorFileSession
-} from '@/stores/runtime'
+import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
 
 export const createWorkspaceTemplateData = (title = '思维导图') =>
   createDefaultMindMapData(title)
@@ -51,16 +54,17 @@ const enterEditor = async router => {
 
 const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   const normalizedData = parseMindMapContent(content)
-  setCurrentFileRef(fileRef, fileRef.mode || 'desktop')
-  syncEditorFileSession(fileRef)
+  const recentProjectRef = createRecentProjectRef(fileRef)
+  setCurrentFileRef(recentProjectRef, recentProjectRef.mode || 'desktop')
   storeData(normalizedData)
   setIsHandleLocalFile(true)
   markDocumentDirty(false)
-  await recordRecentFile(fileRef)
-  setRecentFiles(getRecentFiles())
+  await setWorkspaceLastDirectory(recentProjectRef.path || '')
+  await recordRecentFile(recentProjectRef)
+  syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
   await enterEditor(router)
   return {
-    fileRef,
+    fileRef: recentProjectRef,
     content,
     data: normalizedData
   }
@@ -68,15 +72,13 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
 
 export const refreshWorkspaceRecentFiles = () => {
   const list = getRecentFiles()
-  setRecentFiles(list)
+  syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
   return list
 }
 
 export const clearWorkspaceRecentFiles = async () => {
-  await saveBootstrapStatePatch({
-    recentFiles: []
-  })
-  setRecentFiles([])
+  await setWorkspaceRecentFiles([])
+  syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
   return []
 }
 
@@ -115,13 +117,17 @@ export const createWorkspaceLocalFile = async ({
 } = {}) => {
   try {
     const serialized = JSON.stringify(content)
+    const projectRef =
+      suggestedName === '思维导图'
+        ? createBlankProjectRef(suggestedName)
+        : createTemplateProjectRef(suggestedName)
     const fileRef = await platform.saveMindMapFileAs({
-      suggestedName,
+      suggestedName: projectRef.title,
       content: serialized,
       defaultPath: getLastDirectory()
     })
     if (!fileRef) return null
-    await setLastDirectory(fileRef.path || '')
+    await setWorkspaceLastDirectory(fileRef.path || '')
     return hydrateWorkspaceFileSession(fileRef, serialized, router)
   } catch (error) {
     throw createDesktopFsError(error)
@@ -146,10 +152,14 @@ export const openWorkspaceDirectory = async () => {
     })
     if (!directoryRef) return null
     const entries = await platform.listDirectoryEntries(directoryRef)
-    await setLastDirectory(directoryRef.path || '')
-    return {
+    const workspaceDirectoryRef = createDirectoryWorkspaceRef(
       directoryRef,
       entries
+    )
+    await setWorkspaceLastDirectory(workspaceDirectoryRef.path || '')
+    return {
+      directoryRef: workspaceDirectoryRef,
+      entries: workspaceDirectoryRef.entries
     }
   } catch (error) {
     throw createDesktopFsError(error)

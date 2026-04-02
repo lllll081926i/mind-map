@@ -53,7 +53,7 @@ export default {
     sidebarStyle() {
       return {
         zIndex: this.zIndex,
-        right: this.isShown ? '0' : '-300px',
+        right: this.isShown ? '20px' : '-360px',
         opacity: this.isShown ? 1 : 0,
         pointerEvents: this.isShown ? 'auto' : 'none'
       }
@@ -94,13 +94,15 @@ export default {
 <style lang="less" scoped>
 .sidebarContainer {
   position: fixed;
-  right: -300px;
-  top: 110px;
-  bottom: 0;
-  width: 300px;
+  right: -360px;
+  top: 84px;
+  bottom: 20px;
+  width: 320px;
   z-index: 1100;
   background-color: #fff;
-  border-left: 1px solid #e8e8e8;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   transition:
@@ -109,7 +111,7 @@ export default {
 
   &.isDark {
     background-color: #262a2e;
-    border-left-color: hsla(0, 0%, 100%, 0.1);
+    border-color: hsla(0, 0%, 100%, 0.08);
 
     .sidebarHeader {
       border-bottom-color: hsla(0, 0%, 100%, 0.1);
@@ -118,23 +120,25 @@ export default {
 
     .closeBtn {
       color: #fff;
+      background: hsla(0, 0%, 100%, 0.04);
     }
   }
 
   .closeBtn {
     position: absolute;
-    right: 20px;
+    right: 12px;
     top: 12px;
     cursor: pointer;
     border: none;
-    background: transparent;
+    background: rgba(15, 23, 42, 0.04);
     color: inherit;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 6px;
 
     .iconfont {
       font-size: 14px;
@@ -144,19 +148,23 @@ export default {
 
   .sidebarHeader {
     width: 100%;
-    height: 44px;
-    border-bottom: 1px solid #e8e8e8;
+    min-height: 48px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     flex-grow: 0;
     flex-shrink: 0;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 600;
   }
 
   .sidebarContent {
     width: 100%;
     height: 100%;
     overflow: auto;
+    padding: 0 0 16px;
   }
 }
 </style>

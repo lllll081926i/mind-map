@@ -799,8 +799,8 @@ export default {
 
 <style lang="less" scoped>
 .sidebarContent {
-  padding: 20px;
-  padding-top: 10px;
+  padding: 16px;
+  padding-top: 12px;
 
   &.isDark {
     .title {
@@ -817,11 +817,11 @@ export default {
   }
 
   .title {
-    font-size: 16px;
+    font-size: 14px;
     font-family: PingFangSC-Medium, PingFang SC;
-    font-weight: 500;
+    font-weight: 600;
     color: rgba(26, 26, 26, 0.9);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     margin-top: 20px;
 
     &.noTop {
@@ -833,11 +833,18 @@ export default {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.03);
+    border: 1px solid rgba(15, 23, 42, 0.05);
 
     .rowItem {
       display: flex;
       align-items: center;
-      margin-bottom: 5px;
+      margin-bottom: 0;
+      width: 100%;
+      justify-content: space-between;
+      gap: 12px;
 
       .name {
         font-size: 12px;

@@ -50,8 +50,13 @@ const documentSessionSource = fs.readFileSync(
 const utilsSource = fs.readFileSync(path.resolve('src/utils/index.js'), 'utf8')
 const appSource = fs.readFileSync(path.resolve('src/App.vue'), 'utf8')
 const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8')
+const indexHtmlSource = fs.readFileSync(path.resolve('index.html'), 'utf8')
 const tauriConfigSource = fs.readFileSync(
   path.resolve('src-tauri/tauri.conf.json'),
+  'utf8'
+)
+const tauriCargoSource = fs.readFileSync(
+  path.resolve('src-tauri/Cargo.toml'),
   'utf8'
 )
 const tauriCommandSource = fs.readFileSync(
@@ -232,7 +237,8 @@ test('备注浮层卸载时按真实父节点安全移除 DOM，避免返回首�
 
 test('文档会话同步 bootstrap 状态时会兜底捕获持久化异常', () => {
   assert.match(documentSessionSource, /syncBootstrapState failed/)
-  assert.match(documentSessionSource, /void saveBootstrapStatePatch\(/)
+  assert.match(documentSessionSource, /void setWorkspaceCurrentDocument\(/)
+  assert.match(documentSessionSource, /setWorkspaceLastDirectory\(/)
 })
 
 test('编辑页初始化时会稳妥解析思维导图容器元素，避免 ref 不是原生 DOM 时启动失败', () => {
@@ -278,6 +284,22 @@ test('应用入口补充全局错误处理，根样式不再禁止所有文本�
   assert.match(mainSource, /app\.config\.errorHandler =/)
   assert.doesNotMatch(appSource, /body \*/)
   assert.doesNotMatch(appSource, /user-select: none;/)
+})
+
+test('桌面入口模板不再保留旧接管脚本，并使用 MindMap 作为应用显示名', () => {
+  assert.match(indexHtmlSource, /<title>MindMap<\/title>/)
+  assert.match(indexHtmlSource, /href="\.\/logo\.ico"/)
+  assert.doesNotMatch(indexHtmlSource, /externalPublicPath/)
+  assert.doesNotMatch(indexHtmlSource, /takeOverApp/)
+  assert.doesNotMatch(indexHtmlSource, /window\.onload = async/)
+  assert.match(tauriConfigSource, /"productName": "MindMap"/)
+  assert.match(tauriConfigSource, /"title": "MindMap"/)
+  assert.match(tauriConfigSource, /"shortDescription": "MindMap editor"/)
+  assert.match(
+    tauriConfigSource,
+    /"longDescription": "MindMap application for Windows, macOS, and Linux\."/
+  )
+  assert.match(tauriCargoSource, /description = "MindMap"/)
 })
 
 test('桌面端外链打开不再通过 cmd start 调 shell，CSP 移除任意 https 图片白名单', () => {

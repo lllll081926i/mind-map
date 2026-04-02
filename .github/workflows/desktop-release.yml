@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing release tag to rebuild, for example v0.2.3
+        required: false
+        type: string
 
 concurrency:
   group: desktop-release-${{ github.ref }}
@@ -71,11 +76,14 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const isTagPush = context.eventName === 'push' && context.ref.startsWith('refs/tags/')
-            const tagName = isTagPush ? context.ref.replace('refs/tags/', '') : ''
+            const dispatchTagName = (context.payload.inputs?.tag_name || '').trim()
+            const pushTagName = context.eventName === 'push' && context.ref.startsWith('refs/tags/')
+              ? context.ref.replace('refs/tags/', '')
+              : ''
+            const tagName = dispatchTagName || pushTagName
             core.setOutput('tag_name', tagName)
 
-            if (!isTagPush) {
+            if (!tagName) {
               core.setOutput('release_id', '')
               return
             }
@@ -133,17 +141,19 @@ jobs:
             portable_source_path: ''
             artifact_name: windows-installer
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
+            release_asset_regex: ^MindMap_.*_windows_x64-setup\.exe(\.sig)?$
           - label: Windows Portable
             os: windows-latest
             args: --no-bundle
             release_args: --no-bundle
             include_updater_json: false
-            upload_plain_binary: true
+            upload_plain_binary: false
             target_triple: ''
             portable_asset_suffix: windows_x64
             portable_source_path: src-tauri/target/release/mind-map-desktop.exe
             artifact_name: windows-portable
-            artifact_path: src-tauri/target/release/Mind.Map.Desktop_*.exe
+            artifact_path: src-tauri/target/release/MindMap_*.exe
+            release_asset_regex: ^MindMap_.*_windows_x64\.exe$
           - label: Windows ARM64 Installer
             os: windows-latest
             args: --bundles nsis --target aarch64-pc-windows-msvc
@@ -155,17 +165,19 @@ jobs:
             portable_source_path: ''
             artifact_name: windows-arm64-installer
             artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+            release_asset_regex: ^MindMap_.*_windows_arm64-setup\.exe(\.sig)?$
           - label: Windows ARM64 Portable
             os: windows-latest
             args: --no-bundle --target aarch64-pc-windows-msvc
             release_args: --no-bundle --target aarch64-pc-windows-msvc
             include_updater_json: false
-            upload_plain_binary: true
+            upload_plain_binary: false
             target_triple: aarch64-pc-windows-msvc
             portable_asset_suffix: windows_arm64
             portable_source_path: src-tauri/target/aarch64-pc-windows-msvc/release/mind-map-desktop.exe
             artifact_name: windows-arm64-portable
-            artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/Mind.Map.Desktop_*.exe
+            artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/MindMap_*.exe
+            release_asset_regex: ^MindMap_.*_windows_arm64\.exe$
           - label: macOS Bundle
             os: macos-latest
             args: --bundles app,dmg
@@ -180,6 +192,7 @@ jobs:
             artifact_path: |
               src-tauri/target/release/bundle/macos/*.app
               src-tauri/target/release/bundle/dmg/*.dmg
+            release_asset_regex: ^MindMap_.*_darwin_aarch64\.(app\.tar\.gz|dmg)(\.sig)?$
           - label: Linux Bundle
             os: ubuntu-22.04
             args: --bundles deb,appimage
@@ -193,6 +206,7 @@ jobs:
             artifact_path: |
               src-tauri/target/release/bundle/deb/*.deb
               src-tauri/target/release/bundle/appimage/*.AppImage
+            release_asset_regex: ^MindMap_.*_linux_amd64\.(AppImage|deb)(\.sig)?$
 
     steps:
       - name: Checkout
@@ -285,6 +299,37 @@ jobs:
         run: |
           echo "::warning::Skipping updater artifacts for ${{ matrix.label }} because TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PASSWORD is not configured."
 
+      - name: Remove existing release assets for current target
+        if: needs.create_release.outputs.release_id != ''
+        uses: actions/github-script@v8
+        env:
+          RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
+          ASSET_REGEX: ${{ matrix.release_asset_regex }}
+        with:
+          script: |
+            const releaseId = Number(process.env.RELEASE_ID)
+            const assetRegex = new RegExp(process.env.ASSET_REGEX)
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner,
+              repo,
+              release_id: releaseId,
+              per_page: 100
+            })
+
+            for (const asset of assets) {
+              if (!assetRegex.test(asset.name)) {
+                continue
+              }
+              core.info(`Deleting existing asset: ${asset.name}`)
+              await github.rest.repos.deleteReleaseAsset({
+                owner,
+                repo,
+                asset_id: asset.id
+              })
+            }
+
       - name: Build desktop bundles for release with updater artifacts
         if: needs.create_release.outputs.release_id != '' && matrix.include_updater_json && env.HAS_UPDATER_SECRETS == 'true'
         uses: tauri-apps/tauri-action@v0.6.2
@@ -338,10 +383,50 @@ jobs:
           $version = (Get-Content 'package.json' | ConvertFrom-Json).version
           $source = "${{ matrix.portable_source_path }}"
           $targetDir = Split-Path $source -Parent
-          $target = Join-Path $targetDir "Mind.Map.Desktop_${version}_${{ matrix.portable_asset_suffix }}.exe"
+          $target = Join-Path $targetDir "MindMap_${version}_${{ matrix.portable_asset_suffix }}.exe"
           Copy-Item $source $target -Force
           "path=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$(Split-Path $target -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows portable release asset
+        if: success() && matrix.portable_asset_suffix != '' && needs.create_release.outputs.release_id != ''
+        uses: actions/github-script@v8
+        env:
+          ASSET_PATH: ${{ steps.portable_asset.outputs.path }}
+          ASSET_NAME: ${{ steps.portable_asset.outputs.name }}
+          RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
+        with:
+          script: |
+            const fs = require('fs')
+            const path = process.env.ASSET_PATH
+            const name = process.env.ASSET_NAME
+            const releaseId = Number(process.env.RELEASE_ID)
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner,
+              repo,
+              release_id: releaseId,
+              per_page: 100
+            })
+
+            const existing = assets.find(asset => asset.name === name)
+            if (existing) {
+              await github.rest.repos.deleteReleaseAsset({
+                owner,
+                repo,
+                asset_id: existing.id
+              })
+            }
+
+            await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id: releaseId,
+              name,
+              data: fs.readFileSync(path)
+            })
 
       - name: Upload workflow artifact
         if: success() && matrix.portable_asset_suffix == ''

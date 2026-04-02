@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Mind Map Desktop",
+  "productName": "MindMap",
   "version": "0.2.3",
   "identifier": "com.mindmap.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Mind Map Desktop",
+        "title": "MindMap",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,
@@ -37,8 +37,8 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "shortDescription": "Desktop mind map editor",
-    "longDescription": "Mind map desktop application for Windows, macOS, and Linux.",
+    "shortDescription": "MindMap editor",
+    "longDescription": "MindMap application for Windows, macOS, and Linux.",
     "windows": {
       "digestAlgorithm": "sha256"
     },

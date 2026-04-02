@@ -199,15 +199,17 @@
 <script>
 import { mapState } from 'pinia'
 import { getConfig, getData } from '@/api'
-import { ensureBootstrapDocumentState, getCurrentFileRef } from '@/platform'
+import { ensureBootstrapDocumentState } from '@/platform'
+import { getCurrentFileRef } from '@/services/documentSession'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import {
-  createDefaultExportState,
+  createExportStateFromFileRef,
   getDesktopExportFormats,
   getResolvedExportType,
-  isExportFormatDisabled
+  isExportFormatDisabled,
+  resolveExportContext
 } from '@/services/exportState'
 import defaultNodeImage from '@/assets/img/图片加载失败.svg'
 
@@ -347,13 +349,7 @@ const loadRichTextPlugins = async () => {
 
 export default {
   data() {
-    const currentFileRef = getCurrentFileRef()
-    const baseName = String(
-      currentFileRef?.name || this.$t('exportPage.fallbackFileName')
-    ).replace(
-      /\.[^./\\]+$/,
-      ''
-    )
+    const exportContext = resolveExportContext(getCurrentFileRef())
     const exportFormats = getDesktopExportFormats().map(item => ({
       ...item,
       displayName: getFormatDisplayName(this.$t, item.type)
@@ -365,7 +361,8 @@ export default {
       mindMap: null,
       exportPluginsInstalled: false,
       extendedIconList: [],
-      exportState: createDefaultExportState(baseName),
+      exportContext,
+      exportState: createExportStateFromFileRef(exportContext.fileRef),
       exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat],
       boundExportKeydown: null,
       boundPreviewResize: null

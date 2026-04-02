@@ -7,19 +7,19 @@ import {
   normalizeBootstrapState
 } from './shared/configMigration'
 import { upsertRecentFile } from './shared/recentFiles'
-import {
-  getCurrentFileRef,
-  getDocumentSession,
-  getLastDirectory,
-  hydrateDocumentSession,
-  markDocumentDirty,
-  setCurrentFileRef,
-  setLastDirectory,
-  updateCurrentFileRef
-} from '@/services/documentSession'
 
 const getPlatform = () => {
   return desktopPlatform
+}
+
+const syncDocumentSessionFromBootstrap = () => {
+  void import('@/services/documentSession')
+    .then(module => {
+      module.hydrateDocumentSession()
+    })
+    .catch(error => {
+      console.error('syncDocumentSessionFromBootstrap failed', error)
+    })
 }
 
 let bootstrapState = createDefaultBootstrapState()
@@ -69,7 +69,7 @@ const applyBootstrapMetaState = (input, options = {}) => {
       ? pickState(bootstrapState, BOOTSTRAP_META_KEYS)
       : nextMetaState)
   })
-  hydrateDocumentSession()
+  syncDocumentSessionFromBootstrap()
   return bootstrapState
 }
 
@@ -118,7 +118,7 @@ const queueDocumentWrite = snapshot => {
 export const bootstrapPlatformState = async () => {
   if (!isDesktopRuntime()) {
     bootstrapState = createDefaultBootstrapState()
-    hydrateDocumentSession()
+    syncDocumentSessionFromBootstrap()
     return bootstrapState
   }
   if (!bootstrapMetaPromise) {
@@ -189,7 +189,7 @@ export const saveBootstrapStatePatch = async patch => {
     bumpDocumentMutationVersion()
   }
   if (hasMetaPatch) {
-    hydrateDocumentSession()
+    syncDocumentSessionFromBootstrap()
   }
   if (!isDesktopRuntime()) {
     return bootstrapState
@@ -227,7 +227,7 @@ export const recordRecentFile = async fileRef => {
       ...normalizeBootstrapMetaState(nextState)
     }
     bootstrapMetaPromise = Promise.resolve(bootstrapState)
-    hydrateDocumentSession()
+    syncDocumentSessionFromBootstrap()
     return bootstrapState
   }
   bootstrapState = {
@@ -238,23 +238,13 @@ export const recordRecentFile = async fileRef => {
     })
   }
   bootstrapMetaPromise = Promise.resolve(bootstrapState)
-  hydrateDocumentSession()
+  syncDocumentSessionFromBootstrap()
   await queueMetaWrite(pickState(bootstrapState, BOOTSTRAP_META_KEYS))
   return bootstrapState
 }
 
 export const getRecentFiles = () => {
   return bootstrapState.recentFiles || []
-}
-
-export {
-  getCurrentFileRef,
-  getDocumentSession,
-  getLastDirectory,
-  markDocumentDirty,
-  setCurrentFileRef,
-  setLastDirectory,
-  updateCurrentFileRef
 }
 
 export const isDesktopApp = () => isDesktopRuntime()

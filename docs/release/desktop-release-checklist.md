@@ -11,6 +11,12 @@
 
 ## 功能回归
 
+- 新建文件
+- 打开文件
+- 打开文件夹
+- 编辑保存
+- 导出
+- 最近文件恢复
 - 应用可以正常启动
 - 首次启动可以正常初始化本地配置
 - 打开 `.smm` 文件可编辑
@@ -23,6 +29,7 @@
 
 ## 构建验证
 
+- `npm run test:desktop-flow`
 - `npm run check`
 - `npm run frontend:build`
 - `npm run build`

@@ -41,6 +41,16 @@ const syncThemeFromLocalConfig = () => {
   themeStore.syncFromLocalConfig(settingsStore.localConfig)
 }
 
+const syncEditorStoreFromWorkspaceMeta = state => {
+  const { editorStore } = ensureRuntimeStores()
+  const currentDocument = state?.currentDocument || null
+  editorStore.syncFileSession({
+    path: currentDocument?.path || '',
+    name: currentDocument?.name || ''
+  })
+  editorStore.setRecentFiles(state?.recentFiles || [])
+}
+
 const applyCompositeConfig = (data, persist = true) => {
   const { settingsStore, aiStore, appStore } = ensureRuntimeStores()
   const nextLocalConfig = {
@@ -84,18 +94,12 @@ export const syncRuntimeFromBootstrapState = state => {
     },
     false
   )
-  setRecentFiles(state.recentFiles || [])
-  if (state.currentDocument && state.currentDocument.path) {
-    syncEditorFileSession({
-      path: state.currentDocument.path,
-      name: state.currentDocument.name || ''
-    })
-  } else {
-    syncEditorFileSession({
-      path: '',
-      name: ''
-    })
-  }
+  syncEditorStoreFromWorkspaceMeta(state)
+  return getRuntimeStores()
+}
+
+export const syncRuntimeFromWorkspaceMeta = state => {
+  syncEditorStoreFromWorkspaceMeta(state)
   return getRuntimeStores()
 }
 
@@ -139,13 +143,3 @@ export const setExtendThemeGroupList = createStoreSetter(
   'setExtendThemeGroupList'
 )
 export const setBgList = createStoreSetter('themeStore', 'setBgList')
-
-export const syncEditorFileSession = payload => {
-  const { editorStore } = ensureRuntimeStores()
-  editorStore.syncFileSession(payload)
-}
-
-export const setRecentFiles = list => {
-  const { editorStore } = ensureRuntimeStores()
-  editorStore.setRecentFiles(list)
-}

@@ -1,4 +1,8 @@
-import { getBootstrapState, saveBootstrapStatePatch } from '@/platform'
+import {
+  getWorkspaceMetaState,
+  setWorkspaceCurrentDocument,
+  setWorkspaceLastDirectory
+} from '@/services/workspaceState'
 
 const createDefaultSession = () => ({
   fileRef: null,
@@ -25,16 +29,19 @@ const syncBootstrapState = () => {
         dirty: !!sessionState.dirty
       }
     : null
-  void saveBootstrapStatePatch({
-    currentDocument,
-    lastDirectory: currentDocument ? getParentDirectory(currentDocument.path) : ''
-  }).catch(error => {
-    console.error('syncBootstrapState failed', error)
-  })
+  void setWorkspaceCurrentDocument(currentDocument)
+    .then(() => {
+      return setWorkspaceLastDirectory(
+        currentDocument ? getParentDirectory(currentDocument.path) : ''
+      )
+    })
+    .catch(error => {
+      console.error('syncBootstrapState failed', error)
+    })
 }
 
 export const hydrateDocumentSession = () => {
-  const bootstrapState = getBootstrapState()
+  const bootstrapState = getWorkspaceMetaState()
   if (
     bootstrapState &&
     bootstrapState.currentDocument &&
@@ -98,13 +105,11 @@ export const markDocumentDirty = dirty => {
 }
 
 export const setLastDirectory = directoryPath => {
-  return saveBootstrapStatePatch({
-    lastDirectory: String(directoryPath || '').trim()
-  })
+  return setWorkspaceLastDirectory(directoryPath)
 }
 
 export const getLastDirectory = () => {
-  return getBootstrapState().lastDirectory || ''
+  return getWorkspaceMetaState().lastDirectory || ''
 }
 
 export const createDesktopFsError = error => {
