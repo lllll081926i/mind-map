@@ -12,7 +12,7 @@ on:
         type: string
 
 concurrency:
-  group: desktop-release-${{ github.ref }}
+  group: desktop-release-${{ inputs.tag_name != '' && inputs.tag_name || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name != '' && format('refs/tags/{0}', inputs.tag_name) || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -211,6 +213,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name != '' && format('refs/tags/{0}', inputs.tag_name) || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -319,7 +323,7 @@ jobs:
             })
 
             for (const asset of assets) {
-              if (!assetRegex.test(asset.name)) {
+              if (asset.name !== 'latest.json' && !assetRegex.test(asset.name)) {
                 continue
               }
               core.info(`Deleting existing asset: ${asset.name}`)
@@ -345,7 +349,7 @@ jobs:
           tagName: ${{ needs.create_release.outputs.tag_name }}
           assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
-          includeUpdaterJson: ${{ matrix.include_updater_json }}
+          includeUpdaterJson: false
 
       - name: Build desktop bundles for release without updater artifacts
         if: needs.create_release.outputs.release_id != '' && (!matrix.include_updater_json || env.HAS_UPDATER_SECRETS != 'true')
@@ -382,11 +386,29 @@ jobs:
         run: |
           $version = (Get-Content 'package.json' | ConvertFrom-Json).version
           $source = "${{ matrix.portable_source_path }}"
+          if (-not (Test-Path $source)) {
+            throw "Portable source binary not found: $source"
+          }
           $targetDir = Split-Path $source -Parent
           $target = Join-Path $targetDir "MindMap_${version}_${{ matrix.portable_asset_suffix }}.exe"
           Copy-Item $source $target -Force
-          "path=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if (-not (Test-Path $target)) {
+            throw "Portable target binary was not created: $target"
+          }
+          $normalizedTarget = $target -replace '\\', '/'
+          "path=$normalizedTarget" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$(Split-Path $target -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Verify Windows portable artifact files
+        if: matrix.portable_asset_suffix != ''
+        shell: pwsh
+        run: |
+          Write-Host "Expected artifact pattern: ${{ matrix.artifact_path }}"
+          $files = Get-ChildItem -Path "${{ matrix.artifact_path }}" -ErrorAction SilentlyContinue
+          if (-not $files) {
+            throw "No portable artifacts matched pattern: ${{ matrix.artifact_path }}"
+          }
+          $files | ForEach-Object { Write-Host "Portable artifact: $($_.FullName)" }
 
       - name: Upload Windows portable release asset
         if: success() && matrix.portable_asset_suffix != '' && needs.create_release.outputs.release_id != ''
@@ -444,4 +466,4 @@ jobs:
           name: ${{ matrix.artifact_name }}
           if-no-files-found: error
           compression-level: 0
-          path: ${{ steps.portable_asset.outputs.path }}
+          path: ${{ matrix.artifact_path }}
