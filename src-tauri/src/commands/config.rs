@@ -1,6 +1,7 @@
 use crate::services::app_state::{
   self, DesktopMetaState, DesktopState, RecentFileItem,
 };
+use crate::services::file_association::PendingAssociatedFiles;
 use reqwest::Url;
 use std::process::Command;
 
@@ -74,6 +75,13 @@ pub async fn record_recent_file(
   };
   app_state::write_meta_state(&app, &meta_snapshot).await?;
   Ok(next_state)
+}
+
+#[tauri::command]
+pub fn take_pending_associated_files(
+  state: tauri::State<'_, PendingAssociatedFiles>,
+) -> Vec<String> {
+  state.take_paths()
 }
 
 #[tauri::command]

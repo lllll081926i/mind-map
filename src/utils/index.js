@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+export { parseExternalJsonSafely } from './json'
 
 const INVALID_FILE_NAME_CHARS = /[<>:"/\\|?*]/g
 const INVALID_FILE_NAME_EDGE = /^[.\s]+|[.\s]+$/g
@@ -63,10 +64,6 @@ export const sanitizeRichTextFragment = html => {
     ALLOWED_ATTR: ['style'],
     KEEP_CONTENT: true
   })
-}
-
-export const parseExternalJsonSafely = input => {
-  return JSON.parse(input)
 }
 
 export const sanitizeFileName = (value, fallback = 'mind-map') => {

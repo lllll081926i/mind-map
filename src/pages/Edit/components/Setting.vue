@@ -440,7 +440,7 @@ export default {
   data() {
     return {
       config: {
-        openPerformance: false,
+        openPerformance: true,
         enableFreeDrag: false,
         mousewheelAction: 'zoom',
         mousewheelZoomActionReverse: false,

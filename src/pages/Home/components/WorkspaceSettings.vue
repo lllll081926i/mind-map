@@ -282,7 +282,7 @@ const AiConfigDialog = defineAsyncComponent(() =>
 )
 
 const defaultDocConfig = () => ({
-  openPerformance: false,
+  openPerformance: true,
   enableFreeDrag: false,
   mousewheelAction: 'zoom',
   mousewheelZoomActionReverse: false,

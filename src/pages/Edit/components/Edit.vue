@@ -420,7 +420,8 @@ export default {
     ...mapState(useAppStore, {
       extraTextOnExport: 'extraTextOnExport',
       isDragOutlineTreeNode: 'isDragOutlineTreeNode',
-      activeSidebar: 'activeSidebar'
+      activeSidebar: 'activeSidebar',
+      isOutlineEdit: 'isOutlineEdit'
     }),
     isZenMode() {
       return this.localConfig.isZenMode

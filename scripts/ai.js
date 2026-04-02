@@ -4,6 +4,8 @@ const net = require('net')
 
 const DEFAULT_PORT = 3456
 const DEFAULT_TIMEOUT = 300000
+const DEFAULT_BODY_LIMIT = '256kb'
+const AUTH_HEADER_NAME = 'x-ai-proxy-token'
 
 const parsePortNumber = value => {
   const port = Number(value)
@@ -31,6 +33,7 @@ const getProxyPort = (argv = [], env = process.env) => {
 }
 
 const port = getProxyPort(process.argv.slice(2), process.env)
+const proxyAuthToken = String(process.env.AI_PROXY_TOKEN || '').trim()
 
 const isPortUsed = port => {
   return new Promise(resolve => {
@@ -51,15 +54,35 @@ const isPortUsed = port => {
 
 const createServe = (runtimePort = port) => {
   const app = express()
-  app.use(express.json())
-  app.use(express.urlencoded({ extended: true }))
+  app.use(express.json({ limit: DEFAULT_BODY_LIMIT }))
+  app.use(express.urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }))
 
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', 'http://localhost:5173')
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-    res.header('Access-Control-Allow-Headers', 'Content-Type')
+    res.header(
+      'Access-Control-Allow-Headers',
+      `Content-Type, ${AUTH_HEADER_NAME}`
+    )
     if (req.method === 'OPTIONS') {
       return res.sendStatus(204)
+    }
+    next()
+  })
+
+  app.use((req, res, next) => {
+    if (!proxyAuthToken) {
+      next()
+      return
+    }
+    const requestToken = String(req.headers[AUTH_HEADER_NAME] || '').trim()
+    if (requestToken !== proxyAuthToken) {
+      res.status(401).json({
+        code: 401,
+        msg: 'AI 代理认证失败',
+        detail: '缺少或无效的代理访问令牌'
+      })
+      return
     }
     next()
   })

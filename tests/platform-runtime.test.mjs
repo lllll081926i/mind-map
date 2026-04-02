@@ -8,12 +8,24 @@ import {
   detectDesktopRuntime,
   isDesktopRuntime
 } from '../src/platform/runtime.mjs'
+import {
+  buildDesktopSaveDefaultPath,
+  ensureSmmFilePath,
+  normalizeSaveName
+} from '../src/platform/desktop/index.js'
 
 const require = createRequire(import.meta.url)
 const createViteConfig = require('../vite.config.js')
 const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+const tauriConfig = JSON.parse(
+  fs.readFileSync(path.resolve('src-tauri/tauri.conf.json'), 'utf8')
+)
 const platformIndexSource = fs.readFileSync(
   path.resolve('src/platform/index.js'),
+  'utf8'
+)
+const desktopPlatformSource = fs.readFileSync(
+  path.resolve('src/platform/desktop/index.js'),
   'utf8'
 )
 const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8')
@@ -33,13 +45,47 @@ const appStateSource = fs.readFileSync(
   path.resolve('src-tauri/src/services/app_state.rs'),
   'utf8'
 )
+const rustMainSource = fs.readFileSync(
+  path.resolve('src-tauri/src/main.rs'),
+  'utf8'
+)
+const fileAssociationServiceSource = fs.readFileSync(
+  path.resolve('src-tauri/src/services/file_association.rs'),
+  'utf8'
+)
+const defaultOptionsSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/constants/defaultOptions.js'),
+  'utf8'
+)
+const workspaceSettingsSource = fs.readFileSync(
+  path.resolve('src/pages/Home/components/WorkspaceSettings.vue'),
+  'utf8'
+)
+const settingPanelSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Setting.vue'),
+  'utf8'
+)
 
 test('detectDesktopRuntime 在存在 __TAURI_INTERNALS__ 时返回 true', () => {
-  assert.equal(detectDesktopRuntime({ __TAURI_INTERNALS__: {} }), true)
+  assert.equal(
+    detectDesktopRuntime({
+      __TAURI_INTERNALS__: {
+        invoke() {}
+      }
+    }),
+    true
+  )
 })
 
 test('detectDesktopRuntime 在存在 __TAURI__ 时返回 true', () => {
-  assert.equal(detectDesktopRuntime({ __TAURI__: {} }), true)
+  assert.equal(
+    detectDesktopRuntime({
+      __TAURI__: {
+        invoke() {}
+      }
+    }),
+    true
+  )
 })
 
 test('detectDesktopRuntime 在普通环境下返回 false', () => {
@@ -49,6 +95,43 @@ test('detectDesktopRuntime 在普通环境下返回 false', () => {
 
 test('isDesktopRuntime 在无 window 环境下返回 false', () => {
   assert.equal(isDesktopRuntime(), false)
+})
+
+test('桌面保存文件名会默认补齐 .smm 后缀', () => {
+  assert.equal(normalizeSaveName('思维导图'), '思维导图.smm')
+  assert.equal(normalizeSaveName('demo.smm'), 'demo.smm')
+})
+
+test('桌面保存路径会在对话框未补后缀时兜底追加 .smm', () => {
+  assert.equal(
+    ensureSmmFilePath('/tmp/mind-map'),
+    '/tmp/mind-map.smm'
+  )
+  assert.equal(
+    ensureSmmFilePath('C:\\Users\\demo\\MindMap'),
+    'C:\\Users\\demo\\MindMap.smm'
+  )
+  assert.equal(
+    ensureSmmFilePath('/tmp/already.smm'),
+    '/tmp/already.smm'
+  )
+})
+
+test('桌面保存默认路径会拼接目录和 .smm 文件名', () => {
+  assert.equal(
+    buildDesktopSaveDefaultPath({
+      defaultPath: '/tmp/projects',
+      suggestedName: '示例'
+    }),
+    '/tmp/projects/示例.smm'
+  )
+  assert.equal(
+    buildDesktopSaveDefaultPath({
+      defaultPath: 'C:\\Users\\demo\\Documents',
+      suggestedName: '示例'
+    }),
+    'C:\\Users\\demo\\Documents\\示例.smm'
+  )
 })
 
 test('Vite 配置固定注入桌面运行时标识', () => {
@@ -162,4 +245,90 @@ test('配置迁移模块不再导出 legacy localStorage 迁移函数', () => {
     configMigrationSource.includes('readLegacyLocalStorageSnapshot'),
     false
   )
+})
+
+test('.smm 文件关联配置已接入 Tauri 打包配置', () => {
+  const association = (tauriConfig.bundle.fileAssociations || []).find(item =>
+    Array.isArray(item?.ext) && item.ext.includes('smm')
+  )
+
+  assert.ok(association)
+  assert.equal(association.mimeType, 'application/x-mindmap-smm')
+  assert.equal(association.exportedType.identifier, 'com.mindmap.document.smm')
+  assert.equal(
+    tauriConfig.bundle.windows.nsis.installerHooks,
+    'file-association/windows/smm-file-association.nsh'
+  )
+  assert.equal(
+    tauriConfig.bundle.macOS.infoPlist,
+    'file-association/macos/Info.plist'
+  )
+  assert.equal(
+    tauriConfig.bundle.linux.deb.postInstallScript,
+    'file-association/linux/postinstall.sh'
+  )
+})
+
+test('.smm 文件关联资源文件存在', () => {
+  const resourceFiles = [
+    'src-tauri/file-association/smm-document.svg',
+    'src-tauri/file-association/icons/smm-document.ico',
+    'src-tauri/file-association/icons/smm-document.icns',
+    'src-tauri/file-association/icons/application-x-mindmap-smm.svg',
+    'src-tauri/file-association/icons/application-x-mindmap-smm.png',
+    'src-tauri/file-association/windows/smm-file-association.nsh',
+    'src-tauri/file-association/macos/Info.plist',
+    'src-tauri/file-association/linux/application-x-mindmap-smm.xml',
+    'src-tauri/file-association/linux/postinstall.sh',
+    'src-tauri/file-association/linux/postremove.sh'
+  ]
+
+  resourceFiles.forEach(file => {
+    assert.equal(fs.existsSync(path.resolve(file)), true, file)
+  })
+})
+
+test('桌面平台提供关联文件监听与提取入口', () => {
+  assert.equal(
+    desktopPlatformSource.includes('takePendingAssociatedFiles'),
+    true
+  )
+  assert.equal(
+    desktopPlatformSource.includes('listenAssociatedFileOpen'),
+    true
+  )
+})
+
+test('应用入口会在启动后处理关联文件打开事件', () => {
+  assert.equal(
+    mainSource.includes('setupDesktopAssociatedFileHandling'),
+    true
+  )
+  assert.equal(mainSource.includes('takePendingAssociatedFiles'), true)
+  assert.equal(mainSource.includes('listenAssociatedFileOpen'), true)
+})
+
+test('Rust 桌面入口已接入单实例与关联文件队列', () => {
+  assert.equal(
+    rustMainSource.includes('tauri_plugin_single_instance::init'),
+    true
+  )
+  assert.equal(
+    rustMainSource.includes('take_pending_associated_files'),
+    true
+  )
+  assert.equal(
+    fileAssociationServiceSource.includes('OPEN_ASSOCIATED_FILES_EVENT'),
+    true
+  )
+  assert.equal(
+    fileAssociationServiceSource.includes('resolve_associated_paths'),
+    true
+  )
+})
+
+test('性能模式默认开启并与桌面设置默认值保持一致', () => {
+  assert.equal(defaultOptionsSource.includes('openPerformance: true'), true)
+  assert.equal(workspaceSettingsSource.includes('openPerformance: true'), true)
+  assert.equal(settingPanelSource.includes('openPerformance: true'), true)
 })

@@ -1,6 +1,7 @@
 node_modules
 .eslintcache
 .DS_Store
+dist
 dist_electron
 dist-desktop
 src-tauri/target

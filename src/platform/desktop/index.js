@@ -45,9 +45,42 @@ const createBrowserFilePath = name => {
   return `memory://${Date.now()}-${Math.random().toString(36).slice(2)}/${safeName}`
 }
 
-const normalizeSaveName = suggestedName => {
+export const normalizeSaveName = suggestedName => {
   const baseName = String(suggestedName || '思维导图').trim() || '思维导图'
   return /\.smm$/i.test(baseName) ? baseName : `${baseName}.smm`
+}
+
+export const ensureSmmFilePath = filePath => {
+  const normalizedPath = String(filePath || '').trim()
+  if (!normalizedPath) {
+    return normalizeSaveName()
+  }
+  return /\.smm$/i.test(normalizedPath)
+    ? normalizedPath
+    : `${normalizedPath}.smm`
+}
+
+export const buildDesktopSaveDefaultPath = ({
+  defaultPath,
+  suggestedName
+} = {}) => {
+  const normalizedName = normalizeSaveName(suggestedName)
+  const normalizedDefaultPath = String(defaultPath || '').trim()
+  if (!normalizedDefaultPath) {
+    return normalizedName
+  }
+  if (/\.smm$/i.test(normalizedDefaultPath)) {
+    return ensureSmmFilePath(normalizedDefaultPath)
+  }
+  const sanitizedBasePath = normalizedDefaultPath.replace(/[\\/]+$/, '')
+  if (!sanitizedBasePath) {
+    return normalizedName
+  }
+  const separator =
+    sanitizedBasePath.includes('\\') && !sanitizedBasePath.includes('/')
+      ? '\\'
+      : '/'
+  return `${sanitizedBasePath}${separator}${normalizedName}`
 }
 
 const normalizeInvokeErrorMessage = (error, fallbackMessage) => {
@@ -105,6 +138,8 @@ const createBrowserTauriModules = () => {
   return {
     invoke: async (command, payload = {}) => {
       switch (command) {
+        case 'take_pending_associated_files':
+          return []
         case 'read_text_file': {
           const entry = getBrowserFileEntry(payload.path)
           if (!entry) {
@@ -162,7 +197,12 @@ const createBrowserTauriModules = () => {
       return path
     },
     save: async options => {
-      const name = normalizeSaveName(options?.defaultPath)
+      const name = getFileName(
+        buildDesktopSaveDefaultPath({
+          defaultPath: options?.defaultPath,
+          suggestedName: options?.suggestedName
+        })
+      )
       const path = createBrowserFilePath(name)
       setBrowserFileEntry(path, {
         name,
@@ -228,6 +268,14 @@ const invokeCommand = async (
 export const desktopPlatform = {
   async readBootstrapState() {
     return invokeCommand('read_bootstrap_state', {}, '读取应用状态失败')
+  },
+
+  async takePendingAssociatedFiles() {
+    return invokeCommand(
+      'take_pending_associated_files',
+      {},
+      '读取待打开文件失败'
+    )
   },
 
   async readBootstrapMetaState() {
@@ -300,7 +348,11 @@ export const desktopPlatform = {
   async saveMindMapFileAs({ suggestedName, content, defaultPath }) {
     const { save } = await loadTauriModules()
     const selectedPath = await save({
-      defaultPath: defaultPath || suggestedName,
+      defaultPath: buildDesktopSaveDefaultPath({
+        defaultPath,
+        suggestedName
+      }),
+      suggestedName: normalizeSaveName(suggestedName),
       filters: [
         {
           name: 'Mind Map',
@@ -309,18 +361,19 @@ export const desktopPlatform = {
       ]
     })
     if (!selectedPath) return null
+    const normalizedSelectedPath = ensureSmmFilePath(selectedPath)
     await invokeCommand(
       'write_text_file',
       {
-        path: selectedPath,
+        path: normalizedSelectedPath,
         content
       },
       '保存思维导图文件失败'
     )
     return {
       mode: 'desktop',
-      path: selectedPath,
-      name: getFileName(selectedPath)
+      path: normalizedSelectedPath,
+      name: getFileName(normalizedSelectedPath)
     }
   },
 
@@ -426,5 +479,11 @@ export const desktopPlatform = {
   async listen(eventName, handler) {
     const { listen } = await loadTauriModules()
     return listen(eventName, handler)
+  },
+
+  async listenAssociatedFileOpen(handler) {
+    return this.listen('desktop://open-associated-files', event => {
+      handler(event?.payload || { paths: [] })
+    })
   }
 }

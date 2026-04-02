@@ -8,6 +8,37 @@ const {
 } = require('unplugin-vue-components/resolvers')
 const utilShimPath = path.resolve(__dirname, 'src/shims/browserUtil.js')
 
+const elementPlusOptimizedDeps = [
+  'element-plus/es',
+  'element-plus/es/components/base/style/css',
+  'element-plus/es/components/button/style/css',
+  'element-plus/es/components/checkbox/style/css',
+  'element-plus/es/components/color-picker/style/css',
+  'element-plus/es/components/dialog/style/css',
+  'element-plus/es/components/dropdown/style/css',
+  'element-plus/es/components/dropdown-item/style/css',
+  'element-plus/es/components/dropdown-menu/style/css',
+  'element-plus/es/components/form/style/css',
+  'element-plus/es/components/form-item/style/css',
+  'element-plus/es/components/input/style/css',
+  'element-plus/es/components/input-number/style/css',
+  'element-plus/es/components/loading/style/css',
+  'element-plus/es/components/message/style/css',
+  'element-plus/es/components/message-box/style/css',
+  'element-plus/es/components/notification/style/css',
+  'element-plus/es/components/option/style/css',
+  'element-plus/es/components/popover/style/css',
+  'element-plus/es/components/radio/style/css',
+  'element-plus/es/components/radio-button/style/css',
+  'element-plus/es/components/radio-group/style/css',
+  'element-plus/es/components/select/style/css',
+  'element-plus/es/components/slider/style/css',
+  'element-plus/es/components/switch/style/css',
+  'element-plus/es/components/tooltip/style/css',
+  'element-plus/es/components/tree/style/css',
+  'element-plus/es/components/upload/style/css'
+]
+
 const isPathMatch = (id, keyword) => {
   return id.includes(`/${keyword}/`) || id.includes(`\\${keyword}\\`)
 }
@@ -142,8 +173,14 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
       __VUE_PROD_DEVTOOLS__: false
     },
     optimizeDeps: {
-      entries: ['index.html'],
-      include: ['buffer', 'events', 'punycode', 'stream-browserify']
+      entries: ['index.html', 'src/**/*.{vue,js,mjs}'],
+      include: [
+        'buffer',
+        'events',
+        'punycode',
+        'stream-browserify',
+        ...elementPlusOptimizedDeps
+      ]
     },
     base: isBuild ? './' : '/',
     server: {

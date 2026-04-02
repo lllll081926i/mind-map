@@ -12,6 +12,8 @@ const MAX_HEADER_VALUE_LENGTH: usize = 2048;
 const MAX_MODEL_LENGTH: usize = 256;
 const MAX_MESSAGE_COUNT: usize = 64;
 const MAX_MESSAGE_LENGTH: usize = 32_000;
+const MAX_REQUEST_BODY_SIZE: usize = 128 * 1024;
+const MAX_REQUEST_ID_LENGTH: usize = 128;
 const ALLOWED_AI_DOMAINS: &[&str] = &[
   "api.openai.com",
   "ark.cn-beijing.volces.com",
@@ -74,7 +76,24 @@ fn validate_proxy_request(request: &AiProxyRequest) -> Result<(), String> {
   validate_proxy_request_data(&request.data)
 }
 
+fn validate_request_id(request_id: &str) -> Result<(), String> {
+  let normalized = request_id.trim();
+  if normalized.is_empty() || normalized.len() > MAX_REQUEST_ID_LENGTH {
+    return Err("AI 请求标识无效".into());
+  }
+  if normalized.chars().any(|char| {
+    !(char.is_ascii_alphanumeric() || matches!(char, '-' | '_' | ':' | '.'))
+  }) {
+    return Err("AI 请求标识无效".into());
+  }
+  Ok(())
+}
+
 fn validate_proxy_request_data(data: &serde_json::Value) -> Result<(), String> {
+  let serialized = serde_json::to_vec(data).map_err(|_| "AI 请求体无效".to_string())?;
+  if serialized.len() > MAX_REQUEST_BODY_SIZE {
+    return Err("AI 请求体过大".into());
+  }
   let object = data
     .as_object()
     .ok_or_else(|| "AI 请求体必须是对象".to_string())?;
@@ -193,6 +212,7 @@ fn now_millis() -> u64 {
 }
 
 pub async fn stop_proxy_request(registry: &AiRequestRegistry, request_id: &str) -> Result<(), String> {
+  validate_request_id(request_id)?;
   let mut guard = registry.abort_handles.lock().await;
   if let Some(handle) = guard.remove(request_id) {
     handle.abort();
@@ -206,6 +226,7 @@ pub async fn start_proxy_request(
   request_id: String,
   request: AiProxyRequest,
 ) -> Result<(), String> {
+  validate_request_id(&request_id)?;
   validate_proxy_request(&request)?;
   stop_proxy_request(registry, &request_id).await?;
 

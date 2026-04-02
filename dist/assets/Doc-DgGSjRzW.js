@@ -1,1 +1,0 @@
-import{n as r}from"./index-BF88vo_Y.js";const s={};var _=function(){var n=this;return n._self._c,n._m(0)},a=[function(){var t=this,n=t._self._c;return n("div",{staticClass:"doc"},[t._v(" 文档已迁移至："),n("a",{attrs:{href:"https://wanglin2.github.io/mind-map-docs/"}},[t._v("新地址")])])}],e=r(s,_,a,!1,null,"f2c740b3");const o=e.exports;export{o as default};

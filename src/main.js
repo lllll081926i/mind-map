@@ -16,12 +16,13 @@ import 'element-plus/theme-chalk/el-notification.css'
 import '@/assets/icon-font/iconfont.css'
 import i18n from './i18n'
 import { Buffer } from 'buffer'
-import { bootstrapPlatformState } from '@/platform'
+import platform, { bootstrapPlatformState, isDesktopApp } from '@/platform'
 import pinia from '@/stores'
 import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
 import { emitBootstrapStateReady } from '@/services/appEvents'
 import legacyBus from '@/services/legacyBus'
+import { openWorkspaceFileRef } from '@/services/workspaceActions'
 // import VConsole from 'vconsole'
 // const vConsole = new VConsole()
 
@@ -32,6 +33,75 @@ if (!globalThis.Buffer) {
 const ignoredVueWarnings = [
   'Runtime directive used on component with non-element root node.'
 ]
+
+const getAssociatedFileName = filePath => {
+  return String(filePath || '')
+    .split(/[\\/]/)
+    .pop()
+}
+
+const normalizeAssociatedFilePayload = payload => {
+  if (Array.isArray(payload)) {
+    return payload.filter(Boolean)
+  }
+  if (Array.isArray(payload?.paths)) {
+    return payload.paths.filter(Boolean)
+  }
+  return []
+}
+
+const setupDesktopAssociatedFileHandling = () => {
+  if (!isDesktopApp()) {
+    return Promise.resolve(() => {})
+  }
+
+  let openQueue = Promise.resolve()
+
+  const enqueueOpen = filePath => {
+    if (!filePath) return openQueue
+    openQueue = openQueue
+      .then(async () => {
+        await router.isReady()
+        await openWorkspaceFileRef(
+          {
+            mode: 'desktop',
+            path: filePath,
+            name: getAssociatedFileName(filePath)
+          },
+          router
+        )
+      })
+      .catch(error => {
+        console.error('open associated file failed', error)
+      })
+    return openQueue
+  }
+
+  const openPaths = async payload => {
+    const paths = normalizeAssociatedFilePayload(payload)
+    for (const filePath of paths) {
+      await enqueueOpen(filePath)
+    }
+  }
+
+  return platform
+    .listenAssociatedFileOpen(payload => {
+      void openPaths(payload)
+    })
+    .catch(error => {
+      console.error('listenAssociatedFileOpen failed', error)
+      return () => {}
+    })
+    .then(async unlisten => {
+      try {
+        const pendingPaths = await platform.takePendingAssociatedFiles()
+        await openPaths(pendingPaths)
+      } catch (error) {
+        console.error('takePendingAssociatedFiles failed', error)
+      }
+      return unlisten
+    })
+}
 
 const initApp = () => {
   try {
@@ -85,6 +155,9 @@ const bootstrapApp = () => {
     })
     .catch(error => {
       console.error('bootstrapApp failed to restore platform state', error)
+    })
+    .finally(() => {
+      void setupDesktopAssociatedFileHandling()
     })
 }
 

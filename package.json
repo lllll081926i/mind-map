@@ -1,6 +1,6 @@
 {
   "name": "mind-map-app",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "workspaces": [
     "simple-mind-map",
@@ -18,8 +18,10 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "prepare": "husky",
     "test:update": "node --test tests/update-service-core.test.mjs",
+    "test:utils": "node --test tests/json-utils.test.mjs",
     "test:desktop-runtime": "node --test tests/platform-runtime.test.mjs",
-    "test:desktop-flow": "node --test tests/desktop-file-flow.test.mjs tests/desktop-export-flow.test.mjs",
+    "test:desktop-flow": "node --test tests/desktop-workspace-routing.test.mjs tests/workspace-actions.test.mjs tests/editor-topbar-entrypoints.test.mjs tests/export-page-layout.test.mjs tests/home-page-layout.test.mjs tests/workspace-settings-layout.test.mjs",
+    "test:all": "npm run test:update && npm run test:utils && npm run test:desktop-runtime && npm run test:desktop-flow",
     "frontend:dev": "vite",
     "build": "npm run desktop:build",
     "frontend:build": "vite build --mode desktop",

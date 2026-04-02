@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MindMap",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "identifier": "com.mindmap.desktop",
   "build": {
     "beforeDevCommand": "npm run frontend:dev",
@@ -37,18 +37,63 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
+    "resources": {
+      "file-association/icons/smm-document.ico": "file-association/icons/smm-document.ico"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "smm"
+        ],
+        "name": "MindMap Document",
+        "description": "MindMap 思维导图文档",
+        "role": "Editor",
+        "rank": "Owner",
+        "mimeType": "application/x-mindmap-smm",
+        "contentTypes": [
+          "com.mindmap.document.smm"
+        ],
+        "exportedType": {
+          "identifier": "com.mindmap.document.smm",
+          "conformsTo": [
+            "public.data"
+          ]
+        }
+      }
+    ],
     "shortDescription": "MindMap editor",
     "longDescription": "MindMap application for Windows, macOS, and Linux.",
     "windows": {
-      "digestAlgorithm": "sha256"
+      "digestAlgorithm": "sha256",
+      "nsis": {
+        "installerHooks": "file-association/windows/smm-file-association.nsh"
+      }
     },
     "linux": {
+      "appimage": {
+        "files": {
+          "file-association/linux/application-x-mindmap-smm.xml": "usr/share/mime/packages/application-x-mindmap-smm.xml",
+          "file-association/icons/application-x-mindmap-smm.svg": "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg",
+          "file-association/icons/application-x-mindmap-smm.png": "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png"
+        }
+      },
       "deb": {
-        "depends": []
+        "depends": [],
+        "files": {
+          "file-association/linux/application-x-mindmap-smm.xml": "usr/share/mime/packages/application-x-mindmap-smm.xml",
+          "file-association/icons/application-x-mindmap-smm.svg": "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg",
+          "file-association/icons/application-x-mindmap-smm.png": "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png"
+        },
+        "postInstallScript": "file-association/linux/postinstall.sh",
+        "postRemoveScript": "file-association/linux/postremove.sh"
       }
     },
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "files": {
+        "file-association/icons/smm-document.icns": "Resources/smm-document.icns"
+      },
+      "infoPlist": "file-association/macos/Info.plist"
     }
   },
   "plugins": {
@@ -58,7 +103,7 @@
       "endpoints": [
         "https://github.com/lllll081926i/mind-map/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJFNUZFNDUwNkY0NzFDNTgKUldSWUhFZHZVT1JmTHF2RU9XNnNXYzZuaFJIZXBvMXZCT2dyTGJ3TFFMOHhzM3Z5OXBSRXEvTXYK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2NjBCRDExNzhDQzAxNEMKUldSTUFjeDRFYjFnVmtSaUpyUjJVUERZVERibHpyTm9sbW0zMGlhUS9pQnNWdzAwNWhvbjFRS2EK"
     }
   }
 }

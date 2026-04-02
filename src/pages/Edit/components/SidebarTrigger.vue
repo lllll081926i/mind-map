@@ -31,16 +31,13 @@
 
 <script>
 import { mapState } from 'pinia'
-import { sidebarTriggerList } from '@/config'
+import { sidebarLayout, sidebarTriggerList } from '@/config'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar } from '@/stores/runtime'
 
 // 侧边栏触发器
-const SIDEBAR_PANEL_WIDTH = 300
-const SIDEBAR_TRIGGER_GAP = 8
-const SIDEBAR_COLLAPSED_OFFSET = 46
 const READONLY_ALLOWED_SIDEBARS = ['outline', 'shortcutKey', 'ai']
 
 export default {
@@ -62,14 +59,23 @@ export default {
       enableAi: store => store.localConfig.enableAi
     }),
     containerStyle() {
-      const translateX = this.show
+      const activeOffset =
+        sidebarLayout.panelWidth +
+        sidebarLayout.panelRight +
+        sidebarLayout.triggerGap
+      const collapsedRight =
+        sidebarLayout.collapsedVisibleWidth - sidebarLayout.triggerWidth
+      const right = this.show
         ? this.activeSidebar
-          ? -(SIDEBAR_PANEL_WIDTH + SIDEBAR_TRIGGER_GAP)
+          ? activeOffset
           : 0
-        : SIDEBAR_COLLAPSED_OFFSET
+        : collapsedRight
       return {
+        top: `${sidebarLayout.panelTop}px`,
+        bottom: `${sidebarLayout.panelBottom}px`,
+        width: `${sidebarLayout.triggerWidth}px`,
         maxHeight: this.maxHeight + 'px',
-        transform: `translateX(${translateX}px)`
+        right: `${right}px`
       }
     },
 
@@ -121,9 +127,10 @@ export default {
     },
 
     updateSize() {
-      const topMargin = 110
-      const bottomMargin = 80
-      this.maxHeight = window.innerHeight - topMargin - bottomMargin
+      this.maxHeight = Math.max(
+        0,
+        window.innerHeight - sidebarLayout.panelTop - sidebarLayout.panelBottom
+      )
     }
   }
 }
@@ -132,12 +139,12 @@ export default {
 <style lang="less" scoped>
 .sidebarTriggerContainer {
   position: fixed;
-  top: 110px;
-  bottom: 80px;
+  top: 84px;
+  bottom: 20px;
   right: 0;
   z-index: 1201;
   transition:
-    transform 0.3s ease,
+    right 0.3s ease,
     max-height 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -195,11 +202,11 @@ export default {
 
   .trigger {
     position: relative;
-    width: 60px;
+    width: 100%;
     border-color: #eee;
     background-color: #fff;
     box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
-    border-radius: 6px;
+    border-radius: 6px 0 0 6px;
     max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;

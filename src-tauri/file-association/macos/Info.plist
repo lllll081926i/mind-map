@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+        <array>
+          <string>smm</string>
+        </array>
+        <key>CFBundleTypeIconFile</key>
+        <string>smm-document.icns</string>
+        <key>CFBundleTypeName</key>
+        <string>MindMap Document</string>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>LSHandlerRank</key>
+        <string>Owner</string>
+        <key>LSItemContentTypes</key>
+        <array>
+          <string>com.mindmap.document.smm</string>
+        </array>
+      </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+      <dict>
+        <key>UTTypeConformsTo</key>
+        <array>
+          <string>public.data</string>
+        </array>
+        <key>UTTypeDescription</key>
+        <string>MindMap Document</string>
+        <key>UTTypeIdentifier</key>
+        <string>com.mindmap.document.smm</string>
+        <key>UTTypeTagSpecification</key>
+        <dict>
+          <key>public.filename-extension</key>
+          <array>
+            <string>smm</string>
+          </array>
+          <key>public.mime-type</key>
+          <string>application/x-mindmap-smm</string>
+        </dict>
+      </dict>
+    </array>
+  </dict>
+</plist>

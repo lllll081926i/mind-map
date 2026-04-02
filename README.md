@@ -87,7 +87,7 @@
 
 建议环境：
 
-- Node.js 25.x
+- Node.js 22.x (LTS)
 - npm 10+
 - Rust stable
 - Windows 为当前主要开发宿主机
@@ -172,7 +172,7 @@ npm run ai:serve -- --port=4567
 
 详细说明见：
 
-- [AI 配置迁移说明](/D:/Code/mind-map/docs/ai-migration.md)
+- [AI 配置迁移说明](./docs/ai-migration.md)
 
 ## 常用命令
 
@@ -213,8 +213,8 @@ npm run ai:serve
 
 相关文档：
 
-- [桌面打包说明](/D:/Code/mind-map/docs/desktop-packaging.md)
-- [桌面发布检查清单](/D:/Code/mind-map/docs/release/desktop-release-checklist.md)
+- [桌面打包说明](./docs/desktop-packaging.md)
+- [桌面发布检查清单](./docs/release/desktop-release-checklist.md)
 
 ## 当前状态
 
@@ -227,7 +227,7 @@ npm run ai:serve
 
 详细路线见：
 
-- [项目后续能力规划与升级路线](/D:/Code/mind-map/docs/project-roadmap.md)
+- [项目后续能力规划与升级路线](./docs/project-roadmap.md)
 
 ## 已知方向
 
@@ -244,4 +244,4 @@ npm run ai:serve
 
 详见：
 
-- [LICENSE](/D:/Code/mind-map/LICENSE)
+- [LICENSE](./LICENSE)

@@ -66,6 +66,16 @@ const sidebarTriggerList = {
   zh: sidebarTriggerListZh
 }
 
+const sidebarLayout = {
+  panelWidth: 320,
+  panelRight: 0,
+  panelTop: 84,
+  panelBottom: 20,
+  triggerWidth: 60,
+  triggerGap: 8,
+  collapsedVisibleWidth: 14
+}
+
 const downTypeList = {
   zh: downTypeListZh
 }
@@ -110,6 +120,7 @@ export {
   shapeList,
   shapeListMap,
   sidebarTriggerList,
+  sidebarLayout,
   downTypeList,
   numberTypeList,
   numberLevelList,

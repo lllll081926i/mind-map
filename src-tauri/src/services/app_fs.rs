@@ -81,7 +81,7 @@ async fn collect_allowed_directory_roots(app: &tauri::AppHandle) -> Result<Vec<P
 
   let mut result = Vec::new();
   for root in roots {
-    if let Ok(canonical) = std::fs::canonicalize(&root) {
+    if let Ok(canonical) = tokio::fs::canonicalize(&root).await {
       if !result.iter().any(|item| item == &canonical) {
         result.push(canonical);
       }
@@ -98,7 +98,9 @@ async fn ensure_directory_scope_allowed(
   if allowed_roots.is_empty() {
     return Ok(());
   }
-  let canonical_path = std::fs::canonicalize(path).map_err(|error| error.to_string())?;
+  let canonical_path = tokio::fs::canonicalize(path)
+    .await
+    .map_err(|error| error.to_string())?;
   let is_allowed = allowed_roots.iter().any(|root| {
     canonical_path == *root || canonical_path.starts_with(root)
   });

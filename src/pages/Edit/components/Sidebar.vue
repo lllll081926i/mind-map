@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import { store } from '@/config'
+import { sidebarLayout, store } from '@/config'
 import { mapState } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar } from '@/stores/runtime'
@@ -51,9 +51,13 @@ export default {
       return this.forceShow
     },
     sidebarStyle() {
+      const hiddenRight = `-${sidebarLayout.panelWidth + sidebarLayout.panelRight + 20}px`
       return {
         zIndex: this.zIndex,
-        right: this.isShown ? '20px' : '-360px',
+        top: `${sidebarLayout.panelTop}px`,
+        bottom: `${sidebarLayout.panelBottom}px`,
+        width: `${sidebarLayout.panelWidth}px`,
+        right: this.isShown ? `${sidebarLayout.panelRight}px` : hiddenRight,
         opacity: this.isShown ? 1 : 0,
         pointerEvents: this.isShown ? 'auto' : 'none'
       }
@@ -101,7 +105,8 @@ export default {
   z-index: 1100;
   background-color: #fff;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 8px;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;

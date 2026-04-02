@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2549.3375 1440" width="2549.3375" height="1440" style="--bg:#1a1b26;--fg:#a9b1d6;--line:#3d59a1;--accent:#7aa2f7;--muted:#565f89;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 30%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="4.8" refX="8" refY="2.4" orient="auto">
+    <polygon points="0 0, 8 2.4, 0 4.8" fill="var(--_arrow)" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="4.8" refX="0" refY="2.4" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.4, 8 4.8" fill="var(--_arrow)" />
+  </marker>
+</defs>
+<rect x="321.3499999999999" y="40" width="908.1125" height="736" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<rect x="321.3499999999999" y="40" width="908.1125" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="333.3499999999999" y="54" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;Frontend (Vue 3 + Vite)&quot;</text>
+<rect x="1249.4625" y="508" width="956.0125" height="268" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<rect x="1249.4625" y="508" width="956.0125" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="1261.4625" y="522" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;思维导图核心库 (simple-mind-map)&quot;</text>
+<rect x="40" y="820" width="837.4499999999998" height="580" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<rect x="40" y="820" width="837.4499999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="52" y="834" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;桌面端 (Tauri 2 + Rust)&quot;</text>
+<rect x="897.4499999999998" y="820" width="1611.8875000000003" height="112" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<rect x="897.4499999999998" y="820" width="1611.8875000000003" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="909.4499999999998" y="834" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;外部依赖&quot;</text>
+<polyline points="785.7124999999999,132 785.7124999999999,152 579.5624999999998,152 579.5624999999998,252" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="785.7124999999999,132 785.7124999999999,152 1102.0874999999999,152 1102.0874999999999,252" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="579.5624999999998,288 579.5624999999998,408" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="579.5624999999998,444 579.5624999999998,464 464.8124999999999,464 464.8124999999999,564" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,600 464.8124999999999,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,756 464.8124999999999,876" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="579.5624999999998,444 579.5624999999998,464 975.7749999999999,464 975.7749999999999,564" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="975.7749999999999,600 975.7749999999999,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="579.5624999999998,444 579.5624999999998,464 1062.6999999999998,464 1062.6999999999998,582 1648.0124999999998,582" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="1739.0874999999999,600 1739.0874999999999,620 1373.2624999999998,620 1373.2624999999998,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="1739.0874999999999,600 1739.0874999999999,620 1579.4125,620 1579.4125,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="1739.0874999999999,600 1739.0874999999999,620 1760.5375,620 1760.5375,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="1739.0874999999999,600 1739.0874999999999,620 1938.0874999999999,620 1938.0874999999999,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="1739.0874999999999,600 1739.0874999999999,620 2104.9125,620 2104.9125,720" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,912 464.8124999999999,1032" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,1068 464.8124999999999,1188" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,1224 464.8124999999999,1244 135.19999999999993,1244 135.19999999999993,1344" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,1224 464.8124999999999,1244 316.32499999999993,1244 316.32499999999993,1344" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,1224 464.8124999999999,1244 515.3249999999999,1244 515.3249999999999,1344" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="464.8124999999999,1224 464.8124999999999,1244 742.9249999999998,1244 742.9249999999998,1344" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="2104.9125,756 2104.9125,894 1710.6625,894" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<polyline points="975.7749999999999,756 975.7749999999999,894 1521.3624999999997,894" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
+<rect x="716.0874999999999" y="96" width="139.25" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="502.7874999999998" y="252" width="153.55" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="996.7124999999999" y="252" width="210.75000000000003" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="434.8624999999997" y="408" width="289.40000000000003" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="377.3124999999999" y="564" width="175" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="366.58749999999986" y="720" width="196.45000000000002" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="895.4249999999998" y="564" width="160.70000000000002" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="909.7249999999999" y="720" width="132.10000000000002" height="36" rx="0" ry="0" fill="#42b883" stroke="#35495e" stroke-width="0.75" />
+<rect x="1648.0124999999998" y="564" width="182.15" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="1271.4624999999999" y="720" width="203.60000000000002" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="1499.0625" y="720" width="160.70000000000002" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="1683.7624999999998" y="720" width="153.55" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="1861.3124999999998" y="720" width="153.55" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="2038.8625" y="720" width="132.10000000000002" height="36" rx="0" ry="0" fill="#f7df1e" stroke="#35495e" stroke-width="0.75" />
+<rect x="370.1624999999999" y="876" width="189.3" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="370.1624999999999" y="1032" width="189.3" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="373.7374999999999" y="1188" width="182.15" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="61.99999999999993" y="1344" width="146.4" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="232.39999999999992" y="1344" width="167.85000000000002" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="424.24999999999994" y="1344" width="182.15" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="630.3999999999999" y="1344" width="225.05" height="36" rx="0" ry="0" fill="#dea584" stroke="#35495e" stroke-width="0.75" />
+<rect x="1521.3624999999997" y="876" width="189.3" height="36" rx="0" ry="0" fill="#61dafb" stroke="#35495e" stroke-width="0.75" />
+<rect x="1907.1874999999998" y="876" width="217.9" height="36" rx="0" ry="0" fill="#61dafb" stroke="#35495e" stroke-width="0.75" />
+<rect x="2149.0875" y="876" width="189.3" height="36" rx="0" ry="0" fill="#61dafb" stroke="#35495e" stroke-width="0.75" />
+<rect x="2362.3875000000003" y="876" width="124.95" height="36" rx="0" ry="0" fill="#61dafb" stroke="#35495e" stroke-width="0.75" />
+<text x="785.7124999999999" y="114" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;main.js\n应用入口&quot;</text>
+<text x="579.5624999999998" y="270" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;router.js\n路由配置&quot;</text>
+<text x="1102.0874999999999" y="270" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;stores/\n6 Pinia Stores&quot;</text>
+<text x="579.5624999999998" y="426" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;pages/\nHome | Edit | Export | Doc&quot;</text>
+<text x="464.8124999999999" y="582" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;components/\nUI 组件&quot;</text>
+<text x="464.8124999999999" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;platform/\n桌面/Web 抽象层&quot;</text>
+<text x="975.7749999999999" y="582" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;services/\n业务服务层&quot;</text>
+<text x="975.7749999999999" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#fff">&quot;utils/\n工具函数&quot;</text>
+<text x="1739.0874999999999" y="582" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;MindMap 类\n主入口 869行&quot;</text>
+<text x="1373.2624999999998" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;core/render/\nSVG 渲染引擎&quot;</text>
+<text x="1579.4125" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;layouts/\n9种布局算法&quot;</text>
+<text x="1760.5375" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;plugins/\n25个插件&quot;</text>
+<text x="1938.0874999999999" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;parse/\n格式解析/转换&quot;</text>
+<text x="2104.9125" y="738" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;theme/\n主题系统&quot;</text>
+<text x="464.8124999999999" y="894" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;main.rs\nRust 入口 51行&quot;</text>
+<text x="464.8124999999999" y="1050" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;commands/\nTauri 命令层&quot;</text>
+<text x="464.8124999999999" y="1206" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;services/\nRust 服务层&quot;</text>
+<text x="135.19999999999993" y="1362" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;ai.rs\nAI 代理服务&quot;</text>
+<text x="316.32499999999993" y="1362" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;app_fs.rs\n文件系统服务&quot;</text>
+<text x="515.3249999999999" y="1362" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;app_state.rs\n状态持久化&quot;</text>
+<text x="742.9249999999998" y="1362" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;file_association.rs\n文件关联&quot;</text>
+<text x="1616.0124999999998" y="894" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;Element Plus\nUI 组件库&quot;</text>
+<text x="2016.1374999999998" y="894" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;@svgdotjs/svg.js\nSVG 操作&quot;</text>
+<text x="2243.7375" y="894" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;Yjs + y-webrtc\n协同编辑&quot;</text>
+<text x="2424.8625" y="894" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="#000">&quot;KaTeX\n数学公式&quot;</text>
+</svg>
