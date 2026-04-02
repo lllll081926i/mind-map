@@ -335,7 +335,7 @@ jobs:
             }
 
       - name: Build desktop bundles for release with updater artifacts
-        if: needs.create_release.outputs.release_id != '' && matrix.include_updater_json && env.HAS_UPDATER_SECRETS == 'true'
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id != '' && matrix.include_updater_json && env.HAS_UPDATER_SECRETS == 'true'
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -352,7 +352,7 @@ jobs:
           includeUpdaterJson: false
 
       - name: Build desktop bundles for release without updater artifacts
-        if: needs.create_release.outputs.release_id != '' && (!matrix.include_updater_json || env.HAS_UPDATER_SECRETS != 'true')
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id != '' && (!matrix.include_updater_json || env.HAS_UPDATER_SECRETS != 'true')
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -367,7 +367,7 @@ jobs:
           includeUpdaterJson: false
 
       - name: Build desktop bundles for workflow artifacts
-        if: needs.create_release.outputs.release_id == ''
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id == ''
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -378,6 +378,12 @@ jobs:
           assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
           includeUpdaterJson: false
+
+      - name: Build Windows portable binary
+        if: matrix.portable_asset_suffix != ''
+        shell: pwsh
+        run: |
+          npx tauri build ${{ matrix.args }}
 
       - name: Normalize Windows portable asset name
         id: portable_asset
