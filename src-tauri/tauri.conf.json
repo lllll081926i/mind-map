@@ -72,17 +72,17 @@
     "linux": {
       "appimage": {
         "files": {
-          "file-association/linux/application-x-mindmap-smm.xml": "usr/share/mime/packages/application-x-mindmap-smm.xml",
-          "file-association/icons/application-x-mindmap-smm.svg": "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg",
-          "file-association/icons/application-x-mindmap-smm.png": "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png"
+          "usr/share/mime/packages/application-x-mindmap-smm.xml": "file-association/linux/application-x-mindmap-smm.xml",
+          "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg": "file-association/icons/application-x-mindmap-smm.svg",
+          "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png": "file-association/icons/application-x-mindmap-smm.png"
         }
       },
       "deb": {
         "depends": [],
         "files": {
-          "file-association/linux/application-x-mindmap-smm.xml": "usr/share/mime/packages/application-x-mindmap-smm.xml",
-          "file-association/icons/application-x-mindmap-smm.svg": "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg",
-          "file-association/icons/application-x-mindmap-smm.png": "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png"
+          "usr/share/mime/packages/application-x-mindmap-smm.xml": "file-association/linux/application-x-mindmap-smm.xml",
+          "usr/share/icons/hicolor/scalable/mimetypes/application-x-mindmap-smm.svg": "file-association/icons/application-x-mindmap-smm.svg",
+          "usr/share/icons/hicolor/128x128/mimetypes/application-x-mindmap-smm.png": "file-association/icons/application-x-mindmap-smm.png"
         },
         "postInstallScript": "file-association/linux/postinstall.sh",
         "postRemoveScript": "file-association/linux/postremove.sh"
@@ -91,7 +91,7 @@
     "macOS": {
       "minimumSystemVersion": "11.0",
       "files": {
-        "file-association/icons/smm-document.icns": "Resources/smm-document.icns"
+        "Resources/smm-document.icns": "file-association/icons/smm-document.icns"
       },
       "infoPlist": "file-association/macos/Info.plist"
     }
