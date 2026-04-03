@@ -556,6 +556,7 @@ jobs:
         if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/github-script@v8
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
           TAG_NAME: ${{ needs.create_release.outputs.tag_name }}
         with:
@@ -574,11 +575,17 @@ jobs:
             })
 
             const getSignatureContent = async asset => {
-              const response = await fetch(asset.browser_download_url)
+              const response = await fetch(asset.url, {
+                headers: {
+                  Accept: 'application/octet-stream',
+                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              })
               if (!response.ok) {
                 throw new Error(`Failed to download signature asset ${asset.name}: ${response.status}`)
               }
-              return (await response.text()).trim()
+              return Buffer.from(await response.arrayBuffer()).toString('utf8').trim()
             }
 
             const platformTargets = [
