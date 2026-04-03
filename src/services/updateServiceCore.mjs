@@ -35,6 +35,19 @@ export const parseUpdateManifest = (data, fallbackUrl = '') => {
   }
 }
 
+export const parseGitHubLatestRelease = (data, fallbackUrl = '') => {
+  if (!data || typeof data !== 'object' || !data.tag_name) {
+    throw new Error('GitHub Release 数据格式无效')
+  }
+
+  return {
+    version: normalizeVersion(data.tag_name),
+    notes: String(data.body || ''),
+    url: String(data.html_url || fallbackUrl || '').trim(),
+    publishedAt: String(data.published_at || data.created_at || '').trim()
+  }
+}
+
 export const createManualUpdateResult = (currentVersion, manifest) => {
   const comparison = compareVersions(currentVersion, manifest.version)
   if (comparison < 0) {
@@ -42,7 +55,8 @@ export const createManualUpdateResult = (currentVersion, manifest) => {
       status: 'update-available',
       latestVersion: manifest.version,
       notes: manifest.notes,
-      url: manifest.url
+      url: manifest.url,
+      publishedAt: manifest.publishedAt || ''
     }
   }
   return {

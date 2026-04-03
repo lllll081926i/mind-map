@@ -294,7 +294,11 @@ export const consumeOpenAICompatibleStreamText = (pending, chunk) => {
       done = true
       break
     }
-    items.push(JSON.parse(data))
+    try {
+      items.push(JSON.parse(data))
+    } catch (error) {
+      console.error('consumeOpenAICompatibleStreamText parse failed', error)
+    }
   }
 
   return {

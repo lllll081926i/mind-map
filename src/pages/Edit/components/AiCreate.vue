@@ -61,7 +61,11 @@
           <el-button @click="closeAiCreateDialog">{{
             $t('ai.cancel')
           }}</el-button>
-          <el-button type="primary" @click="doAiCreate">{{
+          <el-button
+            type="primary"
+            @click="doAiCreate"
+            :disabled="hasActiveAiRequest"
+          >{{
             $t('ai.confirm')
           }}</el-button>
         </div>
@@ -89,13 +93,20 @@
     >
       <div class="inputBox">
         <el-input type="textarea" :rows="5" v-model="aiPartInput"> </el-input>
+        <div class="tip" v-if="hasActiveAiRequest">
+          {{ $t('ai.requestInProgressTip') }}
+        </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="closeAiCreatePartDialog">{{
             $t('ai.cancel')
           }}</el-button>
-          <el-button type="primary" @click="confirmAiCreatePart">{{
+          <el-button
+            type="primary"
+            @click="confirmAiCreatePart"
+            :disabled="hasActiveAiRequest"
+          >{{
             $t('ai.confirm')
           }}</el-button>
         </div>
@@ -143,7 +154,7 @@ export default {
   data() {
     return {
       aiInstance: null,
-      isAiCreating: false,
+      activeAiRequestKind: '',
       aiCreatingContent: '',
 
       isLoopRendering: false,
@@ -173,7 +184,19 @@ export default {
     }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
-    })
+    }),
+    hasActiveAiRequest() {
+      return !!this.activeAiRequestKind
+    },
+    isGeneratingMindMapRequest() {
+      return (
+        this.activeAiRequestKind === 'create-all' ||
+        this.activeAiRequestKind === 'create-part'
+      )
+    },
+    isChatRequest() {
+      return this.activeAiRequestKind === 'chat'
+    }
   },
   created() {
     this.removeAiCreateAllListener = onAiCreateAll(this.aiCrateAll)
@@ -239,12 +262,13 @@ export default {
       if (invalidate) {
         this.activeAiRequestId += 1
       }
-      this.isAiCreating = false
+      this.activeAiRequestKind = ''
       this.aiInstance = null
     },
 
-    beginAiRequest() {
+    beginAiRequest(kind = '') {
       this.activeAiRequestId += 1
+      this.activeAiRequestKind = kind
       return this.activeAiRequestId
     },
 
@@ -280,6 +304,25 @@ export default {
       const { ai } = createAiClient(this.aiConfig)
       this.aiInstance = ai
       return ai
+    },
+
+    createUiError(message) {
+      const error = new Error(message)
+      error.code = 'AI_REQUEST_BUSY'
+      return error
+    },
+
+    handleAiBusy(kind = '') {
+      if (!this.hasActiveAiRequest) return false
+      const message = this.isGeneratingMindMapRequest
+        ? this.$t('ai.mindMapGeneratingTip')
+        : this.isChatRequest
+          ? this.$t('ai.chatRequestInProgressTip')
+          : this.$t('ai.requestInProgressTip')
+      if (kind !== 'chat') {
+        this.$message.warning(message)
+      }
+      return this.createUiError(message)
     },
 
     // 显示AI配置修改弹窗
@@ -324,6 +367,8 @@ export default {
     // AI生成整体
     async aiCrateAll() {
       try {
+        const busyError = this.handleAiBusy('create-all')
+        if (busyError) return
         await this.aiTest()
         this.createDialogVisible = true
       } catch (error) {
@@ -344,14 +389,13 @@ export default {
         this.$message.warning(this.$t('ai.noInputTip'))
         return
       }
-      if (this.isAiCreating) {
+      if (this.handleAiBusy('create-all')) {
         return
       }
       this.closeAiCreateDialog()
       this.aiCreatingMaskVisible = true
       // 发起请求
-      this.isAiCreating = true
-      const requestId = this.beginAiRequest()
+      const requestId = this.beginAiRequest('create-all')
       this.createAiInstance()
       this.mindMap.renderer.setRootNodeCenter()
       this.mindMap.setData(null)
@@ -437,7 +481,7 @@ export default {
         this.checkNodeOuter()
 
         // 如果生成结束数据渲染完毕，那么解绑事件
-        if (!this.isAiCreating && !this.aiCreatingContent) {
+        if (!this.isGeneratingMindMapRequest && !this.aiCreatingContent) {
           this.resetOnRenderEnd()
           return
         }
@@ -449,7 +493,7 @@ export default {
         }
         const treeData = nextSnapshot.treeData
         // 正在生成中
-        if (this.isAiCreating) {
+        if (this.isGeneratingMindMapRequest) {
           // 如果和上次数据一样则不触发重新渲染
           const curTreeData = JSON.stringify(treeData)
           if (curTreeData === lastTreeData) {
@@ -520,6 +564,8 @@ export default {
 
     // 显示AI续写弹窗
     showAiCreatePartDialog(node) {
+      const busyError = this.handleAiBusy('create-part')
+      if (busyError) return
       this.beingCreatePartNode = node
       const currentMindMapData = this.mindMap.getData()
       // 填充默认内容
@@ -546,7 +592,13 @@ export default {
 
     // 确认AI续写
     confirmAiCreatePart() {
-      if (!this.aiPartInput.trim()) return
+      if (!this.aiPartInput.trim()) {
+        this.$message.warning(this.$t('ai.noInputTip'))
+        return
+      }
+      if (this.handleAiBusy('create-part')) {
+        return
+      }
       this.closeAiCreatePartDialog()
       this.aiCreatePart()
     },
@@ -557,14 +609,15 @@ export default {
         if (!this.beingCreatePartNode) {
           return
         }
+        const busyError = this.handleAiBusy('create-part')
+        if (busyError) return
         await this.aiTest()
         this.beingAiCreateNodeUid = this.beingCreatePartNode.getData('uid')
         const currentMindMapData = this.mindMap.getData()
         this.mindMapDataCache = JSON.stringify(currentMindMapData)
         this.aiCreatingMaskVisible = true
         // 发起请求
-        this.isAiCreating = true
-        const requestId = this.beginAiRequest()
+        const requestId = this.beginAiRequest('create-part')
         this.createAiInstance()
         this.aiInstance.request(
           {
@@ -648,7 +701,7 @@ export default {
         this.checkNodeOuter()
 
         // 如果生成结束数据渲染完毕，那么解绑事件
-        if (!this.isAiCreating && !this.aiCreatingContent) {
+        if (!this.isGeneratingMindMapRequest && !this.aiCreatingContent) {
           this.resetOnRenderEnd()
           return
         }
@@ -661,7 +714,7 @@ export default {
         const partData = nextSnapshot.treeData
         const treeData = this.addToTargetNode(partData.children || [])
 
-        if (this.isAiCreating) {
+        if (this.isGeneratingMindMapRequest) {
           // 如果和上次数据一样则不触发重新渲染
           const curPartData = JSON.stringify(partData)
           if (curPartData === lastPartData) {
@@ -691,10 +744,14 @@ export default {
       err = () => {}
     ) {
       try {
+        const busyError = this.handleAiBusy('chat')
+        if (busyError) {
+          err(busyError)
+          return
+        }
         await this.aiTest()
         // 发起请求
-        this.isAiCreating = true
-        const requestId = this.beginAiRequest()
+        const requestId = this.beginAiRequest('chat')
         this.createAiInstance()
         this.aiInstance.request(
           {

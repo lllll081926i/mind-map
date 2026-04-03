@@ -1,5 +1,5 @@
 import { imgToDataUrl } from 'simple-mind-map/src/utils/index'
-import { parseExternalJsonSafely } from '@/utils'
+import { parseExternalJsonSafely } from '@/utils/json'
 
 // 处理知犀
 const handleZHIXI = async data => {

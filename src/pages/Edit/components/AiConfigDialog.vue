@@ -15,7 +15,7 @@
         label-width="100px"
       >
         <p class="title">{{ $t('ai.providerConfiguration') }}</p>
-        <p class="desc">{{ $t('ai.configTip') }}</p>
+        <p class="desc">{{ $t('ai.providerConfigurationTip') }}</p>
         <el-form-item :label="$t('ai.provider')" prop="provider">
           <el-select v-model="ruleForm.provider" @change="handleProviderChange">
             <el-option
@@ -27,20 +27,42 @@
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('ai.baseUrl')" prop="baseUrl">
-          <el-input v-model="ruleForm.baseUrl"></el-input>
+          <el-input
+            v-model="ruleForm.baseUrl"
+            clearable
+            :placeholder="$t('ai.baseUrlPlaceholder')"
+          ></el-input>
         </el-form-item>
         <el-form-item :label="$t('ai.apiPath')" prop="apiPath">
-          <el-input v-model="ruleForm.apiPath"></el-input>
+          <el-input
+            v-model="ruleForm.apiPath"
+            clearable
+            :placeholder="$t('ai.apiPathPlaceholder')"
+          ></el-input>
         </el-form-item>
         <el-form-item label="API Key" prop="key">
-          <el-input v-model="ruleForm.key"></el-input>
+          <el-input
+            v-model="ruleForm.key"
+            show-password
+            clearable
+            :placeholder="$t('ai.apiKeyPlaceholder')"
+          ></el-input>
         </el-form-item>
         <el-form-item :label="$t('ai.modelName')" prop="model">
-          <el-input v-model="ruleForm.model"></el-input>
+          <el-input
+            v-model="ruleForm.model"
+            clearable
+            :placeholder="$t('ai.modelPlaceholder')"
+          ></el-input>
         </el-form-item>
         <p class="title">{{ $t('ai.mindMappingClientConfiguration') }}</p>
+        <p class="desc">{{ $t('ai.clientConfigurationTip') }}</p>
         <el-form-item :label="$t('ai.port')" prop="port">
-          <el-input v-model="ruleForm.port"></el-input>
+          <el-input
+            v-model="ruleForm.port"
+            clearable
+            :placeholder="$t('ai.portPlaceholder')"
+          ></el-input>
         </el-form-item>
       </el-form>
     </div>

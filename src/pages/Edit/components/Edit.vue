@@ -22,8 +22,14 @@
       ref="mindMapContainer"
     ></div>
     <Count :mindMap="mindMap" v-if="!isZenMode"></Count>
-    <Navigator v-if="mindMap" :mindMap="mindMap"></Navigator>
-    <NavigatorToolbar :mindMap="mindMap" v-if="!isZenMode"></NavigatorToolbar>
+    <Navigator
+      v-if="mindMap && secondaryUiReady"
+      :mindMap="mindMap"
+    ></Navigator>
+    <NavigatorToolbar
+      :mindMap="mindMap"
+      v-if="!isZenMode && secondaryUiReady"
+    ></NavigatorToolbar>
     <component
       :is="primarySidebarComponent"
       v-bind="primarySidebarProps"
@@ -39,17 +45,26 @@
       :mindMap="mindMap"
     ></RichTextToolbar>
     <NodeNoteContentShow
-      v-if="mindMap"
+      v-if="mindMap && secondaryUiReady"
       :mindMap="mindMap"
     ></NodeNoteContentShow>
-    <NodeImgPreview v-if="mindMap" :mindMap="mindMap"></NodeImgPreview>
+    <NodeImgPreview
+      v-if="mindMap && secondaryUiReady"
+      :mindMap="mindMap"
+    ></NodeImgPreview>
     <SidebarTrigger v-if="!isZenMode"></SidebarTrigger>
-    <Search v-if="mindMap" :mindMap="mindMap"></Search>
+    <Search
+      v-if="mindMap && secondaryUiReady"
+      :mindMap="mindMap"
+    ></Search>
     <NodeIconSidebar
       v-if="mindMap && activeSidebar === 'nodeIconSidebar'"
       :mindMap="mindMap"
     ></NodeIconSidebar>
-    <NodeIconToolbar v-if="mindMap" :mindMap="mindMap"></NodeIconToolbar>
+    <NodeIconToolbar
+      v-if="mindMap && secondaryUiReady"
+      :mindMap="mindMap"
+    ></NodeIconToolbar>
     <OutlineEdit v-if="mindMap && isOutlineEdit" :mindMap="mindMap"></OutlineEdit>
     <Scrollbar v-if="isShowScrollbar && mindMap" :mindMap="mindMap"></Scrollbar>
     <FormulaSidebar
@@ -254,7 +269,10 @@ const loadMindMapRuntime = async () => {
           MindMap
         }
       }
-    )
+    ).catch(error => {
+      mindMapRuntimePromise = null
+      throw error
+    })
   }
   return mindMapRuntimePromise
 }
@@ -263,7 +281,12 @@ const loadScrollbarPlugin = async () => {
   if (!scrollbarPluginPromise) {
     scrollbarPluginPromise = import(
       'simple-mind-map/src/plugins/Scrollbar.js'
-    ).then(module => module.default)
+    )
+      .then(module => module.default)
+      .catch(error => {
+        scrollbarPluginPromise = null
+        throw error
+      })
   }
   return scrollbarPluginPromise
 }
@@ -272,7 +295,10 @@ const loadHandleClipboardText = async () => {
   if (!handleClipboardTextPromise) {
     handleClipboardTextPromise = import('@/utils/handleClipboardText').then(
       module => module.default
-    )
+    ).catch(error => {
+      handleClipboardTextPromise = null
+      throw error
+    })
   }
   return handleClipboardTextPromise
 }
@@ -281,6 +307,9 @@ const loadExtendedIconList = async () => {
   if (!extendedIconListPromise) {
     extendedIconListPromise = import('@/config/icon').then(module => {
       return Array.isArray(module.default) ? module.default : []
+    }).catch(error => {
+      extendedIconListPromise = null
+      throw error
     })
   }
   return extendedIconListPromise
@@ -324,7 +353,10 @@ const loadRichTextPlugins = async () => {
     ]).then(([richTextModule, formulaModule]) => ({
       RichText: richTextModule.default,
       Formula: formulaModule.default
-    }))
+    })).catch(error => {
+      richTextPluginsPromise = null
+      throw error
+    })
   }
   return richTextPluginsPromise
 }
@@ -333,7 +365,10 @@ const loadExportBasePlugin = async () => {
   if (!exportBasePluginPromise) {
     exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js').then(
       module => module.default
-    )
+    ).catch(error => {
+      exportBasePluginPromise = null
+      throw error
+    })
   }
   return exportBasePluginPromise
 }
@@ -342,7 +377,12 @@ const loadExportPdfPlugin = async () => {
   if (!exportPdfPluginPromise) {
     exportPdfPluginPromise = import(
       'simple-mind-map/src/plugins/ExportPDF.js'
-    ).then(module => module.default)
+    )
+      .then(module => module.default)
+      .catch(error => {
+        exportPdfPluginPromise = null
+        throw error
+      })
   }
   return exportPdfPluginPromise
 }
@@ -351,7 +391,12 @@ const loadExportXMindPlugin = async () => {
   if (!exportXMindPluginPromise) {
     exportXMindPluginPromise = import(
       'simple-mind-map/src/plugins/ExportXMind.js'
-    ).then(module => module.default)
+    )
+      .then(module => module.default)
+      .catch(error => {
+        exportXMindPluginPromise = null
+        throw error
+      })
   }
   return exportXMindPluginPromise
 }
@@ -410,7 +455,10 @@ export default {
       extendedIconList: [],
       extendedIconLoaded: false,
       initErrorMessage: '',
-      editorEventsBound: false
+      editorEventsBound: false,
+      secondaryUiReady: false,
+      secondaryUiFrame: 0,
+      secondaryUiTimer: 0
     }
   },
   computed: {
@@ -514,6 +562,7 @@ export default {
     }
   },
   beforeUnmount() {
+    this.cancelSecondaryUiMount()
     this.unbindEditorEvents()
     if (this.onDataChange) {
       this.$bus.$off('data_change', this.onDataChange)
@@ -585,6 +634,8 @@ export default {
       this.initErrorMessage = ''
       try {
         this.enableShowLoading = true
+        this.cancelSecondaryUiMount()
+        this.secondaryUiReady = false
         this.unbindMindMapEvents()
         if (this.mindMap && typeof this.mindMap.destroy === 'function') {
           this.mindMap.destroy()
@@ -648,6 +699,29 @@ export default {
       this.resizeFrame = requestAnimationFrame(() => {
         this.resizeFrame = 0
         this.mindMap?.resize()
+      })
+    },
+
+    cancelSecondaryUiMount() {
+      if (this.secondaryUiFrame) {
+        cancelAnimationFrame(this.secondaryUiFrame)
+        this.secondaryUiFrame = 0
+      }
+      if (this.secondaryUiTimer) {
+        clearTimeout(this.secondaryUiTimer)
+        this.secondaryUiTimer = 0
+      }
+    },
+
+    scheduleSecondaryUiMount() {
+      this.cancelSecondaryUiMount()
+      this.secondaryUiReady = false
+      this.secondaryUiFrame = requestAnimationFrame(() => {
+        this.secondaryUiFrame = 0
+        this.secondaryUiTimer = window.setTimeout(() => {
+          this.secondaryUiTimer = 0
+          this.secondaryUiReady = true
+        }, 80)
       })
     },
 
@@ -955,16 +1029,21 @@ export default {
     // 初始化
     async init() {
       await this.$nextTick()
-      const handleClipboardText = await loadHandleClipboardText()
-      const { MindMap } = await loadMindMapRuntime()
       const hasFileURL = this.hasFileURL()
       const initialData = this.normalizeMindMapData(this.mindMapData)
       const fallbackData = createDefaultMindMapData(this.$t('edit.root'))
       const config = this.mindMapConfig
-      if (hasExtendedNodeIcons(initialData)) {
-        await this.ensureExtendedIconListLoaded(true)
-      }
-      const containerEl = await this.waitForMindMapContainerReady()
+      const iconTask = hasExtendedNodeIcons(initialData)
+        ? this.ensureExtendedIconListLoaded(true)
+        : Promise.resolve(this.extendedIconList)
+      const [handleClipboardText, { MindMap }, containerEl] = await Promise.all(
+        [
+          loadHandleClipboardText(),
+          loadMindMapRuntime(),
+          this.waitForMindMapContainerReady(),
+          iconTask
+        ]
+      )
       this.mindMap = new MindMap(
         this.createMindMapOptions({
           containerEl,
@@ -987,6 +1066,7 @@ export default {
         this.$bus.$emit('handle_file_url')
       }
       this.registerCurrentDataGetter()
+      this.scheduleSecondaryUiMount()
     },
 
     async ensureExportPluginsLoaded(exportType = 'smm') {

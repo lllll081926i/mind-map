@@ -1,4 +1,4 @@
-import appEvents from './appEvents'
+import appEvents from './appEvents.js'
 
 const legacyBus = {
   $on(eventName, handler) {

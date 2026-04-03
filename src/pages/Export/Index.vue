@@ -317,6 +317,9 @@ const loadMindMapRuntime = async () => {
       return {
         MindMap
       }
+    }).catch(error => {
+      mindMapRuntimePromise = null
+      throw error
     })
   }
   return mindMapRuntimePromise
@@ -326,7 +329,10 @@ const loadExportBasePlugin = async () => {
   if (!exportBasePluginPromise) {
     exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js').then(
       module => module.default
-    )
+    ).catch(error => {
+      exportBasePluginPromise = null
+      throw error
+    })
   }
   return exportBasePluginPromise
 }
@@ -335,7 +341,12 @@ const loadExportPdfPlugin = async () => {
   if (!exportPdfPluginPromise) {
     exportPdfPluginPromise = import(
       'simple-mind-map/src/plugins/ExportPDF.js'
-    ).then(module => module.default)
+    )
+      .then(module => module.default)
+      .catch(error => {
+        exportPdfPluginPromise = null
+        throw error
+      })
   }
   return exportPdfPluginPromise
 }
@@ -344,7 +355,12 @@ const loadExportXMindPlugin = async () => {
   if (!exportXMindPluginPromise) {
     exportXMindPluginPromise = import(
       'simple-mind-map/src/plugins/ExportXMind.js'
-    ).then(module => module.default)
+    )
+      .then(module => module.default)
+      .catch(error => {
+        exportXMindPluginPromise = null
+        throw error
+      })
   }
   return exportXMindPluginPromise
 }
@@ -357,7 +373,10 @@ const loadRichTextPlugins = async () => {
     ]).then(([richTextModule, formulaModule]) => ({
       RichText: richTextModule.default,
       Formula: formulaModule.default
-    }))
+    })).catch(error => {
+      richTextPluginsPromise = null
+      throw error
+    })
   }
   return richTextPluginsPromise
 }
@@ -365,11 +384,6 @@ const loadRichTextPlugins = async () => {
 export default {
   data() {
     const exportContext = resolveExportContext(getCurrentFileRef())
-    const exportFormats = getDesktopExportFormats().map(item => ({
-      ...item,
-      displayName: getFormatDisplayName(this.$t, item.type)
-    }))
-    const fallbackExportFormat = createFallbackExportFormat(this.$t)
     return {
       previewLoading: true,
       exporting: false,
@@ -382,7 +396,6 @@ export default {
       extendedIconList: [],
       exportContext,
       exportState: createExportStateFromFileRef(exportContext.fileRef),
-      exportFormats: exportFormats.length ? exportFormats : [fallbackExportFormat],
       boundExportKeydown: null,
       boundPreviewResize: null,
       previewResizeFrame: 0
@@ -395,6 +408,15 @@ export default {
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
     }),
+    exportFormats() {
+      const exportFormats = getDesktopExportFormats().map(item => ({
+        ...item,
+        displayName: getFormatDisplayName(this.$t, item.type)
+      }))
+      return exportFormats.length
+        ? exportFormats
+        : [createFallbackExportFormat(this.$t)]
+    },
     currentFormat() {
       return (
         this.exportFormats.find(item => item.type === this.exportState.exportType) ||

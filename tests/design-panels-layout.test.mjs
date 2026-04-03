@@ -71,7 +71,12 @@ test('设计侧栏壳层使用统一面板头部与内容容器', () => {
   assert.match(sidebarSource, /sidebarPanelBody/)
   assert.match(sidebarSource, /isShown\(\)\s*\{\s*return this\.forceShow/)
   assert.doesNotMatch(sidebarSource, /show:\s*this\.forceShow \|\| false/)
-  assert.match(sidebarSource, /right 0\.3s ease,\s*opacity 0\.3s ease/)
+  assert.match(sidebarSource, /will-change:\s*right,\s*opacity;/)
+  assert.match(
+    sidebarSource,
+    /right 0\.28s cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\),\s*opacity 0\.18s ease/
+  )
+  assert.match(sidebarSource, /&\.isSwapTransition[\s\S]*transition:\s*opacity 0\.18s ease;/)
 })
 
 test('基础样式、节点样式、主题面板保留核心分组', () => {
@@ -148,7 +153,8 @@ test('页面级侧边栏组件不再各自写入 sidebar.show，统一由 active
 
 test('侧边栏触发器保持可见，并在面板打开时通过位移让出右侧空间', () => {
   assert.match(sidebarTriggerSource, /containerStyle\(\)/)
-  assert.match(sidebarTriggerSource, /translateX\(/)
+  assert.match(sidebarTriggerSource, /const activeOffset =/)
+  assert.match(sidebarTriggerSource, /right:\s*`\$\{right\}px`/)
   assert.doesNotMatch(sidebarTriggerSource, /right:\s*-60px/)
   assert.match(sidebarTriggerSource, /activeSidebar\(val\)/)
   assert.match(sidebarTriggerSource, /if \(val && !this\.show\)/)

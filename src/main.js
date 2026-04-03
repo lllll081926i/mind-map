@@ -22,9 +22,21 @@ import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
 import { emitBootstrapStateReady } from '@/services/appEvents'
 import legacyBus from '@/services/legacyBus'
-import { openWorkspaceFileRef } from '@/services/workspaceActions'
 // import VConsole from 'vconsole'
 // const vConsole = new VConsole()
+
+let workspaceActionsPromise = null
+
+const loadWorkspaceActions = async () => {
+  if (!workspaceActionsPromise) {
+    workspaceActionsPromise = import('@/services/workspaceActions')
+      .catch(error => {
+        workspaceActionsPromise = null
+        throw error
+      })
+  }
+  return workspaceActionsPromise
+}
 
 if (!globalThis.Buffer) {
   globalThis.Buffer = Buffer
@@ -62,6 +74,7 @@ const setupDesktopAssociatedFileHandling = () => {
     openQueue = openQueue
       .then(async () => {
         await router.isReady()
+        const { openWorkspaceFileRef } = await loadWorkspaceActions()
         await openWorkspaceFileRef(
           {
             mode: 'desktop',
@@ -158,7 +171,6 @@ const bootstrapApp = async () => {
 
   if (bootstrapState) {
     emitBootstrapStateReady(bootstrapState)
-    legacyBus.$emit('bootstrap_state_ready', bootstrapState)
   }
 
   void setupDesktopAssociatedFileHandling()

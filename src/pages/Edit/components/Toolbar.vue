@@ -285,7 +285,7 @@ import { mapState } from 'pinia'
 import { ElNotification as Notification } from 'element-plus'
 import { getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
-import { parseExternalJsonSafely } from '@/utils'
+import { parseExternalJsonSafely } from '@/utils/json'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
   getRecentFiles,

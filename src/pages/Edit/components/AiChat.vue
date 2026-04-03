@@ -6,7 +6,7 @@
   >
     <div class="aiChatBox" :class="{ isDark: isDark }">
       <div class="chatHeader">
-        <el-button size="small" @click="clear">
+        <el-button size="small" @click="clear" :disabled="!hasChatMessages">
           {{ $t('ai.clearRecords') }}
         </el-button>
         <el-button size="small" @click="modifyAiConfig">
@@ -14,11 +14,22 @@
         </el-button>
       </div>
       <div class="chatResBox customScrollbar" ref="chatResBoxRef">
+        <div class="chatEmptyState" v-if="!hasChatMessages">
+          <div class="emptyIcon">
+            <span class="icon iconfont iconAIshengcheng"></span>
+          </div>
+          <p class="emptyTitle">{{ $t('ai.chatEmptyTitle') }}</p>
+          <p class="emptyDesc">{{ $t('ai.chatEmptyDescription') }}</p>
+          <p class="emptyTip">{{ $t('ai.chatInputPlaceholder') }}</p>
+          <el-button size="small" @click="modifyAiConfig">
+            {{ $t('ai.modifyAIConfiguration') }}
+          </el-button>
+        </div>
         <div
           class="chatItem"
           v-for="item in chatList"
           :key="item.id"
-          :class="[item.type]"
+          :class="[item.type, item.status]"
         >
           <div class="chatItemInner" v-if="item.type === 'user'">
             <div class="avatar">
@@ -30,29 +41,65 @@
             <div class="avatar">
               <span class="icon iconfont iconAIshengcheng"></span>
             </div>
-            <div class="content" v-html="item.content"></div>
+            <div class="messageMeta">
+              <span class="statusTag" v-if="item.status === 'streaming'">
+                {{ $t('ai.generatingStatus') }}
+              </span>
+              <span class="statusTag warning" v-else-if="item.status === 'stopped'">
+                {{ $t('ai.stoppedStatus') }}
+              </span>
+              <span class="statusTag danger" v-else-if="item.status === 'error'">
+                {{ $t('ai.failedStatus') }}
+              </span>
+            </div>
+            <div
+              class="content"
+              v-if="item.content"
+              v-html="item.content"
+            ></div>
+            <div class="content placeholder" v-else>
+              {{ $t('ai.generatingPlaceholder') }}
+            </div>
           </div>
         </div>
       </div>
       <div class="chatInputBox">
+        <div class="chatStatusBar">
+          <span class="statusText" :class="{ danger: !!chatError }">
+            {{
+              isCreating
+                ? $t('ai.generatingStatus')
+                : chatError || $t('ai.chatFooterTip')
+            }}
+          </span>
+        </div>
         <textarea
-          v-model="text"
+          v-model="chatDraftProxy"
           class="customScrollbar"
           :placeholder="$t('ai.chatInputPlaceholder')"
+          :disabled="isCreating"
           @keydown="onKeydown"
         ></textarea>
-        <el-button class="btn" size="small" @click="send" :loading="isCreating">
-          {{ $t('ai.send') }}
-        </el-button>
-        <el-button
-          class="stop"
-          size="small"
-          type="warning"
-          @click="stop"
-          v-show="isCreating"
-        >
-          {{ $t('ai.stopGenerating') }}
-        </el-button>
+        <div class="chatActions">
+          <el-button
+            class="btn"
+            size="small"
+            @click="send"
+            :loading="isCreating"
+            :disabled="!canSend"
+          >
+            {{ $t('ai.send') }}
+          </el-button>
+          <el-button
+            class="stop"
+            size="small"
+            type="warning"
+            @click="stop"
+            v-show="isCreating"
+          >
+            {{ $t('ai.stopGenerating') }}
+          </el-button>
+        </div>
       </div>
     </div>
   </Sidebar>
@@ -60,11 +107,9 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { createUid } from 'simple-mind-map/src/utils'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import { useAiStore } from '@/stores/ai'
 import { useThemeStore } from '@/stores/theme'
 import {
   emitAiChat,
@@ -73,8 +118,23 @@ import {
 } from '@/services/appEvents'
 
 let md = null
+let sanitizeHtml = null
+let rendererLoader = null
 
-const sanitizeHtml = html => {
+const escapeHtml = value => {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+const renderPlainText = value => {
+  return escapeHtml(value).replace(/\r?\n/g, '<br>')
+}
+
+const createSanitizer = DOMPurify => html => {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       'p',
@@ -112,27 +172,122 @@ const sanitizeHtml = html => {
   })
 }
 
+const ensureRendererReady = async () => {
+  if (md && sanitizeHtml) {
+    return
+  }
+  if (!rendererLoader) {
+    rendererLoader = Promise.all([import('markdown-it'), import('dompurify')])
+      .then(([markdownItModule, domPurifyModule]) => {
+        const MarkdownIt = markdownItModule.default || markdownItModule
+        const DOMPurify = domPurifyModule.default || domPurifyModule
+        md = new MarkdownIt()
+        sanitizeHtml = createSanitizer(DOMPurify)
+      })
+      .catch(error => {
+        rendererLoader = null
+        throw error
+      })
+  }
+  await rendererLoader
+}
+
 export default {
   components: {
     Sidebar
   },
   data() {
     return {
-      text: '',
-      chatList: [],
-      isCreating: false,
       activeResponseId: 0
     }
   },
   computed: {
+    ...mapState(useAiStore, {
+      chatList: 'chatList',
+      chatStatus: 'chatStatus',
+      chatError: 'chatError',
+      activeAssistantMessageId: 'activeAssistantMessageId'
+    }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
     }),
     ...mapState(useAppStore, {
       activeSidebar: 'activeSidebar'
-    })
+    }),
+    chatDraftProxy: {
+      get() {
+        return useAiStore().chatDraft
+      },
+      set(value) {
+        useAiStore().setChatDraft(value)
+      }
+    },
+    hasChatMessages() {
+      return this.chatList.length > 0
+    },
+    isCreating() {
+      return this.chatStatus === 'streaming'
+    },
+    canSend() {
+      return !this.isCreating && !!this.chatDraftProxy.trim()
+    }
+  },
+  created() {
+    useAiStore().hydrateChatSession()
+    void this.prepareRenderer()
+  },
+  mounted() {
+    this.queueScrollToBottom()
   },
   methods: {
+    getAiStore() {
+      return useAiStore()
+    },
+
+    queueScrollToBottom() {
+      this.$nextTick(() => {
+        const box = this.$refs.chatResBoxRef
+        if (!box) return
+        box.scrollTop = box.scrollHeight
+      })
+    },
+
+    async prepareRenderer() {
+      try {
+        await ensureRendererReady()
+        this.refreshRenderedMessages()
+      } catch (error) {
+        console.error('prepareRenderer failed', error)
+      }
+    },
+
+    refreshRenderedMessages() {
+      if (!md || !sanitizeHtml) return
+      const aiStore = this.getAiStore()
+      this.chatList
+        .filter(item => item.type === 'ai')
+        .forEach(item => {
+          const source = item.rawContent || item.content || ''
+          const nextContent = this.renderAiContent(source)
+          if (nextContent === item.content) return
+          aiStore.updateAssistantMessage({
+            id: item.id,
+            rawContent: item.rawContent || source,
+            content: nextContent,
+            status: item.status,
+            includeInHistory: item.includeInHistory
+          })
+        })
+    },
+
+    renderAiContent(content) {
+      const normalizedContent = String(content || '')
+      if (!md || !sanitizeHtml) {
+        return renderPlainText(normalizedContent)
+      }
+      return sanitizeHtml(md.render(normalizedContent))
+    },
+
     onKeydown(e) {
       if (e.keyCode === 13) {
         if (!e.shiftKey) {
@@ -144,30 +299,13 @@ export default {
 
     send() {
       if (this.isCreating) return
-      const text = this.text.trim()
+      const aiStore = this.getAiStore()
+      const text = this.chatDraftProxy.trim()
       if (!text) {
         return
       }
-      this.text = ''
-      const historyMsgList = this.chatList.map(item => {
-        return {
-          role: item.type === 'ai' ? 'assistant' : 'user',
-          content: item.rawContent || item.content
-        }
-      })
-      this.chatList.push({
-        id: createUid(),
-        type: 'user',
-        content: text,
-        rawContent: text
-      })
-      this.chatList.push({
-        id: createUid(),
-        type: 'ai',
-        content: '',
-        rawContent: ''
-      })
-      this.isCreating = true
+      const historyMsgList = aiStore.getHistoryMessages()
+      const assistantId = aiStore.startChatRequest(text)
       const responseId = ++this.activeResponseId
       const messageList = [
         ...historyMsgList,
@@ -180,32 +318,35 @@ export default {
         messageList,
         res => {
           if (responseId !== this.activeResponseId) return
-          if (!md) {
-            md = new MarkdownIt()
-          }
-          const currentItem = this.chatList[this.chatList.length - 1]
-          if (!currentItem || currentItem.type !== 'ai') return
-          currentItem.rawContent = res
-          currentItem.content = sanitizeHtml(md.render(res))
-          this.$refs.chatResBoxRef.scrollTop =
-            this.$refs.chatResBoxRef.scrollHeight
+          aiStore.updateAssistantMessage({
+            id: assistantId,
+            rawContent: res,
+            content: this.renderAiContent(res),
+            status: 'streaming',
+            includeInHistory: !!String(res || '').trim()
+          })
+          this.queueScrollToBottom()
         },
-        () => {
+        content => {
           if (responseId !== this.activeResponseId) return
-          this.isCreating = false
+          aiStore.finishChatRequest({
+            id: assistantId,
+            rawContent: content,
+            content: this.renderAiContent(content)
+          })
+          this.queueScrollToBottom()
         },
         error => {
           if (responseId !== this.activeResponseId) return
-          this.isCreating = false
-          const currentItem = this.chatList[this.chatList.length - 1]
-          if (
-            currentItem &&
-            currentItem.type === 'ai' &&
-            !currentItem.rawContent
-          ) {
-            this.chatList.pop()
-          }
-          this.$message.error(error?.message || this.$t('ai.generationFailed'))
+          const message = error?.message || this.$t('ai.generationFailed')
+          aiStore.failChatRequest({
+            id: assistantId,
+            message,
+            rawContent: '',
+            content: this.renderAiContent(message)
+          })
+          this.queueScrollToBottom()
+          this.$message.error(message)
         }
       )
     },
@@ -213,20 +354,19 @@ export default {
     stop() {
       this.activeResponseId += 1
       emitAiChatStop()
-      this.isCreating = false
-      const currentItem = this.chatList[this.chatList.length - 1]
-      if (currentItem && currentItem.type === 'ai' && !currentItem.rawContent) {
-        this.chatList.pop()
-      }
+      this.getAiStore().stopChatRequest({
+        id: this.activeAssistantMessageId,
+        content: this.renderAiContent(this.$t('ai.chatStoppedTip'))
+      })
+      this.queueScrollToBottom()
     },
 
     clear() {
       if (this.isCreating) {
         this.stop()
-      } else {
-        this.activeResponseId += 1
       }
-      this.chatList = []
+      this.activeResponseId += 1
+      this.getAiStore().clearChatSession()
     },
 
     modifyAiConfig() {
@@ -266,6 +406,11 @@ export default {
     }
 
     .chatResBox {
+      .chatEmptyState {
+        background-color: rgba(255, 255, 255, 0.02);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
       .chatItem {
         background-color: rgba(255, 255, 255, 0.02);
 
@@ -295,6 +440,10 @@ export default {
       textarea::placeholder {
         color: hsla(0, 0%, 100%, 0.45);
       }
+
+      .statusText {
+        color: hsla(0, 0%, 100%, 0.68);
+      }
     }
   }
 
@@ -313,6 +462,45 @@ export default {
     margin: 12px 0;
     overflow-y: auto;
     overflow-x: hidden;
+
+    .chatEmptyState {
+      min-height: 180px;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 10px;
+
+      .emptyIcon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(64, 158, 255, 0.1);
+        color: #409eff;
+        font-size: 20px;
+      }
+
+      .emptyTitle {
+        margin: 0;
+        color: #1f2329;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .emptyDesc,
+      .emptyTip {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #637381;
+      }
+    }
 
     .chatItem {
       margin-bottom: 20px;
@@ -338,6 +526,18 @@ export default {
             }
           }
         }
+
+        &.streaming {
+          border-style: dashed;
+        }
+
+        &.error {
+          border-color: #e45656;
+        }
+
+        &.stopped {
+          border-color: #e6a23c;
+        }
       }
 
       &.user {
@@ -359,6 +559,32 @@ export default {
       .chatItemInner {
         width: 100%;
         padding: 12px;
+
+        .messageMeta {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 8px;
+        }
+
+        .statusTag {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background-color: rgba(64, 158, 255, 0.12);
+          color: #409eff;
+          font-size: 12px;
+
+          &.warning {
+            background-color: rgba(230, 162, 60, 0.12);
+            color: #e6a23c;
+          }
+
+          &.danger {
+            background-color: rgba(228, 86, 86, 0.12);
+            color: #e45656;
+          }
+        }
 
         .avatar {
           width: 30px;
@@ -384,6 +610,10 @@ export default {
           color: #3f4a54;
           font-size: 14px;
           line-height: 1.5;
+
+          &.placeholder {
+            color: #7c8a98;
+          }
 
           p {
             margin-bottom: 12px;
@@ -438,29 +668,51 @@ export default {
   .chatInputBox {
     flex-shrink: 0;
     width: 100%;
-    height: 150px;
+    min-height: 176px;
     border-top: 1px solid #e8e8e8;
-    position: relative;
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .chatStatusBar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 20px;
+    }
+
+    .statusText {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #7c8a98;
+
+      &.danger {
+        color: #e45656;
+      }
+    }
 
     textarea {
       width: 100%;
-      height: 100%;
+      min-height: 96px;
+      flex: 1;
       outline: none;
       padding: 12px;
-      border: none;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 8px;
+      resize: none;
     }
 
-    .btn {
-      position: absolute;
-      right: 12px;
-      bottom: 12px;
+    .chatActions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
     }
 
+    .btn,
     .stop {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      top: -30px;
+      position: static;
     }
   }
 }

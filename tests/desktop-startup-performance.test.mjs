@@ -27,12 +27,21 @@ const toolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Toolbar.vue'),
   'utf8'
 )
+const importSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Import.vue'),
+  'utf8'
+)
+const clipboardSource = fs.readFileSync(
+  path.resolve('src/utils/handleClipboardText.js'),
+  'utf8'
+)
 const apiSource = fs.readFileSync(path.resolve('src/api/index.js'), 'utf8')
 const configMigrationSource = fs.readFileSync(
   path.resolve('src/platform/shared/configMigration.js'),
   'utf8'
 )
 const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8')
+const viteConfigSource = fs.readFileSync(path.resolve('vite.config.js'), 'utf8')
 const simpleMindMapPackageSource = fs.readFileSync(
   path.resolve('simple-mind-map/package.json'),
   'utf8'
@@ -41,6 +50,20 @@ const simpleMindMapPackageSource = fs.readFileSync(
 test('工作台首页不再直接引入 simple-mind-map 示例数据链路', () => {
   assert.equal(/simple-mind-map\/example\/exampleData/.test(homeSource), false)
   assert.equal(/simple-mind-map\/src\/utils\/index/.test(homeSource), false)
+})
+
+test('首页工作台动作改为按需异步加载，避免首屏直接打入文件系统动作链', () => {
+  assert.doesNotMatch(homeSource, /from '@\/services\/workspaceActions'/)
+  assert.match(homeSource, /const loadWorkspaceActions = async \(\) =>/)
+  assert.match(homeSource, /import\('@\/services\/workspaceActions'\)/)
+  assert.match(homeSource, /scheduleRefreshHomeData\(\)/)
+})
+
+test('应用入口关联文件处理改为按需加载工作区动作，避免启动主包携带文件动作链', () => {
+  assert.doesNotMatch(mainSource, /from '@\/services\/workspaceActions'/)
+  assert.match(mainSource, /const loadWorkspaceActions = async \(\) =>/)
+  assert.match(mainSource, /import\('@\/services\/workspaceActions'\)/)
+  assert.match(mainSource, /const \{ openWorkspaceFileRef \} = await loadWorkspaceActions\(\)/)
 })
 
 test('工作台文件动作服务不再直接依赖 simple-mind-map 示例数据', () => {
@@ -52,6 +75,17 @@ test('工作台文件动作服务不再直接依赖 simple-mind-map 示例数据
     /simple-mind-map\/src\/utils\/index/.test(workspaceActionsSource),
     false
   )
+})
+
+test('JSON 解析入口改为直接依赖轻量 json 工具，避免误拉取 DOMPurify', () => {
+  assert.match(workspaceActionsSource, /from '@\/utils\/json'/)
+  assert.match(toolbarSource, /from '@\/utils\/json'/)
+  assert.match(importSource, /from '@\/utils\/json'/)
+  assert.match(clipboardSource, /from '@\/utils\/json'/)
+  assert.doesNotMatch(workspaceActionsSource, /from '@\/utils'/)
+  assert.doesNotMatch(toolbarSource, /from '@\/utils'/)
+  assert.doesNotMatch(importSource, /from '@\/utils'/)
+  assert.doesNotMatch(clipboardSource, /from '@\/utils'/)
 })
 
 test('首页不再引入桌面设置视图', () => {
@@ -141,6 +175,22 @@ test('编辑页核心重子组件改为按需异步加载', () => {
   )
 })
 
+test('编辑页次级 UI 延后挂载，优先让主画布进入可用态', () => {
+  assert.match(editPageSource, /secondaryUiReady: false/)
+  assert.match(editPageSource, /scheduleSecondaryUiMount\(\)/)
+  assert.match(editPageSource, /cancelSecondaryUiMount\(\)/)
+  assert.match(editPageSource, /<Navigator[\s\S]*secondaryUiReady/m)
+  assert.match(editPageSource, /<Search[\s\S]*secondaryUiReady/m)
+  assert.match(editPageSource, /<NodeIconToolbar[\s\S]*secondaryUiReady/m)
+})
+
+test('编辑页初始化并行等待关键资源，避免串行阻塞进入编辑器', () => {
+  assert.match(editPageSource, /Promise\.all\(\s*\[/)
+  assert.match(editPageSource, /loadHandleClipboardText\(\)/)
+  assert.match(editPageSource, /loadMindMapRuntime\(\)/)
+  assert.match(editPageSource, /this\.waitForMindMapContainerReady\(\)/)
+})
+
 test('编辑页按需加载剪贴板图片处理工具，避免首包回流 mind-map util', () => {
   assert.equal(
     /import handleClipboardText from ['"]@\/utils\/handleClipboardText['"]/.test(
@@ -213,13 +263,17 @@ test('应用入口改为按需解析 Element Plus 组件，不再在 main.js 手
   assert.doesNotMatch(mainSource, /const elementComponents = \[/)
   assert.doesNotMatch(mainSource, /app\.component\(component\.name, component\)/)
   assert.match(
-    fs.readFileSync(path.resolve('vite.config.js'), 'utf8'),
+    viteConfigSource,
     /unplugin-vue-components\/vite/
   )
   assert.match(
-    fs.readFileSync(path.resolve('vite.config.js'), 'utf8'),
+    viteConfigSource,
     /ElementPlusResolver/
   )
+})
+
+test('桌面构建关闭 module preload，避免首页预取编辑器重资源', () => {
+  assert.match(viteConfigSource, /modulePreload:\s*false/)
 })
 
 test('AI 聊天侧边栏仅在激活时挂载，避免编辑页常驻占用', () => {

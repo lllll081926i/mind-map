@@ -70,7 +70,7 @@
 import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import { mapState } from 'pinia'
-import { parseExternalJsonSafely } from '@/utils'
+import { parseExternalJsonSafely } from '@/utils/json'
 import { onShowImport } from '@/services/appEvents'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar, setIsHandleLocalFile } from '@/stores/runtime'

@@ -64,6 +64,40 @@
       </aside>
 
       <main class="workspaceMain">
+        <section class="resumeSection">
+          <div class="resumeHeader">
+            <h2>{{ $t('home.continueTitle') }}</h2>
+            <span v-if="hasDirtyDraft" class="dirtyBadge">
+              {{ $t('home.unsavedBadge') }}
+            </span>
+          </div>
+
+          <button
+            v-if="hasResumeEntry"
+            type="button"
+            class="resumeCard"
+            :disabled="busy"
+            @click="continueWorkspace"
+          >
+            <div class="resumeMain">
+              <strong>{{ resumeEntry.title }}</strong>
+              <span>{{ resumeEntry.path || $t('home.resumeUnsavedPath') }}</span>
+              <em class="resumeHint">
+                {{
+                  hasDirtyDraft
+                    ? $t('home.resumeDirtyHint')
+                    : $t('home.resumeReadyHint')
+                }}
+              </em>
+            </div>
+            <span class="resumeAction">{{ $t('home.continueAction') }}</span>
+          </button>
+
+          <div v-else class="resumeEmpty">
+            <p>{{ $t('home.continueEmpty') }}</p>
+          </div>
+        </section>
+
         <header class="mainHeader">
           <h2>{{ $t('home.recentTitle') }}</h2>
           <button
@@ -88,8 +122,8 @@
             <div class="recentMain">
               <strong>{{ resolveRecentTitle(item) }}</strong>
               <span>{{ item.path }}</span>
-              <em v-if="directorySummary" class="recentHint">
-                {{ $t('home.currentDirectory') }}{{ directorySummary }}
+              <em v-if="lastDirectory" class="recentHint">
+                {{ $t('home.currentDirectory') }}{{ lastDirectory }}
               </em>
             </div>
             <time class="recentMeta">{{ formatUpdatedAt(item.updatedAt) }}</time>
@@ -111,39 +145,75 @@
 
 <script>
 import { mapState } from 'pinia'
-import {
-  clearWorkspaceRecentFiles,
-  createWorkspaceLocalFile,
-  openWorkspaceDirectory,
-  openWorkspaceLocalFile,
-  openWorkspaceRecentFile,
-  refreshWorkspaceRecentFiles
-} from '@/services/workspaceActions'
-import { getWorkspaceMetaState } from '@/services/workspaceState'
+import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
+
+let workspaceActionsPromise = null
+
+const loadWorkspaceActions = async () => {
+  if (!workspaceActionsPromise) {
+    workspaceActionsPromise = import('@/services/workspaceActions')
+      .catch(error => {
+        workspaceActionsPromise = null
+        throw error
+      })
+  }
+  return workspaceActionsPromise
+}
 
 export default {
   name: 'HomePage',
   data() {
     return {
       busy: false,
-      recentFiles: [],
-      directorySummary: ''
+      homeRefreshFrame: 0,
+      homeRefreshTimer: 0
     }
   },
   computed: {
+    ...mapState(useEditorStore, {
+      recentFiles: 'recentFiles',
+      resumeEntry: 'resumeEntry',
+      hasResumeEntry: 'hasResumeEntry',
+      hasDirtyDraft: 'hasDirtyDraft',
+      lastDirectory: 'lastDirectory'
+    }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
     })
   },
-  created() {
-    this.refreshHomeData()
+  mounted() {
+    this.scheduleRefreshHomeData()
+  },
+  beforeUnmount() {
+    this.clearHomeRefreshTask()
   },
   methods: {
-    refreshHomeData() {
-      this.recentFiles = refreshWorkspaceRecentFiles()
-      const state = getWorkspaceMetaState()
-      this.directorySummary = String(state?.lastDirectory || '')
+    clearHomeRefreshTask() {
+      if (this.homeRefreshFrame) {
+        cancelAnimationFrame(this.homeRefreshFrame)
+        this.homeRefreshFrame = 0
+      }
+      if (this.homeRefreshTimer) {
+        clearTimeout(this.homeRefreshTimer)
+        this.homeRefreshTimer = 0
+      }
+    },
+
+    scheduleRefreshHomeData() {
+      this.clearHomeRefreshTask()
+      this.homeRefreshFrame = requestAnimationFrame(() => {
+        this.homeRefreshFrame = 0
+        this.homeRefreshTimer = window.setTimeout(() => {
+          this.homeRefreshTimer = 0
+          void this.refreshHomeData()
+        }, 80)
+      })
+    },
+
+    async refreshHomeData() {
+      const { refreshWorkspaceRecentFiles } = await loadWorkspaceActions()
+      refreshWorkspaceRecentFiles()
     },
 
     resolveRecentTitle(item) {
@@ -173,7 +243,7 @@ export default {
       this.busy = true
       try {
         await action()
-        this.refreshHomeData()
+        await this.refreshHomeData()
       } catch (error) {
         console.error('workspace action failed', error)
         this.$message.error(error?.message || this.$t('home.actionFailed'))
@@ -183,34 +253,47 @@ export default {
     },
 
     async createBlankProject() {
-      await this.runWorkspaceAction(() =>
-        createWorkspaceLocalFile({
+      await this.runWorkspaceAction(async () => {
+        const { createWorkspaceLocalFile } = await loadWorkspaceActions()
+        return createWorkspaceLocalFile({
           router: this.$router
         })
-      )
+      })
     },
 
     async openLocalFile() {
-      await this.runWorkspaceAction(() => openWorkspaceLocalFile(this.$router))
+      await this.runWorkspaceAction(async () => {
+        const { openWorkspaceLocalFile } = await loadWorkspaceActions()
+        return openWorkspaceLocalFile(this.$router)
+      })
     },
 
     async openLocalDirectory() {
       await this.runWorkspaceAction(async () => {
+        const { openWorkspaceDirectory } = await loadWorkspaceActions()
         const result = await openWorkspaceDirectory()
         if (!result) return
-        this.directorySummary = String(result.directoryRef?.path || '')
         this.$message.success(this.$t('home.workspaceRecorded'))
       })
     },
 
+    async continueWorkspace() {
+      await this.runWorkspaceAction(async () => {
+        const { resumeWorkspaceSession } = await loadWorkspaceActions()
+        return resumeWorkspaceSession(this.$router)
+      })
+    },
+
     async openRecent(item) {
-      await this.runWorkspaceAction(() =>
-        openWorkspaceRecentFile(item, this.$router)
-      )
+      await this.runWorkspaceAction(async () => {
+        const { openWorkspaceRecentFile } = await loadWorkspaceActions()
+        return openWorkspaceRecentFile(item, this.$router)
+      })
     },
 
     async clearRecents() {
       await this.runWorkspaceAction(async () => {
+        const { clearWorkspaceRecentFiles } = await loadWorkspaceActions()
         await clearWorkspaceRecentFiles()
       })
     }
@@ -248,6 +331,9 @@ export default {
 
     .sidebarIntro p,
     .actionText span,
+    .resumeMain span,
+    .resumeMain .resumeHint,
+    .resumeEmpty p,
     .recentMain span,
     .recentMeta,
     .textButton,
@@ -281,6 +367,9 @@ export default {
     }
 
     .actionText strong,
+    .resumeHeader h2,
+    .resumeMain strong,
+    .resumeAction,
     .mainHeader h2,
     .recentMain strong,
     .textButton:hover:not(:disabled) {
@@ -289,6 +378,25 @@ export default {
 
     .mainHeader {
       border-bottom-color: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .resumeCard {
+      background: rgba(255, 255, 255, 0.02);
+      border-color: hsla(0, 0%, 100%, 0.08);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: hsla(0, 0%, 100%, 0.14);
+      }
+    }
+
+    .resumeEmpty {
+      border-color: hsla(0, 0%, 100%, 0.1);
+    }
+
+    .dirtyBadge {
+      background: rgba(251, 191, 36, 0.18);
+      color: #fcd34d;
     }
 
     .recentItem {
@@ -466,6 +574,101 @@ export default {
   background: #fff;
 }
 
+.resumeSection {
+  margin-bottom: 32px;
+}
+
+.resumeHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+
+  h2 {
+    font-size: 16px;
+    font-weight: 500;
+    color: #111827;
+  }
+}
+
+.dirtyBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.resumeCard {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #d1d5db;
+    background: #fafafa;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.resumeMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  strong {
+    font-size: 15px;
+    font-weight: 500;
+    color: #111827;
+  }
+
+  span,
+  .resumeHint {
+    font-size: 12px;
+    color: #6b7280;
+    word-break: break-all;
+    font-style: normal;
+  }
+}
+
+.resumeAction {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.resumeEmpty {
+  padding: 16px 18px;
+  border: 1px dashed #e5e7eb;
+  border-radius: 6px;
+
+  p {
+    font-size: 13px;
+    color: #9ca3af;
+  }
+}
+
 .mainHeader {
   display: flex;
   justify-content: space-between;
@@ -611,6 +814,11 @@ export default {
   }
 
   .recentItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .resumeCard {
     flex-direction: column;
     align-items: flex-start;
   }

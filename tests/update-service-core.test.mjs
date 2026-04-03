@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import {
   compareVersions,
   normalizeVersion,
-  parseUpdateManifest,
+  parseGitHubLatestRelease,
   createManualUpdateResult
 } from '../src/services/updateServiceCore.mjs'
 
@@ -19,17 +19,13 @@ test('compareVersions 可以正确比较版本号', () => {
   assert.equal(compareVersions('2.0.0', '1.9.9'), 1)
 })
 
-test('parseUpdateManifest 支持 Tauri latest.json 格式', () => {
-  const manifest = parseUpdateManifest(
+test('parseGitHubLatestRelease 支持 GitHub latest release 格式', () => {
+  const manifest = parseGitHubLatestRelease(
     {
-      version: 'v1.3.0',
-      notes: '修复若干问题',
-      platforms: {
-        'windows-x86_64': {
-          signature: 'sig',
-          url: 'https://example.com/windows.exe'
-        }
-      }
+      tag_name: 'v1.3.0',
+      body: '修复若干问题',
+      html_url: 'https://github.com/lllll081926i/mind-map/releases/tag/v1.3.0',
+      published_at: '2026-04-03T10:00:00Z'
     },
     'https://github.com/lllll081926i/mind-map/releases'
   )
@@ -37,21 +33,22 @@ test('parseUpdateManifest 支持 Tauri latest.json 格式', () => {
   assert.deepEqual(manifest, {
     version: '1.3.0',
     notes: '修复若干问题',
-    url: 'https://github.com/lllll081926i/mind-map/releases'
+    url: 'https://github.com/lllll081926i/mind-map/releases/tag/v1.3.0',
+    publishedAt: '2026-04-03T10:00:00Z'
   })
 })
 
-test('parseUpdateManifest 支持旧简化格式', () => {
-  const manifest = parseUpdateManifest({
-    version: '1.4.0',
-    notes: '旧格式说明',
-    url: 'https://example.com/release'
-  })
+test('parseGitHubLatestRelease 在缺少 html_url 时回退到发布页地址', () => {
+  const manifest = parseGitHubLatestRelease({
+    tag_name: '1.4.0',
+    body: '旧格式说明'
+  }, 'https://example.com/release')
 
   assert.deepEqual(manifest, {
     version: '1.4.0',
     notes: '旧格式说明',
-    url: 'https://example.com/release'
+    url: 'https://example.com/release',
+    publishedAt: ''
   })
 })
 
@@ -59,14 +56,16 @@ test('createManualUpdateResult 在发现新版本时返回 update-available', ()
   const result = createManualUpdateResult('0.1.0', {
     version: '0.2.0',
     notes: '新版本',
-    url: 'https://example.com/release'
+    url: 'https://example.com/release',
+    publishedAt: '2026-04-03T10:00:00Z'
   })
 
   assert.deepEqual(result, {
     status: 'update-available',
     latestVersion: '0.2.0',
     notes: '新版本',
-    url: 'https://example.com/release'
+    url: 'https://example.com/release',
+    publishedAt: '2026-04-03T10:00:00Z'
   })
 })
 

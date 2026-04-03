@@ -395,7 +395,7 @@
         <div class="rowItem">
           <el-button
             size="small"
-            :loading="checkingForUpdates || installingUpdate"
+            :loading="checkingForUpdates"
             @click="checkForUpdates"
           >
             {{ $t('setting.checkUpdate') }}
@@ -416,10 +416,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocalConfigPatch } from '@/stores/runtime'
 import {
-  checkForUpdates as runUpdateCheck,
-  canUseDesktopUpdater,
-  downloadAndInstallUpdate,
-  relaunchAfterUpdate
+  checkForUpdates as runUpdateCheck
 } from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
 
@@ -468,7 +465,6 @@ export default {
       updateWatermarkTimer: null,
       enableNodeRichText: true,
       checkingForUpdates: false,
-      installingUpdate: false,
       localConfigs: {
         isShowScrollbar: false,
         enableDragImport: false,
@@ -644,33 +640,17 @@ export default {
     },
 
     async checkForUpdates() {
-      if (this.checkingForUpdates || this.installingUpdate) return
+      if (this.checkingForUpdates) return
       this.checkingForUpdates = true
       try {
         const result = await runUpdateCheck(this.appVersion)
         if (result.status === 'update-available') {
           const notes = result.notes ? `\n\n${result.notes}` : ''
-          if (canUseDesktopUpdater()) {
-            this.$confirm(
-              `${this.$t('setting.updateAvailableMessage', {
-                version: result.latestVersion
-              })}${notes}`,
-              this.$t('setting.updateAvailableTitle'),
-              {
-                confirmButtonText: this.$t('setting.updateInstallNow'),
-                cancelButtonText: this.$t('setting.updateLater'),
-                type: 'info'
-              }
-            )
-              .then(() => this.installUpdate(result.latestVersion))
-              .catch(() => {})
-            return
-          }
           if (result.url) {
             this.$confirm(
               `${this.$t('setting.updateAvailableMessage', {
                 version: result.latestVersion
-              })}${notes}`,
+              })}\n\n${this.$t('setting.updateOpenReleasePageTip')}${notes}`,
               this.$t('setting.updateAvailableTitle'),
               {
                 confirmButtonText: this.$t('setting.openReleasePage'),
@@ -723,74 +703,6 @@ export default {
         )
       } finally {
         this.checkingForUpdates = false
-      }
-    },
-
-    async installUpdate(latestVersion) {
-      this.installingUpdate = true
-      const loading = this.$loading({
-        lock: true,
-        text: this.$t('setting.updatePreparing'),
-        background: 'rgba(0, 0, 0, 0.35)'
-      })
-      try {
-        let downloadedBytes = 0
-        const result = await downloadAndInstallUpdate(event => {
-          if (event.event === 'Started') {
-            const totalBytes = Number(event.data.contentLength || 0)
-            if (totalBytes > 0) {
-              loading.setText?.(
-                this.$t('setting.updateDownloadingWithSize', {
-                  current: '0.0',
-                  total: (totalBytes / 1024 / 1024).toFixed(1)
-                })
-              )
-            } else {
-              loading.setText?.(this.$t('setting.updateDownloading'))
-            }
-            return
-          }
-          if (event.event === 'Progress') {
-            downloadedBytes += Number(event.data.chunkLength || 0)
-            loading.setText?.(
-              this.$t('setting.updateDownloadingProgress', {
-                current: (downloadedBytes / 1024 / 1024).toFixed(1)
-              })
-            )
-            return
-          }
-          if (event.event === 'Finished') {
-            loading.setText?.(this.$t('setting.updateInstalling'))
-          }
-        })
-        loading.close()
-        if (result.shouldRelaunch) {
-          this.$confirm(
-            this.$t('setting.updateInstallCompleted', {
-              version: latestVersion
-            }),
-            this.$t('setting.updateRestartTitle'),
-            {
-              confirmButtonText: this.$t('setting.updateRestartNow'),
-              cancelButtonText: this.$t('setting.updateRestartLater'),
-              type: 'success'
-            }
-          )
-            .then(async () => {
-              await relaunchAfterUpdate()
-            })
-            .catch(() => {})
-          return
-        }
-        this.$message.success(this.$t('setting.updateWindowsInstalling'))
-      } catch (error) {
-        console.error('installUpdate failed', error)
-        loading.close()
-        this.$message.error(
-          error?.message || this.$t('setting.updateInstallFailed')
-        )
-      } finally {
-        this.installingUpdate = false
       }
     }
   }
