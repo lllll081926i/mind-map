@@ -8,17 +8,17 @@ const routes = [
   {
     path: '/home',
     name: 'Home',
-    component: () => import(`./pages/Home/Index.vue`)
+    component: () => import('./pages/Home/Index.vue')
   },
   {
     path: '/edit',
     name: 'Edit',
-    component: () => import(`./pages/Edit/Index.vue`)
+    component: () => import('./pages/Edit/Index.vue')
   },
   {
     path: '/export',
     name: 'Export',
-    component: () => import(`./pages/Edit/Index.vue`)
+    component: () => import('./pages/Edit/Index.vue')
   },
   {
     path: '/index',
@@ -26,7 +26,7 @@ const routes = [
   },
   {
     path: '/doc/zh',
-    component: () => import(`./pages/Doc.vue`)
+    component: () => import('./pages/Doc.vue')
   }
 ]
 

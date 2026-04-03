@@ -1,5 +1,5 @@
 use crate::services::app_state::{
-  self, DesktopMetaState, DesktopState, RecentFileItem,
+  self, DesktopDocumentState, DesktopMetaState, DesktopState, RecentFileItem,
 };
 use crate::services::file_association::PendingAssociatedFiles;
 use reqwest::Url;
@@ -20,7 +20,7 @@ pub async fn read_bootstrap_meta_state(
 #[tauri::command]
 pub async fn read_bootstrap_document_state(
   app: tauri::AppHandle,
-) -> Result<DesktopState, String> {
+) -> Result<DesktopDocumentState, String> {
   app_state::read_document_state(&app).await
 }
 
@@ -43,7 +43,7 @@ pub async fn write_bootstrap_meta_state(
 #[tauri::command]
 pub async fn write_bootstrap_document_state(
   app: tauri::AppHandle,
-  state: DesktopState,
+  state: DesktopDocumentState,
 ) -> Result<(), String> {
   app_state::write_document_state(&app, &state).await
 }

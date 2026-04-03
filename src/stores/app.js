@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 export const useAppStore = defineStore('app', {
   state: () => ({
     activeSidebar: '',
+    sidebarTransitionMode: 'slide',
     isOutlineEdit: false,
     isReadonly: false,
     isSourceCodeEdit: false,
@@ -13,6 +14,9 @@ export const useAppStore = defineStore('app', {
   actions: {
     setActiveSidebar(value) {
       this.activeSidebar = value
+    },
+    setSidebarTransitionMode(value) {
+      this.sidebarTransitionMode = value === 'swap' ? 'swap' : 'slide'
     },
     setIsOutlineEdit(value) {
       this.isOutlineEdit = value

@@ -48,7 +48,11 @@ export const emitAppEvent = (eventName, ...args) => {
   const listeners = listenersMap.get(eventName)
   if (!listeners || listeners.size <= 0) return
   Array.from(listeners).forEach(handler => {
-    handler(...args)
+    try {
+      handler(...args)
+    } catch (error) {
+      console.error(`emitAppEvent handler error [${eventName}]`, error)
+    }
   })
 }
 

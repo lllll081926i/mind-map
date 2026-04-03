@@ -76,10 +76,10 @@ export const buildDesktopSaveDefaultPath = ({
   if (!sanitizedBasePath) {
     return normalizedName
   }
+  const lastBackwardSlashIndex = sanitizedBasePath.lastIndexOf('\\')
+  const lastForwardSlashIndex = sanitizedBasePath.lastIndexOf('/')
   const separator =
-    sanitizedBasePath.includes('\\') && !sanitizedBasePath.includes('/')
-      ? '\\'
-      : '/'
+    lastBackwardSlashIndex > lastForwardSlashIndex ? '\\' : '/'
   return `${sanitizedBasePath}${separator}${normalizedName}`
 }
 

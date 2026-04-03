@@ -1,5 +1,5 @@
 <template>
-  <div class="homePage">
+  <div class="homePage" :class="{ isDark: isDark }">
     <div class="workspaceShell">
       <aside class="workspaceSidebar">
         <div class="sidebarMeta">{{ $t('home.eyebrow') }}</div>
@@ -110,6 +110,7 @@
 </template>
 
 <script>
+import { mapState } from 'pinia'
 import {
   clearWorkspaceRecentFiles,
   createWorkspaceLocalFile,
@@ -119,6 +120,7 @@ import {
   refreshWorkspaceRecentFiles
 } from '@/services/workspaceActions'
 import { getWorkspaceMetaState } from '@/services/workspaceState'
+import { useThemeStore } from '@/stores/theme'
 
 export default {
   name: 'HomePage',
@@ -128,6 +130,11 @@ export default {
       recentFiles: [],
       directorySummary: ''
     }
+  },
+  computed: {
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    })
   },
   created() {
     this.refreshHomeData()
@@ -218,6 +225,86 @@ export default {
   color: #111827;
   display: flex;
   flex-direction: column;
+
+  &.isDark {
+    background:
+      radial-gradient(circle at top left, rgba(64, 158, 255, 0.08), transparent 28%),
+      #171a1f;
+    color: hsla(0, 0%, 100%, 0.88);
+
+    .workspaceSidebar {
+      background: rgba(28, 32, 38, 0.92);
+      border-right-color: hsla(0, 0%, 100%, 0.08);
+      box-shadow: inset -1px 0 0 hsla(0, 0%, 100%, 0.04);
+    }
+
+    .sidebarMeta {
+      color: hsla(0, 0%, 100%, 0.46);
+
+      &::before {
+        background: rgba(64, 158, 255, 0.72);
+      }
+    }
+
+    .sidebarIntro p,
+    .actionText span,
+    .recentMain span,
+    .recentMeta,
+    .textButton,
+    .emptyState p {
+      color: hsla(0, 0%, 100%, 0.56);
+    }
+
+    .workspaceMain {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
+        transparent;
+    }
+
+    .primaryAction {
+      background: #409eff;
+
+      &:hover:not(:disabled) {
+        background: #67b1ff;
+      }
+    }
+
+    .actionItem {
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    .actionIcon,
+    .recentHint {
+      color: hsla(0, 0%, 100%, 0.42);
+    }
+
+    .actionText strong,
+    .mainHeader h2,
+    .recentMain strong,
+    .textButton:hover:not(:disabled) {
+      color: hsla(0, 0%, 100%, 0.92);
+    }
+
+    .mainHeader {
+      border-bottom-color: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .recentItem {
+      border-bottom-color: hsla(0, 0%, 100%, 0.08);
+
+      &:hover:not(:disabled) {
+        .recentMain strong {
+          color: #fff;
+        }
+      }
+    }
+
+    .emptyState svg {
+      stroke: hsla(0, 0%, 100%, 0.12);
+    }
+  }
 }
 
 .workspaceShell {
@@ -376,6 +463,7 @@ export default {
   padding: 48px 64px;
   display: flex;
   flex-direction: column;
+  background: #fff;
 }
 
 .mainHeader {

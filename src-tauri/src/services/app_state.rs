@@ -133,8 +133,20 @@ fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   let path = app
     .path()
     .app_data_dir()
-    .map_err(|error| error.to_string())?;
-  std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
+    .map_err(|error| format!("获取应用数据目录失败: {}", error))?;
+
+  if !path.exists() {
+    std::fs::create_dir_all(&path)
+      .map_err(|error| format!("创建应用数据目录失败 ({}): {}", path.display(), error))?;
+  }
+
+  let metadata = std::fs::metadata(&path)
+    .map_err(|error| format!("读取应用数据目录信息失败 ({}): {}", path.display(), error))?;
+  if !metadata.is_dir() {
+    return Err(format!("应用数据目录不可用 ({}): 目标不是目录", path.display()));
+  }
+
+  eprintln!("[MindMap] 应用数据目录: {}", path.display());
   Ok(path)
 }
 
@@ -158,28 +170,67 @@ fn legacy_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 async fn read_json_file<T>(path: PathBuf, default_value: T) -> Result<T, String>
 where
-  T: DeserializeOwned,
+  T: DeserializeOwned + Clone,
 {
   if !path.exists() {
-    return Ok(default_value);
+    return Ok(default_value.clone());
   }
-  let content = tokio::fs::read(path)
-    .await
-    .map_err(|error| error.to_string())?;
-  if content.is_empty() {
-    return Ok(default_value);
+  let content = match tokio::fs::read(&path).await {
+    Ok(content) => content,
+    Err(error) => {
+      eprintln!(
+        "[MindMap] 警告: 读取状态文件失败 {}: {}, 使用默认值",
+        path.display(),
+        error
+      );
+      return Ok(default_value.clone());
+    }
+  };
+  let content = if content.starts_with(&[0xEF, 0xBB, 0xBF]) {
+    &content[3..]
+  } else {
+    &content[..]
+  };
+  if content.is_empty() || content.iter().all(|byte| byte.is_ascii_whitespace()) {
+    eprintln!(
+      "[MindMap] 警告: 状态文件为空 {}，使用默认值",
+      path.display()
+    );
+    return Ok(default_value.clone());
   }
-  serde_json::from_slice(&content).map_err(|error| error.to_string())
+  match serde_json::from_slice(content) {
+    Ok(value) => Ok(value),
+    Err(error) => {
+      eprintln!(
+        "[MindMap] 警告: 状态文件损坏 {}: {}, 使用默认值",
+        path.display(),
+        error
+      );
+      let backup_path = path.with_extension("json.corrupted");
+      let _ = tokio::fs::remove_file(&backup_path).await;
+      let _ = tokio::fs::rename(&path, &backup_path).await;
+      Ok(default_value)
+    }
+  }
 }
 
 async fn write_json_file<T>(path: PathBuf, value: &T) -> Result<(), String>
 where
   T: Serialize,
 {
-  let content = serde_json::to_vec(value).map_err(|error| error.to_string())?;
-  tokio::fs::write(path, content)
+  let content = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
+  let temp_path = path.with_extension("json.tmp");
+  tokio::fs::write(&temp_path, content)
     .await
-    .map_err(|error| error.to_string())
+    .map_err(|error| format!("写入临时状态文件失败: {}", error))?;
+  if path.exists() {
+    tokio::fs::remove_file(&path)
+      .await
+      .map_err(|error| format!("替换状态文件前删除旧文件失败: {}", error))?;
+  }
+  tokio::fs::rename(&temp_path, &path)
+    .await
+    .map_err(|error| format!("重命名状态文件失败: {}", error))
 }
 
 async fn read_legacy_state(app: &tauri::AppHandle) -> Result<Option<DesktopState>, String> {
@@ -252,9 +303,10 @@ pub async fn read_meta_state(app: &tauri::AppHandle) -> Result<DesktopMetaState,
   read_meta_state_raw(app).await
 }
 
-pub async fn read_document_state(app: &tauri::AppHandle) -> Result<DesktopState, String> {
-  let document_state = read_document_state_raw(app).await?;
-  Ok(merge_state(default_meta_state(), document_state))
+pub async fn read_document_state(
+  app: &tauri::AppHandle,
+) -> Result<DesktopDocumentState, String> {
+  read_document_state_raw(app).await
 }
 
 pub async fn write_meta_state(
@@ -266,10 +318,9 @@ pub async fn write_meta_state(
 
 pub async fn write_document_state(
   app: &tauri::AppHandle,
-  state: &DesktopState,
+  state: &DesktopDocumentState,
 ) -> Result<(), String> {
-  let (_, document_state) = split_state(state);
-  write_json_file(document_state_file_path(app)?, &document_state).await
+  write_json_file(document_state_file_path(app)?, state).await
 }
 
 pub async fn write_state(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), String> {

@@ -2,7 +2,7 @@
   <div
     class="sidebarContainer sidebarPanel"
     @click.stop
-    :class="{ isDark: isDark }"
+    :class="{ isDark: isDark, isSwapTransition: isSwapTransition }"
     :style="sidebarStyle"
   >
     <button class="closeBtn" type="button" @click="close">
@@ -23,6 +23,7 @@
 <script>
 import { sidebarLayout, store } from '@/config'
 import { mapState } from 'pinia'
+import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { setActiveSidebar } from '@/stores/runtime'
 
@@ -47,17 +48,28 @@ export default {
     ...mapState(useThemeStore, {
       isDark: 'isDark'
     }),
+    ...mapState(useAppStore, {
+      sidebarTransitionMode: 'sidebarTransitionMode'
+    }),
     isShown() {
       return this.forceShow
     },
+    isSwapTransition() {
+      return this.sidebarTransitionMode === 'swap'
+    },
     sidebarStyle() {
       const hiddenRight = `-${sidebarLayout.panelWidth + sidebarLayout.panelRight + 20}px`
+      const right = this.isSwapTransition
+        ? `${sidebarLayout.panelRight}px`
+        : this.isShown
+          ? `${sidebarLayout.panelRight}px`
+          : hiddenRight
       return {
         zIndex: this.zIndex,
         top: `${sidebarLayout.panelTop}px`,
         bottom: `${sidebarLayout.panelBottom}px`,
         width: `${sidebarLayout.panelWidth}px`,
-        right: this.isShown ? `${sidebarLayout.panelRight}px` : hiddenRight,
+        right,
         opacity: this.isShown ? 1 : 0,
         pointerEvents: this.isShown ? 'auto' : 'none'
       }
@@ -110,13 +122,20 @@ export default {
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
+  will-change: right, opacity;
   transition:
-    right 0.3s ease,
-    opacity 0.3s ease;
+    right 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
+
+  &.isSwapTransition {
+    will-change: opacity;
+    transition: opacity 0.18s ease;
+  }
 
   &.isDark {
     background-color: #262a2e;
     border-color: hsla(0, 0%, 100%, 0.08);
+    color: hsla(0, 0%, 100%, 0.86);
 
     .sidebarHeader {
       border-bottom-color: hsla(0, 0%, 100%, 0.1);
@@ -126,6 +145,10 @@ export default {
     .closeBtn {
       color: #fff;
       background: hsla(0, 0%, 100%, 0.04);
+    }
+
+    .sidebarContent {
+      color: hsla(0, 0%, 100%, 0.82);
     }
   }
 
@@ -170,6 +193,7 @@ export default {
     height: 100%;
     overflow: auto;
     padding: 0 0 16px;
+    color: rgba(26, 26, 26, 0.88);
   }
 }
 </style>

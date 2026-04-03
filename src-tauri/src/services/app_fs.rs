@@ -12,7 +12,7 @@ const RESERVED_WINDOWS_NAMES: &[&str] = &[
 ];
 
 fn is_path_safe(path: &str) -> bool {
-  if path.trim().is_empty() || path.contains('\0') || path.contains("\\\\?\\") {
+  if path.trim().is_empty() || path.contains('\0') {
     return false;
   }
 
@@ -32,6 +32,17 @@ fn is_path_safe(path: &str) -> bool {
       _ => false,
     }
   })
+}
+
+fn normalize_windows_path_prefix(path: &Path) -> PathBuf {
+  let raw = path.to_string_lossy();
+  if let Some(rest) = raw.strip_prefix("\\\\?\\UNC\\") {
+    return PathBuf::from(format!("\\\\{rest}"));
+  }
+  if let Some(rest) = raw.strip_prefix("\\\\?\\") {
+    return PathBuf::from(rest);
+  }
+  path.to_path_buf()
 }
 
 fn has_allowed_extension(path: &str) -> bool {
@@ -60,33 +71,53 @@ fn normalize_directory_scope(path: &str) -> Option<PathBuf> {
 async fn collect_allowed_directory_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
   let mut roots = Vec::new();
   if let Ok(app_data_dir) = app.path().app_data_dir() {
+    eprintln!("[MindMap] 允许的目录根节点 (app_data_dir): {}", app_data_dir.display());
     roots.push(app_data_dir);
+  } else {
+    eprintln!("[MindMap] 警告: 无法获取 app_data_dir");
   }
+  
   let meta_state = app_state::read_meta_state_raw(app).await?;
   if let Some(path) = normalize_directory_scope(&meta_state.last_directory) {
+    eprintln!("[MindMap] 允许的目录根节点 (last_directory): {}", path.display());
     roots.push(path);
   }
   if let Some(current_document) = meta_state.current_document.as_ref() {
     if let Some(path) = current_document.get("path").and_then(|value| value.as_str()) {
       if let Some(scope) = normalize_directory_scope(path) {
+        eprintln!("[MindMap] 允许的目录根节点 (current_document): {}", scope.display());
         roots.push(scope);
       }
     }
   }
   meta_state.recent_files.iter().for_each(|item| {
     if let Some(scope) = normalize_directory_scope(&item.path) {
+      eprintln!("[MindMap] 允许的目录根节点 (recent_files): {}", scope.display());
       roots.push(scope);
     }
   });
 
   let mut result = Vec::new();
   for root in roots {
-    if let Ok(canonical) = tokio::fs::canonicalize(&root).await {
-      if !result.iter().any(|item| item == &canonical) {
-        result.push(canonical);
+    match tokio::fs::canonicalize(&root).await {
+      Ok(canonical) => {
+        let normalized = normalize_windows_path_prefix(&canonical);
+        if !result.iter().any(|item| item == &normalized) {
+          result.push(normalized);
+        }
+      }
+      Err(e) => {
+        eprintln!("[MindMap] 警告: 无法规范化路径 {}: {}", root.display(), e);
+        if root.exists() {
+          let normalized = normalize_windows_path_prefix(&root);
+          if !result.iter().any(|item| item == &normalized) {
+            result.push(normalized);
+          }
+        }
       }
     }
   }
+  eprintln!("[MindMap] 最终允许的目录根节点数量: {}", result.len());
   Ok(result)
 }
 
@@ -96,18 +127,42 @@ async fn ensure_directory_scope_allowed(
 ) -> Result<(), String> {
   let allowed_roots = collect_allowed_directory_roots(app).await?;
   if allowed_roots.is_empty() {
+    eprintln!("[MindMap] 警告: 没有允许的目录根节点，放行所有访问");
     return Ok(());
   }
-  let canonical_path = tokio::fs::canonicalize(path)
+
+  let requested_path = Path::new(path);
+  let path_to_check = if requested_path.exists() {
+    requested_path.to_path_buf()
+  } else {
+    requested_path
+      .parent()
+      .map(|parent| parent.to_path_buf())
+      .unwrap_or_else(|| requested_path.to_path_buf())
+  };
+
+  let canonical_path = tokio::fs::canonicalize(&path_to_check)
     .await
-    .map_err(|error| error.to_string())?;
+    .map(|canonical| normalize_windows_path_prefix(&canonical))
+    .map_err(|error| {
+      format!(
+        "无法规范化路径 '{}' (检查路径 '{}'): {}",
+        path,
+        path_to_check.display(),
+        error
+      )
+    })?;
+
+  eprintln!("[MindMap] 检查路径权限: {} (规范化后: {})", path, canonical_path.display());
+
   let is_allowed = allowed_roots.iter().any(|root| {
     canonical_path == *root || canonical_path.starts_with(root)
   });
   if is_allowed {
     Ok(())
   } else {
-    Err("无权访问该目录".into())
+    let allowed_paths: Vec<String> = allowed_roots.iter().map(|p| p.display().to_string()).collect();
+    Err(format!("无权访问该目录 '{}'。允许的根目录: {}", path, allowed_paths.join(", ")))
   }
 }
 
@@ -149,6 +204,9 @@ pub async fn write_text_file(path: &str, content: &str) -> Result<(), String> {
     return Err("无效的路径".into());
   }
   if let Some(parent) = Path::new(path).parent() {
+    tokio::fs::create_dir_all(parent)
+      .await
+      .map_err(|error| format!("创建目标目录失败: {}", error))?;
     let metadata = tokio::fs::metadata(parent)
       .await
       .map_err(|_| "目标目录不存在".to_string())?;

@@ -93,7 +93,10 @@ const queueMetaWrite = snapshot => {
   }
   const platform = getPlatform()
   metaWriteQueue = metaWriteQueue
-    .catch(() => undefined)
+    .catch(error => {
+      console.error('queueMetaWrite previous task failed', error)
+      return undefined
+    })
     .then(async () => {
       await platform.writeBootstrapMetaState(snapshot)
       return snapshot
@@ -107,12 +110,27 @@ const queueDocumentWrite = snapshot => {
   }
   const platform = getPlatform()
   documentWriteQueue = documentWriteQueue
-    .catch(() => undefined)
+    .catch(error => {
+      console.error('queueDocumentWrite previous task failed', error)
+      return undefined
+    })
     .then(async () => {
       await platform.writeBootstrapDocumentState(snapshot)
       return snapshot
     })
   return documentWriteQueue
+}
+
+const openUrlWithBrowserFallback = url => {
+  if (
+    typeof window === 'undefined' ||
+    typeof window.open !== 'function' ||
+    !String(url || '').trim()
+  ) {
+    return false
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+  return true
 }
 
 export const bootstrapPlatformState = async () => {
@@ -132,10 +150,10 @@ export const bootstrapPlatformState = async () => {
         })
       } catch (error) {
         console.error(
-          'bootstrapPlatformState failed, fallback to defaults',
+          'bootstrapPlatformState failed, preserve current bootstrap meta state',
           error
         )
-        return applyBootstrapMetaState(createDefaultBootstrapState(), {
+        return applyBootstrapMetaState(pickState(bootstrapState, BOOTSTRAP_META_KEYS), {
           startVersion
         })
       }
@@ -159,12 +177,15 @@ export const ensureBootstrapDocumentState = async () => {
         })
       } catch (error) {
         console.error(
-          'ensureBootstrapDocumentState failed, fallback to defaults',
+          'ensureBootstrapDocumentState failed, preserve current bootstrap document state',
           error
         )
-        return applyBootstrapDocumentState(createDefaultBootstrapState(), {
-          startVersion
-        })
+        return applyBootstrapDocumentState(
+          pickState(bootstrapState, BOOTSTRAP_DOCUMENT_KEYS),
+          {
+            startVersion
+          }
+        )
       }
     })()
   }
@@ -251,7 +272,13 @@ export const isDesktopApp = () => isDesktopRuntime()
 
 export const openExternalUrl = url => {
   const platform = getPlatform()
-  return platform.openExternalUrl(url)
+  return platform.openExternalUrl(url).catch(error => {
+    console.error('openExternalUrl failed, fallback to window.open', error)
+    if (openUrlWithBrowserFallback(url)) {
+      return undefined
+    }
+    throw error
+  })
 }
 
 export default desktopPlatform

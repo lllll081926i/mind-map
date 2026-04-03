@@ -112,7 +112,7 @@ fn normalize_associated_path(
   }
 
   let normalized_path = std::fs::canonicalize(&resolved_path).unwrap_or(resolved_path);
-  normalized_path.to_str().map(|value| value.to_string())
+  Some(normalized_path.to_string_lossy().to_string())
 }
 
 fn is_smm_file(path: &Path) -> bool {

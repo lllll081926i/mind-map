@@ -191,9 +191,13 @@ test('package.json 不再依赖 @vue/compat', () => {
   assert.equal('@vue/compat' in (packageJson.dependencies || {}), false)
 })
 
-test('应用启动不再等待 bootstrapPlatformState 完成后才挂载 UI', () => {
-  assert.equal(mainSource.includes('await bootstrapPlatformState()'), false)
-  assert.equal(mainSource.indexOf('initApp()') < mainSource.indexOf('bootstrapPlatformState()'), true)
+test('应用启动会等待 bootstrapPlatformState 完成后再挂载 UI', () => {
+  assert.equal(mainSource.includes('await bootstrapPlatformState()'), true)
+  assert.equal(
+    mainSource.indexOf('bootstrapPlatformState()') <
+      mainSource.indexOf('initApp()'),
+    true
+  )
 })
 
 test('桌面状态存储拆分为元数据与文档数据文件', () => {

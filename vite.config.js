@@ -173,7 +173,7 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
       __VUE_PROD_DEVTOOLS__: false
     },
     optimizeDeps: {
-      entries: ['index.html', 'src/**/*.{vue,js,mjs}'],
+      entries: ['index.html'],
       include: [
         'buffer',
         'events',

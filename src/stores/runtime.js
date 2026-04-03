@@ -106,6 +106,14 @@ export const syncRuntimeFromWorkspaceMeta = state => {
 export const setActiveSidebar = value => {
   const { settingsStore, appStore } = ensureRuntimeStores()
   const normalizedValue = typeof value === 'string' ? value : ''
+  const previousSidebar = appStore.activeSidebar
+  const transitionMode =
+    previousSidebar &&
+    normalizedValue &&
+    previousSidebar !== normalizedValue
+      ? 'swap'
+      : 'slide'
+  appStore.setSidebarTransitionMode(transitionMode)
   if (normalizedValue === 'ai' && !settingsStore.localConfig.enableAi) {
     appStore.setActiveSidebar('')
     return

@@ -145,20 +145,23 @@ const initApp = () => {
   }
 }
 
-const bootstrapApp = () => {
+const bootstrapApp = async () => {
+  let bootstrapState = null
+  try {
+    bootstrapState = await bootstrapPlatformState()
+    syncRuntimeFromBootstrapState(bootstrapState)
+  } catch (error) {
+    console.error('bootstrapApp failed to restore platform state', error)
+  }
+
   initApp()
-  void bootstrapPlatformState()
-    .then(state => {
-      syncRuntimeFromBootstrapState(state)
-      emitBootstrapStateReady(state)
-      legacyBus.$emit('bootstrap_state_ready', state)
-    })
-    .catch(error => {
-      console.error('bootstrapApp failed to restore platform state', error)
-    })
-    .finally(() => {
-      void setupDesktopAssociatedFileHandling()
-    })
+
+  if (bootstrapState) {
+    emitBootstrapStateReady(bootstrapState)
+    legacyBus.$emit('bootstrap_state_ready', bootstrapState)
+  }
+
+  void setupDesktopAssociatedFileHandling()
 }
 
-bootstrapApp()
+void bootstrapApp()

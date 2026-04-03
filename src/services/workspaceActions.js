@@ -30,9 +30,11 @@ export const createWorkspaceTemplateData = (title = '思维导图') =>
 const getDirectoryPath = filePath => {
   const value = String(filePath || '').trim()
   if (!value) return ''
-  const parts = value.split(/[\\/]/)
-  parts.pop()
-  return parts.join('/')
+  const lastSeparatorIndex = Math.max(
+    value.lastIndexOf('\\'),
+    value.lastIndexOf('/')
+  )
+  return lastSeparatorIndex >= 0 ? value.slice(0, lastSeparatorIndex) : ''
 }
 
 export const normalizeWorkspaceMindMapData = data => {
@@ -67,8 +69,14 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   storeData(normalizedData)
   setIsHandleLocalFile(true)
   markDocumentDirty(false)
-  await setWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || ''))
-  await recordRecentFile(recentProjectRef)
+  void setWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || '')).catch(
+    error => {
+      console.warn('setWorkspaceLastDirectory failed', error)
+    }
+  )
+  void recordRecentFile(recentProjectRef).catch(error => {
+    console.warn('recordRecentFile failed', error)
+  })
   syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
   await enterEditor(router)
   return {

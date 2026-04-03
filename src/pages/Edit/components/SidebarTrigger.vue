@@ -153,12 +153,17 @@ export default {
   &.isDark {
     .trigger {
       background-color: #262a2e;
+      border-color: hsla(0, 0%, 100%, 0.08);
 
       .triggerItem {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: hsla(0, 0%, 100%, 0.72);
 
         &:hover {
           background-color: hsla(0, 0%, 100%, 0.05);
+        }
+
+        &.active {
+          color: #8ec5ff;
         }
       }
     }

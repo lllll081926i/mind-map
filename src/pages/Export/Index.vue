@@ -311,8 +311,8 @@ const loadMindMapRuntime = async () => {
       const MindMap = mindMapModule.default
       const Themes = themesModule.default
       Themes.init(MindMap)
-      if (typeof MoreThemes !== 'undefined') {
-        MoreThemes.init(MindMap)
+      if (typeof globalThis.MoreThemes !== 'undefined') {
+        globalThis.MoreThemes.init(MindMap)
       }
       return {
         MindMap
@@ -469,12 +469,6 @@ export default {
       this.mindMap = null
     }
     this.extendedIconList = []
-    exportBasePluginPromise = null
-    exportPdfPluginPromise = null
-    exportXMindPluginPromise = null
-    richTextPluginsPromise = null
-    mindMapRuntimePromise = null
-    extendedIconListPromise = null
   },
   methods: {
     getPreviewContainerRect() {
@@ -799,6 +793,10 @@ export default {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
+    .dialogHeader {
+      border-bottom-color: hsla(0, 0%, 100%, 0.08);
+    }
+
     .headerActionBtn {
       background: #363b3f;
       border-color: hsla(0, 0%, 100%, 0.1);
@@ -824,6 +822,32 @@ export default {
       border-color: hsla(0, 0%, 100%, 0.08);
     }
 
+    .dialogCloseBtn:hover {
+      background: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .formatRail {
+      background: #23272e;
+    }
+
+    .formatNavItem:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: hsla(0, 0%, 100%, 0.06);
+    }
+
+    .formatNavLabel,
+    .contentHeader strong,
+    .previewPanelHeader strong,
+    .dialogHeaderMain h1 {
+      color: hsla(0, 0%, 100%, 0.92);
+    }
+
+    .dialogEyebrow,
+    .formatSelected,
+    .formatHint {
+      color: #76b9ff;
+    }
+
     .previewPanelHeader span {
       color: hsla(0, 0%, 100%, 0.56);
     }
@@ -832,6 +856,50 @@ export default {
       background: rgba(255, 255, 255, 0.04);
       border-color: hsla(0, 0%, 100%, 0.08);
       color: hsla(0, 0%, 100%, 0.56);
+    }
+
+    .formRow {
+      border-bottom-color: hsla(0, 0%, 100%, 0.06);
+    }
+
+    .contentHeader {
+      border-bottom-color: hsla(0, 0%, 100%, 0.06);
+    }
+
+    .dialogFooter {
+      border-top-color: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .previewSurface {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(14, 18, 24, 0.36)),
+        #1f242b;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    :deep(.el-input__wrapper),
+    :deep(.el-input-number__decrease),
+    :deep(.el-input-number__increase) {
+      background: #343941;
+      box-shadow: 0 0 0 1px hsla(0, 0%, 100%, 0.1) inset;
+      color: hsla(0, 0%, 100%, 0.86);
+    }
+
+    :deep(.el-input__inner),
+    :deep(.el-input-number .el-input__inner) {
+      color: hsla(0, 0%, 100%, 0.88);
+    }
+
+    :deep(.el-radio-group) {
+      gap: 8px;
+    }
+
+    :deep(.el-radio) {
+      color: hsla(0, 0%, 100%, 0.72);
+    }
+
+    :deep(.el-radio__input.is-checked + .el-radio__label) {
+      color: #8ec5ff;
     }
   }
 }

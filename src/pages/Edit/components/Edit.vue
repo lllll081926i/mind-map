@@ -247,8 +247,8 @@ const loadMindMapRuntime = async () => {
           .usePlugin(mindMapLayoutProModule.default)
           .usePlugin(nodeBase64ImageStorageModule.default)
         themesModule.default.init(MindMap)
-        if (typeof MoreThemes !== 'undefined') {
-          MoreThemes.init(MindMap)
+        if (typeof globalThis.MoreThemes !== 'undefined') {
+          globalThis.MoreThemes.init(MindMap)
         }
         return {
           MindMap
@@ -531,14 +531,6 @@ export default {
       this.mindMap.destroy()
     }
     this.mindMap = null
-    richTextPluginsPromise = null
-    exportBasePluginPromise = null
-    exportPdfPluginPromise = null
-    exportXMindPluginPromise = null
-    scrollbarPluginPromise = null
-    handleClipboardTextPromise = null
-    mindMapRuntimePromise = null
-    extendedIconListPromise = null
   },
   methods: {
     bindEditorEvents() {
