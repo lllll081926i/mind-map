@@ -271,14 +271,22 @@ export const getRecentFiles = () => {
 export const isDesktopApp = () => isDesktopRuntime()
 
 export const openExternalUrl = url => {
-  const platform = getPlatform()
-  return platform.openExternalUrl(url).catch(error => {
-    console.error('openExternalUrl failed, fallback to window.open', error)
+  try {
+    const platform = getPlatform()
+    return Promise.resolve(platform.openExternalUrl(url)).catch(error => {
+      console.error('openExternalUrl failed, fallback to window.open', error)
+      if (openUrlWithBrowserFallback(url)) {
+        return undefined
+      }
+      throw error
+    })
+  } catch (error) {
+    console.error('openExternalUrl invoke setup failed', error)
     if (openUrlWithBrowserFallback(url)) {
-      return undefined
+      return Promise.resolve(undefined)
     }
-    throw error
-  })
+    return Promise.reject(error)
+  }
 }
 
 export default desktopPlatform

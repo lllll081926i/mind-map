@@ -22,7 +22,10 @@ const parseXmindFile = (file, handleMultiCanvas) => {
         try {
           let content = ''
           let jsonFile = zip.files['content.json']
-          let xmlFile = zip.files['content.xml'] || zip.files['/content.xml']
+          let xmlFile =
+            zip.files['content.xml'] ||
+            zip.files['/content.xml'] ||
+            zip.files['\\content.xml']
           if (jsonFile) {
             let json = await jsonFile.async('string')
             content = await transformXmind(json, zip.files, handleMultiCanvas)

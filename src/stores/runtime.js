@@ -5,6 +5,7 @@ import { useEditorStore } from './editor'
 import { useSettingsStore } from './settings'
 import { useThemeStore } from './theme'
 import { persistLocalConfig } from '@/services/localConfigStorage'
+import { getWorkspaceSessionState } from '@/services/workspaceSession'
 import {
   AI_CONFIG_KEYS,
   normalizeAiConfig
@@ -43,12 +44,7 @@ const syncThemeFromLocalConfig = () => {
 
 const syncEditorStoreFromWorkspaceMeta = state => {
   const { editorStore } = ensureRuntimeStores()
-  const currentDocument = state?.currentDocument || null
-  editorStore.syncFileSession({
-    path: currentDocument?.path || '',
-    name: currentDocument?.name || ''
-  })
-  editorStore.setRecentFiles(state?.recentFiles || [])
+  editorStore.syncWorkspaceSession(getWorkspaceSessionState(state))
 }
 
 const applyCompositeConfig = (data, persist = true) => {

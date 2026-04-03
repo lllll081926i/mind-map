@@ -9,6 +9,7 @@ const MAX_RECENT_FILES: usize = 20;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct RecentFileItem {
   pub path: String,
   pub name: String,
@@ -18,6 +19,7 @@ pub struct RecentFileItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct DesktopMetaState {
   pub version: u32,
   pub local_config: serde_json::Value,
@@ -29,6 +31,7 @@ pub struct DesktopMetaState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct DesktopDocumentState {
   pub version: u32,
   pub mind_map_data: serde_json::Value,
@@ -37,6 +40,7 @@ pub struct DesktopDocumentState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct DesktopState {
   pub version: u32,
   pub mind_map_data: serde_json::Value,
@@ -129,18 +133,23 @@ fn split_state(state: &DesktopState) -> (DesktopMetaState, DesktopDocumentState)
   )
 }
 
-fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+async fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   let path = app
     .path()
     .app_data_dir()
     .map_err(|error| format!("获取应用数据目录失败: {}", error))?;
 
-  if !path.exists() {
-    std::fs::create_dir_all(&path)
+  if !tokio::fs::try_exists(&path)
+    .await
+    .map_err(|error| format!("检查应用数据目录失败 ({}): {}", path.display(), error))?
+  {
+    tokio::fs::create_dir_all(&path)
+      .await
       .map_err(|error| format!("创建应用数据目录失败 ({}): {}", path.display(), error))?;
   }
 
-  let metadata = std::fs::metadata(&path)
+  let metadata = tokio::fs::metadata(&path)
+    .await
     .map_err(|error| format!("读取应用数据目录信息失败 ({}): {}", path.display(), error))?;
   if !metadata.is_dir() {
     return Err(format!("应用数据目录不可用 ({}): 目标不是目录", path.display()));
@@ -150,20 +159,20 @@ fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   Ok(path)
 }
 
-fn meta_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  let mut path = state_dir_path(app)?;
+async fn meta_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+  let mut path = state_dir_path(app).await?;
   path.push(META_STATE_FILE_NAME);
   Ok(path)
 }
 
-fn document_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  let mut path = state_dir_path(app)?;
+async fn document_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+  let mut path = state_dir_path(app).await?;
   path.push(DOCUMENT_STATE_FILE_NAME);
   Ok(path)
 }
 
-fn legacy_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  let mut path = state_dir_path(app)?;
+async fn legacy_state_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+  let mut path = state_dir_path(app).await?;
   path.push(LEGACY_STATE_FILE_NAME);
   Ok(path)
 }
@@ -220,22 +229,44 @@ where
 {
   let content = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
   let temp_path = path.with_extension("json.tmp");
+  let backup_path = path.with_extension("json.bak");
   tokio::fs::write(&temp_path, content)
     .await
     .map_err(|error| format!("写入临时状态文件失败: {}", error))?;
-  if path.exists() {
-    tokio::fs::remove_file(&path)
-      .await
-      .map_err(|error| format!("替换状态文件前删除旧文件失败: {}", error))?;
-  }
-  tokio::fs::rename(&temp_path, &path)
+
+  let mut original_backed_up = false;
+  if tokio::fs::try_exists(&path)
     .await
-    .map_err(|error| format!("重命名状态文件失败: {}", error))
+    .map_err(|error| format!("检查状态文件失败 ({}): {}", path.display(), error))?
+  {
+    let _ = tokio::fs::remove_file(&backup_path).await;
+    tokio::fs::rename(&path, &backup_path)
+      .await
+      .map_err(|error| format!("备份旧状态文件失败: {}", error))?;
+    original_backed_up = true;
+  }
+
+  if let Err(error) = tokio::fs::rename(&temp_path, &path).await {
+    let _ = tokio::fs::remove_file(&temp_path).await;
+    if original_backed_up {
+      let _ = tokio::fs::rename(&backup_path, &path).await;
+    }
+    return Err(format!("重命名状态文件失败: {}", error));
+  }
+
+  if original_backed_up {
+    let _ = tokio::fs::remove_file(&backup_path).await;
+  }
+
+  Ok(())
 }
 
 async fn read_legacy_state(app: &tauri::AppHandle) -> Result<Option<DesktopState>, String> {
-  let path = legacy_state_file_path(app)?;
-  if !path.exists() {
+  let path = legacy_state_file_path(app).await?;
+  if !tokio::fs::try_exists(&path)
+    .await
+    .map_err(|error| format!("检查旧状态文件失败 ({}): {}", path.display(), error))?
+  {
     return Ok(None);
   }
   let content = tokio::fs::read(path)
@@ -249,27 +280,40 @@ async fn read_legacy_state(app: &tauri::AppHandle) -> Result<Option<DesktopState
 }
 
 async fn migrate_legacy_state(app: &tauri::AppHandle) -> Result<Option<DesktopState>, String> {
-  let meta_path = meta_state_file_path(app)?;
-  let document_path = document_state_file_path(app)?;
-  if meta_path.exists() && document_path.exists() {
+  let meta_path = meta_state_file_path(app).await?;
+  let document_path = document_state_file_path(app).await?;
+  let meta_exists = tokio::fs::try_exists(&meta_path)
+    .await
+    .map_err(|error| format!("检查元状态文件失败 ({}): {}", meta_path.display(), error))?;
+  let document_exists = tokio::fs::try_exists(&document_path).await.map_err(|error| {
+    format!(
+      "检查文档状态文件失败 ({}): {}",
+      document_path.display(),
+      error
+    )
+  })?;
+  if meta_exists && document_exists {
     return Ok(None);
   }
   let Some(legacy_state) = read_legacy_state(app).await? else {
     return Ok(None);
   };
   let (meta_state, document_state) = split_state(&legacy_state);
-  if !meta_path.exists() {
+  if !meta_exists {
     write_json_file(meta_path, &meta_state).await?;
   }
-  if !document_path.exists() {
+  if !document_exists {
     write_json_file(document_path, &document_state).await?;
   }
   Ok(Some(legacy_state))
 }
 
 pub async fn read_meta_state_raw(app: &tauri::AppHandle) -> Result<DesktopMetaState, String> {
-  let path = meta_state_file_path(app)?;
-  if path.exists() {
+  let path = meta_state_file_path(app).await?;
+  if tokio::fs::try_exists(&path)
+    .await
+    .map_err(|error| format!("检查元状态文件失败 ({}): {}", path.display(), error))?
+  {
     return read_json_file(path, default_meta_state()).await;
   }
   if let Some(legacy_state) = migrate_legacy_state(app).await? {
@@ -282,8 +326,11 @@ pub async fn read_meta_state_raw(app: &tauri::AppHandle) -> Result<DesktopMetaSt
 pub async fn read_document_state_raw(
   app: &tauri::AppHandle,
 ) -> Result<DesktopDocumentState, String> {
-  let path = document_state_file_path(app)?;
-  if path.exists() {
+  let path = document_state_file_path(app).await?;
+  if tokio::fs::try_exists(&path)
+    .await
+    .map_err(|error| format!("检查文档状态文件失败 ({}): {}", path.display(), error))?
+  {
     return read_json_file(path, default_document_state()).await;
   }
   if let Some(legacy_state) = migrate_legacy_state(app).await? {
@@ -313,18 +360,18 @@ pub async fn write_meta_state(
   app: &tauri::AppHandle,
   state: &DesktopMetaState,
 ) -> Result<(), String> {
-  write_json_file(meta_state_file_path(app)?, state).await
+  write_json_file(meta_state_file_path(app).await?, state).await
 }
 
 pub async fn write_document_state(
   app: &tauri::AppHandle,
   state: &DesktopDocumentState,
 ) -> Result<(), String> {
-  write_json_file(document_state_file_path(app)?, state).await
+  write_json_file(document_state_file_path(app).await?, state).await
 }
 
 pub async fn write_state(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), String> {
   let (meta_state, document_state) = split_state(state);
-  write_json_file(meta_state_file_path(app)?, &meta_state).await?;
-  write_json_file(document_state_file_path(app)?, &document_state).await
+  write_json_file(meta_state_file_path(app).await?, &meta_state).await?;
+  write_json_file(document_state_file_path(app).await?, &document_state).await
 }

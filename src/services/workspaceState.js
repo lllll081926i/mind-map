@@ -1,4 +1,5 @@
 import { getBootstrapState, saveBootstrapStatePatch } from '@/platform'
+import { normalizeWorkspaceCurrentDocument } from './workspaceSession.js'
 
 const normalizeRecentFiles = value => {
   return Array.isArray(value) ? value.filter(Boolean) : []
@@ -24,16 +25,7 @@ export const setWorkspaceLastDirectory = async lastDirectory => {
 
 export const setWorkspaceCurrentDocument = async currentDocument => {
   const normalizedCurrentDocument =
-    currentDocument &&
-    typeof currentDocument === 'object' &&
-    typeof currentDocument.path === 'string'
-      ? {
-          path: currentDocument.path,
-          name: String(currentDocument.name || ''),
-          source: String(currentDocument.source || ''),
-          dirty: !!currentDocument.dirty
-        }
-      : null
+    normalizeWorkspaceCurrentDocument(currentDocument)
   const nextState = await saveBootstrapStatePatch({
     currentDocument: normalizedCurrentDocument
   })

@@ -334,8 +334,9 @@ class RichText {
 
   // 设置quill编辑器容器的最小高度
   setQuillContainerMinHeight(minHeight) {
-    document.querySelector('.' + RICH_TEXT_EDIT_WRAP).style.minHeight =
-      minHeight + 'px'
+    const wrapEl = document.querySelector('.' + RICH_TEXT_EDIT_WRAP)
+    if (!wrapEl) return
+    wrapEl.style.minHeight = minHeight + 'px'
   }
 
   // 更新文本编辑框的大小和位置

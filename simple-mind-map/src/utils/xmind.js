@@ -66,9 +66,10 @@ export const getItemByName = (arr, name) => {
 
 // 解析旧版xmind数据，从一个数组中根据attributes.type找出该项
 export const getElementsByType = (arr, type) => {
-  return arr.find(el => {
-    return el.attributes.type === type
-  }).elements
+  const target = (arr || []).find(el => {
+    return el?.attributes?.type === type
+  })
+  return target?.elements || null
 }
 
 // 解析xmind数据，将概要转换为smm支持的结构
@@ -111,9 +112,12 @@ export const handleNodeImageFromXmind = async (
     try {
       // 读取图片
       const imageType = /\.([^.]+)$/.exec(node.image.src)[1]
+      const imagePathSegment = String(node.image.src || '')
+        .split(/[\\/]/)
+        .pop()
       const imageBase64 =
         `data:image/${imageType};base64,` +
-        (await files['resources/' + node.image.src.split('/')[1]].async(
+        (await files['resources/' + imagePathSegment].async(
           'base64'
         ))
       newNode.data.image = imageBase64

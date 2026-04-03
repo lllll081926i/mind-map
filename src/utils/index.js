@@ -116,7 +116,9 @@ const fallbackCopy = text => {
 // 复制文本到剪贴板
 export const setDataToClipboard = data => {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(data)
+    navigator.clipboard.writeText(data).catch(error => {
+      console.error('setDataToClipboard failed', error)
+    })
   }
 }
 
@@ -124,7 +126,9 @@ export const setDataToClipboard = data => {
 export const setImgToClipboard = img => {
   if (navigator.clipboard && navigator.clipboard.write) {
     const data = [new ClipboardItem({ ['image/png']: img })]
-    navigator.clipboard.write(data)
+    navigator.clipboard.write(data).catch(error => {
+      console.error('setImgToClipboard failed', error)
+    })
   }
 }
 

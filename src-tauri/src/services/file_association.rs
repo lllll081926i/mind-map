@@ -111,8 +111,20 @@ fn normalize_associated_path(
     return None;
   }
 
-  let normalized_path = std::fs::canonicalize(&resolved_path).unwrap_or(resolved_path);
+  let normalized_path =
+    normalize_windows_path_prefix(&std::fs::canonicalize(&resolved_path).unwrap_or(resolved_path));
   Some(normalized_path.to_string_lossy().to_string())
+}
+
+fn normalize_windows_path_prefix(path: &Path) -> PathBuf {
+  let raw = path.to_string_lossy();
+  if let Some(rest) = raw.strip_prefix("\\\\?\\UNC\\") {
+    return PathBuf::from(format!("\\\\{rest}"));
+  }
+  if let Some(rest) = raw.strip_prefix("\\\\?\\") {
+    return PathBuf::from(rest);
+  }
+  path.to_path_buf()
 }
 
 fn is_smm_file(path: &Path) -> bool {

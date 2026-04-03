@@ -11,15 +11,19 @@ fn validate_path_length(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn read_text_file(path: String) -> Result<String, String> {
+pub async fn read_text_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
   validate_path_length(&path)?;
-  app_fs::read_text_file(&path).await
+  app_fs::read_text_file(&app, &path).await
 }
 
 #[tauri::command]
-pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+pub async fn write_text_file(
+  app: tauri::AppHandle,
+  path: String,
+  content: String,
+) -> Result<(), String> {
   validate_path_length(&path)?;
-  app_fs::write_text_file(&path, &content).await
+  app_fs::write_text_file(&app, &path, &content).await
 }
 
 #[tauri::command]

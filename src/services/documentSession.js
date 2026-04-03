@@ -3,6 +3,7 @@ import {
   setWorkspaceCurrentDocument,
   setWorkspaceLastDirectory
 } from '@/services/workspaceState'
+import { normalizeWorkspaceCurrentDocument } from './workspaceSession.js'
 
 const createDefaultSession = () => ({
   fileRef: null,
@@ -11,29 +12,40 @@ const createDefaultSession = () => ({
 })
 
 let sessionState = createDefaultSession()
+let bootstrapSyncQueue = Promise.resolve()
 
 const getParentDirectory = filePath => {
   const value = String(filePath || '').trim()
   if (!value) return ''
-  const parts = value.split(/[\\/]/)
-  parts.pop()
-  return parts.join('/')
+  const lastSeparatorIndex = Math.max(
+    value.lastIndexOf('\\'),
+    value.lastIndexOf('/')
+  )
+  return lastSeparatorIndex >= 0 ? value.slice(0, lastSeparatorIndex) : ''
 }
 
 const syncBootstrapState = () => {
-  const currentDocument = sessionState.fileRef
-    ? {
-        path: sessionState.fileRef.path || '',
-        name: sessionState.fileRef.name || '',
-        source: sessionState.source || '',
-        dirty: !!sessionState.dirty
-      }
-    : null
-  void setWorkspaceCurrentDocument(currentDocument)
-    .then(() => {
-      return setWorkspaceLastDirectory(
+  const currentDocument = normalizeWorkspaceCurrentDocument(
+    sessionState.fileRef
+      ? {
+          path: sessionState.fileRef.path || '',
+          name: sessionState.fileRef.name || '',
+          source: sessionState.source || '',
+          dirty: !!sessionState.dirty
+        }
+      : null
+  )
+  bootstrapSyncQueue = bootstrapSyncQueue
+    .catch(error => {
+      console.error('syncBootstrapState previous task failed', error)
+    })
+    .then(async () => {
+      await setWorkspaceCurrentDocument(currentDocument)
+      await setWorkspaceLastDirectory(
         currentDocument ? getParentDirectory(currentDocument.path) : ''
       )
+      const runtimeModule = await import('@/stores/runtime')
+      runtimeModule.syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
     })
     .catch(error => {
       console.error('syncBootstrapState failed', error)
@@ -47,14 +59,17 @@ export const hydrateDocumentSession = () => {
     bootstrapState.currentDocument &&
     bootstrapState.currentDocument.path
   ) {
+    const currentDocument = normalizeWorkspaceCurrentDocument(
+      bootstrapState.currentDocument
+    )
     sessionState = {
       fileRef: {
         mode: 'desktop',
-        path: bootstrapState.currentDocument.path,
-        name: bootstrapState.currentDocument.name || ''
+        path: currentDocument?.path || '',
+        name: currentDocument?.name || ''
       },
-      source: bootstrapState.currentDocument.source || 'desktop',
-      dirty: !!bootstrapState.currentDocument.dirty
+      source: currentDocument?.source || 'desktop',
+      dirty: !!currentDocument?.dirty
     }
     return sessionState
   }

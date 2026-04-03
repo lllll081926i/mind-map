@@ -767,10 +767,15 @@ class MindMap {
   // 实例化插件
   initPlugin(plugin) {
     if (this[plugin.instanceName]) return
-    this[plugin.instanceName] = new plugin({
-      mindMap: this,
-      pluginOpt: plugin.pluginOpt
-    })
+    try {
+      this[plugin.instanceName] = new plugin({
+        mindMap: this,
+        pluginOpt: plugin.pluginOpt
+      })
+    } catch (error) {
+      this.opt.errorHandler(ERROR_TYPES.EXEC_COMMAND_ERROR, error)
+      this[plugin.instanceName] = null
+    }
   }
 
   // 销毁

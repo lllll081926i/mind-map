@@ -11,7 +11,7 @@ import { getRuntimeStores } from '@/stores/runtime'
 // 获取缓存的思维导图数据
 export const getData = () => {
   const { appStore } = getRuntimeStores()
-  const currentData = appStore.isHandleLocalFile ? getCurrentData() : null
+  const currentData = appStore?.isHandleLocalFile ? getCurrentData() : null
   if (currentData) {
     return currentData
   }

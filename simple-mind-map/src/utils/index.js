@@ -151,10 +151,15 @@ export const getStrWithBrFromHtml = str => {
 
 //  极简的深拷贝
 export const simpleDeepClone = data => {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(data)
+    } catch (error) {}
+  }
   try {
     return JSON.parse(JSON.stringify(data))
   } catch (error) {
-    return null
+    return data
   }
 }
 

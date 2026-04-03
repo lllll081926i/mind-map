@@ -1,4 +1,4 @@
-use crate::services::app_state;
+use crate::services::{app_state, file_association::PendingAssociatedFiles};
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use tauri::Manager;
@@ -77,7 +77,16 @@ async fn collect_allowed_directory_roots(app: &tauri::AppHandle) -> Result<Vec<P
     eprintln!("[MindMap] 警告: 无法获取 app_data_dir");
   }
   
-  let meta_state = app_state::read_meta_state_raw(app).await?;
+  let meta_state = match app_state::read_meta_state_raw(app).await {
+    Ok(state) => state,
+    Err(error) => {
+      eprintln!(
+        "[MindMap] 警告: 读取工作区状态失败，目录权限校验回退到 app_data_dir: {}",
+        error
+      );
+      app_state::DesktopMetaState::default()
+    }
+  };
   if let Some(path) = normalize_directory_scope(&meta_state.last_directory) {
     eprintln!("[MindMap] 允许的目录根节点 (last_directory): {}", path.display());
     roots.push(path);
@@ -95,6 +104,17 @@ async fn collect_allowed_directory_roots(app: &tauri::AppHandle) -> Result<Vec<P
       eprintln!("[MindMap] 允许的目录根节点 (recent_files): {}", scope.display());
       roots.push(scope);
     }
+  });
+  let pending_associated_files = app.state::<PendingAssociatedFiles>();
+  pending_associated_files.take_paths().into_iter().for_each(|path| {
+    if let Some(scope) = normalize_directory_scope(&path) {
+      eprintln!(
+        "[MindMap] 允许的目录根节点 (pending_associated_files): {}",
+        scope.display()
+      );
+      roots.push(scope);
+    }
+    pending_associated_files.push_paths(vec![path]);
   });
 
   let mut result = Vec::new();
@@ -132,7 +152,7 @@ async fn ensure_directory_scope_allowed(
   }
 
   let requested_path = Path::new(path);
-  let path_to_check = if requested_path.exists() {
+  let mut path_to_check = if requested_path.exists() {
     requested_path.to_path_buf()
   } else {
     requested_path
@@ -140,6 +160,12 @@ async fn ensure_directory_scope_allowed(
       .map(|parent| parent.to_path_buf())
       .unwrap_or_else(|| requested_path.to_path_buf())
   };
+  while !path_to_check.exists() {
+    let Some(parent) = path_to_check.parent() else {
+      break;
+    };
+    path_to_check = parent.to_path_buf();
+  }
 
   let canonical_path = tokio::fs::canonicalize(&path_to_check)
     .await
@@ -178,13 +204,14 @@ pub struct DirectoryEntry {
   pub enable_edit: bool,
 }
 
-pub async fn read_text_file(path: &str) -> Result<String, String> {
+pub async fn read_text_file(app: &tauri::AppHandle, path: &str) -> Result<String, String> {
   if !has_allowed_extension(path) {
     return Err("不支持的文件类型".into());
   }
   if !is_path_safe(path) {
     return Err("无效的路径".into());
   }
+  ensure_directory_scope_allowed(app, path).await?;
   let metadata = tokio::fs::metadata(path)
     .await
     .map_err(|error| error.to_string())?;
@@ -196,13 +223,18 @@ pub async fn read_text_file(path: &str) -> Result<String, String> {
     .map_err(|error| error.to_string())
 }
 
-pub async fn write_text_file(path: &str, content: &str) -> Result<(), String> {
+pub async fn write_text_file(
+  app: &tauri::AppHandle,
+  path: &str,
+  content: &str,
+) -> Result<(), String> {
   if !has_allowed_extension(path) {
     return Err("不支持的文件类型".into());
   }
   if !is_path_safe(path) {
     return Err("无效的路径".into());
   }
+  ensure_directory_scope_allowed(app, path).await?;
   if let Some(parent) = Path::new(path).parent() {
     tokio::fs::create_dir_all(parent)
       .await
@@ -234,7 +266,7 @@ pub async fn list_directory_entries(
   let mut file_list = Vec::new();
 
   while let Some(entry) = entries.next_entry().await.map_err(|error| error.to_string())? {
-    let entry_path = entry.path();
+    let entry_path = normalize_windows_path_prefix(&entry.path());
     let metadata = entry.metadata().await.map_err(|error| error.to_string())?;
     let name = entry.file_name().to_string_lossy().to_string();
     let is_file = metadata.is_file();

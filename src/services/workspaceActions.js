@@ -20,7 +20,8 @@ import {
   setWorkspaceLastDirectory,
   setWorkspaceRecentFiles
 } from '@/services/workspaceState'
-import { parseExternalJsonSafely } from '@/utils'
+import { getWorkspaceResumeEntry } from './workspaceSession.js'
+import { parseExternalJsonSafely } from '@/utils/json'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
 
@@ -35,6 +36,12 @@ const getDirectoryPath = filePath => {
     value.lastIndexOf('/')
   )
   return lastSeparatorIndex >= 0 ? value.slice(0, lastSeparatorIndex) : ''
+}
+
+const persistWorkspaceLastDirectory = directoryPath => {
+  void setWorkspaceLastDirectory(directoryPath).catch(error => {
+    console.warn('setWorkspaceLastDirectory failed', error)
+  })
 }
 
 export const normalizeWorkspaceMindMapData = data => {
@@ -62,6 +69,18 @@ const enterEditor = async router => {
   await router.push('/edit')
 }
 
+export const resumeWorkspaceSession = async router => {
+  const state = getWorkspaceMetaState()
+  const resumeEntry = getWorkspaceResumeEntry(state)
+  if (!resumeEntry) {
+    return null
+  }
+  setIsHandleLocalFile(!!resumeEntry.path)
+  syncRuntimeFromWorkspaceMeta(state)
+  await enterEditor(router)
+  return resumeEntry
+}
+
 const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   const normalizedData = parseMindMapContent(content)
   const recentProjectRef = createRecentProjectRef(fileRef)
@@ -69,11 +88,7 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   storeData(normalizedData)
   setIsHandleLocalFile(true)
   markDocumentDirty(false)
-  void setWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || '')).catch(
-    error => {
-      console.warn('setWorkspaceLastDirectory failed', error)
-    }
-  )
+  persistWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || ''))
   void recordRecentFile(recentProjectRef).catch(error => {
     console.warn('recordRecentFile failed', error)
   })
@@ -143,7 +158,7 @@ export const createWorkspaceLocalFile = async ({
       defaultPath: getLastDirectory()
     })
     if (!fileRef) return null
-    await setWorkspaceLastDirectory(getDirectoryPath(fileRef.path || ''))
+    persistWorkspaceLastDirectory(getDirectoryPath(fileRef.path || ''))
     return hydrateWorkspaceFileSession(fileRef, serialized, router)
   } catch (error) {
     throw createDesktopFsError(error)
@@ -172,7 +187,7 @@ export const openWorkspaceDirectory = async () => {
       directoryRef,
       entries
     )
-    await setWorkspaceLastDirectory(workspaceDirectoryRef.path || '')
+    persistWorkspaceLastDirectory(workspaceDirectoryRef.path || '')
     return {
       directoryRef: workspaceDirectoryRef,
       entries: workspaceDirectoryRef.entries

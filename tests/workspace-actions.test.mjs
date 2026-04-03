@@ -14,6 +14,7 @@ test('工作台文件操作服务存在并暴露共享动作', () => {
   assert.match(source, /export\s+const\s+createWorkspaceLocalFile/)
   assert.match(source, /export\s+const\s+openWorkspaceRecentFile/)
   assert.match(source, /export\s+const\s+refreshWorkspaceRecentFiles/)
+  assert.match(source, /export\s+const\s+resumeWorkspaceSession/)
 })
 
 test('桌面平台在无 Tauri 注入时会回退到浏览器文件桥接，避免首页新建直接崩溃', () => {
