@@ -77,6 +77,18 @@ const createManualChunks = id => {
     if (isPathMatch(id, 'axios')) {
       return 'vendor-network'
     }
+    if (isPathMatch(id, 'markdown-it') || isPathMatch(id, 'markdown-it-checkbox')) {
+      return 'vendor-markdown'
+    }
+    if (isPathMatch(id, 'dompurify')) {
+      return 'vendor-dompurify'
+    }
+    if (isPathMatch(id, 'pdf-lib')) {
+      return 'vendor-pdf'
+    }
+    if (isPathMatch(id, 'jszip') || isPathMatch(id, 'xml-js')) {
+      return 'vendor-doc-codec'
+    }
   }
 
   if (isPathMatch(id, 'simple-mind-map')) {
@@ -134,11 +146,10 @@ const createManualChunks = id => {
 module.exports = defineConfig(({ command, mode: _mode }) => {
   const isBuild = command === 'build'
   const defaultReleaseUrl = 'https://github.com/lllll081926i/mind-map/releases'
-  const defaultUpdateManifestUrl =
-    'https://github.com/lllll081926i/mind-map/releases/latest/download/latest.json'
+  const defaultReleaseApiUrl =
+    'https://api.github.com/repos/lllll081926i/mind-map/releases/latest'
   const releaseUrl = process.env.APP_RELEASE_URL || defaultReleaseUrl
-  const updateManifestUrl =
-    process.env.APP_UPDATE_MANIFEST_URL || defaultUpdateManifestUrl
+  const releaseApiUrl = process.env.APP_RELEASE_API_URL || defaultReleaseApiUrl
 
   return {
     plugins: [
@@ -168,7 +179,7 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
       __APP_PLATFORM__: JSON.stringify(process.platform),
       __APP_RUNTIME__: JSON.stringify('desktop'),
       __APP_RELEASE_URL__: JSON.stringify(releaseUrl),
-      __APP_UPDATE_MANIFEST_URL__: JSON.stringify(updateManifestUrl),
+      __APP_RELEASE_API_URL__: JSON.stringify(releaseApiUrl),
       __VUE_OPTIONS_API__: true,
       __VUE_PROD_DEVTOOLS__: false
     },
@@ -202,6 +213,7 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
     build: {
       outDir: 'dist-desktop',
       emptyOutDir: true,
+      modulePreload: false,
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {

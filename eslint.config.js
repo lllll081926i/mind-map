@@ -37,7 +37,7 @@ module.exports = [
         __APP_VERSION__: 'readonly',
         __APP_PLATFORM__: 'readonly',
         __APP_RELEASE_URL__: 'readonly',
-        __APP_UPDATE_MANIFEST_URL__: 'readonly'
+        __APP_RELEASE_API_URL__: 'readonly'
       }
     },
     plugins: {

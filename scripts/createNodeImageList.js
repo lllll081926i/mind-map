@@ -12,6 +12,15 @@ const run = dir => {
       walkDir(cur, item)
     }
   })
+  const content = `
+// 该文件请运行npm run createNodeImageList命令自动生成
+${importList.join('\n')}
+export default ${JSON.stringify(list, null, 2).replace(
+    /(url":\s*)"([^"]+)"(,)/g,
+    '$1$2$3'
+  )}
+`
+  fs.writeFileSync(targetDest, content)
 }
 
 const list = []
@@ -39,15 +48,6 @@ const walkDir = (dir, item) => {
     name,
     list: itemList
   })
-  const content = `
-// 该文件请运行npm run createNodeImageList命令自动生成
-${importList.join('\n')}
-export default ${JSON.stringify(list, null, 2).replace(
-    /(url":\s*)"([^"]+)"(,)/g,
-    '$1$2$3'
-  )}
-`
-  fs.writeFileSync(targetDest, content)
 }
 
 run(fileDest)

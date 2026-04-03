@@ -1,8 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 
-const distIndex = path.resolve(__dirname, '../../dist/index.html')
-const rootIndex = path.resolve(__dirname, '../../index.html')
+const distIndex = path.resolve(__dirname, '../dist-desktop/index.html')
+const rootIndex = path.resolve(__dirname, '../index.html')
 const tempRootIndex = `${rootIndex}.tmp`
 
 const normalizeAssetPath = assetPath => assetPath.replace(/^\.?\//, '')

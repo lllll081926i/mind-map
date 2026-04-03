@@ -25,7 +25,6 @@ fn main() {
     .manage(pending_associated_files)
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_process::init())
-    .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       commands::config::read_bootstrap_state,
       commands::config::read_bootstrap_meta_state,
