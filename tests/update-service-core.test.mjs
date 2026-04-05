@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import {
   compareVersions,
@@ -79,5 +81,32 @@ test('createManualUpdateResult 在已是最新版本时返回 up-to-date', () =>
   assert.deepEqual(result, {
     status: 'up-to-date',
     latestVersion: '0.2.0'
+  })
+})
+
+test('检查更新服务统一依赖 GitHub latest release 结果，不再暴露降级状态', () => {
+  const serviceSource = fs.readFileSync(
+    path.resolve('src/services/updateService.js'),
+    'utf8'
+  )
+
+  assert.match(serviceSource, /fetchLatestRelease/)
+  assert.match(serviceSource, /createManualUpdateResult/)
+  assert.doesNotMatch(serviceSource, /release-page-only/)
+  assert.doesNotMatch(serviceSource, /not-configured/)
+})
+
+test('设置页更新入口只处理新版本和已是最新版本两条分支', () => {
+  const files = [
+    path.resolve('src/pages/Edit/components/Setting.vue'),
+    path.resolve('src/pages/Home/components/WorkspaceSettings.vue')
+  ]
+
+  files.forEach(file => {
+    const source = fs.readFileSync(file, 'utf8')
+    assert.match(source, /result\.status === 'update-available'/)
+    assert.match(source, /result\.status === 'up-to-date'/)
+    assert.doesNotMatch(source, /release-page-only/)
+    assert.doesNotMatch(source, /updateSourceNotConfigured/)
   })
 })

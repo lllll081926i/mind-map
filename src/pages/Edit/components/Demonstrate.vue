@@ -140,12 +140,12 @@ export default {
 
   &.isDark {
     .btn {
-      color: hsla(0, 0%, 100%, 0.6);
+      color: var(--navigator-text, hsla(0, 0%, 100%, 0.72));
     }
   }
 
   .item {
-    margin-right: 12px;
+    margin-right: 6px;
 
     &:last-of-type {
       margin-right: 0;
@@ -154,7 +154,7 @@ export default {
 
   .btn {
     cursor: pointer;
-    font-size: 24px;
+    font-size: 16px;
   }
 }
 

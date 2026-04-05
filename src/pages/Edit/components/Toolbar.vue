@@ -1,10 +1,15 @@
 <template>
   <div class="toolbarContainer" :class="{ isDark: isDark }">
-    <div class="toolbar" ref="toolbarRef">
+    <div
+      class="toolbar"
+      ref="toolbarRef"
+      :class="{ hideLabels: !showToolbarLabels }"
+    >
       <!-- 节点操作 -->
-      <div class="toolbarBlock">
+      <div class="toolbarBlock fileActionsBlock">
         <ToolbarNodeBtnList
           :list="horizontalList"
+          :show-text="showToolbarLabels"
           @show-node-image="openNodeImageDialog"
           @show-node-link="openNodeLinkDialog"
           @show-node-note="openNodeNoteDialog"
@@ -22,6 +27,7 @@
           <ToolbarNodeBtnList
             dir="v"
             :list="verticalList"
+            :show-text="true"
             @click="popoverShow = false"
             @show-node-image="openNodeImageDialog"
             @show-node-link="openNodeLinkDialog"
@@ -37,7 +43,7 @@
               @keydown.enter.prevent="popoverShow = !popoverShow"
               @keydown.space.prevent="popoverShow = !popoverShow"
             >
-              <span class="icon iconfont icongongshi"></span>
+              <span class="icon iconfont edit-icon-more"></span>
               <span class="text">{{ $t('toolbar.more') }}</span>
             </div>
           </template>
@@ -46,7 +52,7 @@
       <!-- 导出 -->
       <div class="toolbarBlock">
         <div
-          class="toolbarBtn"
+          class="toolbarBtn fileActionBtn"
           role="button"
           tabindex="0"
           :aria-label="$t('toolbar.directory')"
@@ -65,7 +71,7 @@
           v-if="!isMobile"
         >
           <div
-            class="toolbarBtn"
+            class="toolbarBtn fileActionBtn"
             role="button"
             tabindex="0"
             :aria-label="$t('toolbar.newFile')"
@@ -84,7 +90,7 @@
           v-if="!isMobile"
         >
           <div
-            class="toolbarBtn"
+            class="toolbarBtn fileActionBtn"
             role="button"
             tabindex="0"
             :aria-label="$t('toolbar.openFile')"
@@ -102,7 +108,7 @@
           @command="openRecentFile"
         >
           <div
-            class="toolbarBtn"
+            class="toolbarBtn fileActionBtn"
             role="button"
             tabindex="0"
             :aria-label="$t('toolbar.recentFiles')"
@@ -126,7 +132,7 @@
           </template>
         </el-dropdown>
         <div
-          class="toolbarBtn"
+          class="toolbarBtn fileActionBtn"
           role="button"
           tabindex="0"
           :aria-label="$t('toolbar.saveAs')"
@@ -139,7 +145,7 @@
           <span class="text">{{ $t('toolbar.saveAs') }}</span>
         </div>
         <div
-          class="toolbarBtn"
+          class="toolbarBtn fileActionBtn"
           role="button"
           tabindex="0"
           :aria-label="$t('toolbar.import')"
@@ -150,9 +156,8 @@
           <span class="icon iconfont icondaoru"></span>
           <span class="text">{{ $t('toolbar.import') }}</span>
         </div>
-        <div class="toolbarDivider"></div>
         <div
-          class="toolbarBtn pageEntryBtn"
+          class="toolbarBtn fileActionBtn"
           role="button"
           tabindex="0"
           :aria-label="$t('toolbar.exportCenter')"
@@ -164,7 +169,7 @@
           <span class="text">{{ $t('toolbar.exportCenter') }}</span>
         </div>
         <div
-          class="toolbarBtn pageEntryBtn"
+          class="toolbarBtn fileActionBtn"
           role="button"
           tabindex="0"
           :aria-label="$t('toolbar.returnHome')"
@@ -259,10 +264,13 @@
       <div class="toolbarMeasure">
         <div class="toolbarBlock isMeasure" ref="toolbarMeasureBlockRef">
           <div ref="toolbarMeasureListRef">
-            <ToolbarNodeBtnList :list="btnLit"></ToolbarNodeBtnList>
+            <ToolbarNodeBtnList
+              :list="btnLit"
+              :show-text="showToolbarLabels"
+            ></ToolbarNodeBtnList>
           </div>
           <div class="toolbarBtn" ref="toolbarMeasureMoreRef">
-            <span class="icon iconfont icongongshi"></span>
+            <span class="icon iconfont edit-icon-more"></span>
             <span class="text">{{ $t('toolbar.more') }}</span>
           </div>
         </div>
@@ -404,6 +412,10 @@ export default {
       return this.localConfig.enableAi
     },
 
+    showToolbarLabels() {
+      return this.localConfig.showToolbarLabels !== false
+    },
+
     btnLit() {
       let res = [...defaultBtnList]
       if (!this.openNodeRichText) {
@@ -429,6 +441,9 @@ export default {
       handler() {
         this.computeToolbarShow()
       }
+    },
+    showToolbarLabels() {
+      this.computeToolbarShow()
     }
   },
   created() {
@@ -924,17 +939,54 @@ export default {
 
 <style lang="less" scoped>
 .toolbarContainer {
+  --toolbar-surface: rgba(255, 255, 255, 0.9);
+  --toolbar-border: rgba(15, 23, 42, 0.08);
+  --toolbar-shadow: none;
+  --toolbar-text-color: rgba(15, 23, 42, 0.72);
+  --toolbar-text-hover-color: rgba(15, 23, 42, 0.96);
+  --toolbar-subtle-text-color: #737373;
+  --toolbar-icon-bg: transparent;
+  --toolbar-icon-border: transparent;
+  --toolbar-icon-shadow: none;
+  --toolbar-icon-hover-bg: rgba(15, 23, 42, 0.06);
+  --toolbar-icon-hover-border: transparent;
+  --toolbar-icon-hover-shadow: none;
+  --toolbar-icon-active-bg: rgba(15, 23, 42, 0.09);
+  --toolbar-icon-active-border: transparent;
+  --toolbar-icon-active-shadow: none;
+  --toolbar-divider-color: rgba(15, 23, 42, 0.08);
+  --toolbar-disabled-color: rgba(15, 23, 42, 0.24);
+
   &.isDark {
+    --toolbar-surface: rgba(24, 28, 34, 0.92);
+    --toolbar-border: rgba(255, 255, 255, 0.08);
+    --toolbar-shadow: none;
+    --toolbar-text-color: hsla(0, 0%, 100%, 0.74);
+    --toolbar-text-hover-color: #fff;
+    --toolbar-subtle-text-color: hsla(0, 0%, 100%, 0.52);
+    --toolbar-icon-bg: transparent;
+    --toolbar-icon-border: transparent;
+    --toolbar-icon-shadow: none;
+    --toolbar-icon-hover-bg: rgba(255, 255, 255, 0.1);
+    --toolbar-icon-hover-border: transparent;
+    --toolbar-icon-hover-shadow: none;
+    --toolbar-icon-active-bg: rgba(255, 255, 255, 0.12);
+    --toolbar-icon-active-border: transparent;
+    --toolbar-icon-active-shadow: none;
+    --toolbar-divider-color: rgba(255, 255, 255, 0.1);
+    --toolbar-disabled-color: rgba(255, 255, 255, 0.2);
+
     .toolbar {
-      color: hsla(0, 0%, 100%, 0.9);
+      color: var(--toolbar-text-color);
       .toolbarBlock {
-        background-color: #262a2e;
+        background-color: var(--toolbar-surface);
 
         .fileTreeBox {
-          background-color: #262a2e;
+          background-color: #20242b;
+          border-color: rgba(255, 255, 255, 0.08);
 
           :deep(.el-tree) {
-            background-color: #262a2e;
+            background-color: #20242b;
 
             &.el-tree--highlight-current {
               .el-tree-node.is-current > .el-tree-node__content {
@@ -970,71 +1022,69 @@ export default {
 
       .toolbarBtn {
         .icon {
-          background: transparent;
-          border-color: transparent;
+          background: var(--toolbar-icon-bg);
+          border-color: var(--toolbar-icon-border);
         }
 
         &:hover {
           &:not(.disabled) {
             .icon {
-              background: hsla(0, 0%, 100%, 0.05);
+              background: var(--toolbar-icon-hover-bg);
             }
           }
         }
 
         &.disabled {
-          color: #54595f;
+          color: var(--toolbar-disabled-color);
         }
       }
 
       .toolbarDivider {
-        background: hsla(0, 0%, 100%, 0.1);
-      }
-
-      .pageEntryBtn {
-        .icon {
-          background: hsla(0, 0%, 100%, 0.04);
-          border-color: hsla(0, 0%, 100%, 0.1);
-        }
+        background: var(--toolbar-divider-color);
       }
     }
   }
 
   .toolbar {
     position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    top: 20px;
-    width: max-content;
+    left: 0;
+    right: 0;
+    top: 0;
+    width: auto;
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     font-size: 12px;
     font-family:
-      PingFangSC-Regular,
-      PingFang SC;
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
     font-weight: 400;
-    color: rgba(26, 26, 26, 0.8);
-    z-index: 2;
+    color: var(--toolbar-text-color);
+    z-index: 1200;
+    min-height: 56px;
+    padding: 0 16px;
+    background: var(--toolbar-surface);
+    border-bottom: 1px solid var(--toolbar-border);
+    box-shadow: var(--toolbar-shadow);
+    backdrop-filter: blur(18px);
 
     .toolbarBlock {
       display: flex;
       align-items: center;
-      background-color: #fff;
-      padding: 8px 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      margin-right: 8px;
+      background-color: transparent;
+      padding: 0;
+      border-radius: 0;
+      box-shadow: none;
+      border: none;
       flex-shrink: 0;
       position: relative;
-
-      &:last-of-type {
-        margin-right: 0;
-      }
 
       .fileTreeBox {
         position: absolute;
         left: 0;
-        top: 60px;
+        top: 52px;
         width: 100%;
         height: 30px;
         background-color: #fff;
@@ -1043,9 +1093,10 @@ export default {
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        border-radius: 5px;
+        border-radius: 16px;
         min-width: 200px;
-        box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+        box-shadow: 0 22px 40px rgba(15, 23, 42, 0.14);
+        border: 1px solid var(--toolbar-border);
 
         &.expand {
           height: 300px;
@@ -1057,22 +1108,23 @@ export default {
 
         .fileTreeToolbar {
           width: 100%;
-          height: 30px;
+          height: 34px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid #e9e9e9;
+          border-bottom: 1px solid var(--toolbar-divider-color);
           margin-bottom: 12px;
           padding-left: 12px;
+          color: inherit;
 
           .fileTreeName {
           }
 
           .fileTreeActionList {
             .btn {
-              width: 20px;
-              height: 20px;
+              width: 24px;
+              height: 24px;
               display: inline-flex;
               align-items: center;
               justify-content: center;
@@ -1081,6 +1133,14 @@ export default {
               margin-left: 12px;
               cursor: pointer;
               line-height: 1;
+              border-radius: 8px;
+              transition:
+                background 0.2s ease,
+                transform 0.2s ease;
+
+              &:hover {
+                background: rgba(15, 23, 42, 0.06);
+              }
 
               &.expanded {
                 transform: rotate(180deg);
@@ -1133,74 +1193,122 @@ export default {
       }
     }
 
+    .toolbarBlock:first-of-type {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      margin-right: 12px;
+    }
+
+    .toolbarBlock:nth-of-type(2) {
+      flex: 0 0 auto;
+      gap: 4px;
+
+      :deep(.el-dropdown) {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .fileActionBtn,
+      :deep(.el-dropdown) > .toolbarBtn {
+        min-width: 38px;
+      }
+    }
+
     .toolbarBtn {
-      display: flex;
+      display: inline-flex;
       justify-content: center;
       align-items: center;
       flex-direction: column;
       cursor: pointer;
-      margin-right: 8px;
-      min-width: 40px;
+      min-width: 38px;
       flex-shrink: 0;
-
-      &:last-of-type {
-        margin-right: 0;
-      }
+      color: inherit;
+      transition:
+        color 0.2s ease,
+        transform 0.22s ease;
 
       &:hover {
         &:not(.disabled) {
+          transform: translateY(-1px);
+
           .icon {
-            background: #f5f5f5;
+            background: var(--toolbar-icon-hover-bg);
+            border-color: var(--toolbar-icon-hover-border);
+            box-shadow: var(--toolbar-icon-hover-shadow);
           }
         }
       }
 
       &.active {
         .icon {
-          background: #f5f5f5;
+          background: var(--toolbar-icon-active-bg);
+          border-color: var(--toolbar-icon-active-border);
+          box-shadow: var(--toolbar-icon-active-shadow);
         }
       }
 
       &.disabled {
-        color: #bcbcbc;
+        color: var(--toolbar-disabled-color);
         cursor: not-allowed;
         pointer-events: none;
       }
 
       .icon {
-        display: flex;
-        height: 26px;
-        background: #fff;
-        border-radius: 4px;
-        border: 1px solid #e9e9e9;
+        display: inline-flex;
+        align-items: center;
         justify-content: center;
-        flex-direction: column;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        background: var(--toolbar-icon-bg);
+        border-radius: 6px;
+        border: 1px solid var(--toolbar-icon-border);
         text-align: center;
-        padding: 0 5px;
+        padding: 0 6px;
+        font-size: 15px;
+        line-height: 1;
+        box-shadow: var(--toolbar-icon-shadow);
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease,
+          box-shadow 0.22s ease;
       }
 
       .text {
-        margin-top: 3px;
-        line-height: 1.2;
+        margin-top: 4px;
+        line-height: 1.1;
         text-align: center;
         white-space: nowrap;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        color: var(--toolbar-subtle-text-color);
       }
     }
 
     .toolbarDivider {
       width: 1px;
-      height: 34px;
-      background: rgba(15, 23, 42, 0.08);
-      margin: 0 1px;
+      height: 16px;
+      background: var(--toolbar-divider-color);
+      margin: 0 8px;
       flex-shrink: 0;
     }
 
-    .pageEntryBtn {
-      min-width: 54px;
+    &.hideLabels {
+      .toolbarBtn {
+        min-width: 32px;
 
-      .icon {
-        width: 28px;
-        align-items: center;
+        .text {
+          display: none;
+        }
+      }
+
+      .fileActionsBlock {
+        .fileActionBtn,
+        :deep(.el-dropdown) > .toolbarBtn {
+          min-width: 32px;
+        }
       }
     }
 

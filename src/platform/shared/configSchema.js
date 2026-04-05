@@ -7,6 +7,7 @@ export const DEFAULT_MIND_MAP_LAYOUT = 'logicalStructure'
 export const DEFAULT_LOCAL_CONFIG = {
   isZenMode: false,
   openNodeRichText: true,
+  showToolbarLabels: true,
   useLeftKeySelectionRightKeyDrag: false,
   isShowScrollbar: false,
   isDark: false,

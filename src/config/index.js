@@ -69,10 +69,10 @@ const sidebarTriggerList = {
 const sidebarLayout = {
   panelWidth: 320,
   panelRight: 0,
-  panelTop: 84,
-  panelBottom: 20,
+  panelTop: 76,
+  panelBottom: 92,
   triggerWidth: 60,
-  triggerGap: 8,
+  triggerGap: 0,
   collapsedVisibleWidth: 14
 }
 

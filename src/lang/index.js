@@ -60,6 +60,7 @@ const zh = {
     "activeOnly": "只激活新节点，不进入编辑",
     "openRealtimeRenderOnNodeTextEdit": "开启文本编辑实时渲染效果",
     "isShowScrollbar": "是否显示滚动条",
+    "showToolbarLabels": "顶部工具栏是否显示文字",
     "isUseHandDrawnLikeStyle": "是否开启手绘风格",
     "isUseMomentum": "是否开启拖动画布的动量效果",
     "openBlankMode": "是否开启演示模式的填空功能",

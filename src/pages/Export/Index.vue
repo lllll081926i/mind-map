@@ -4,36 +4,9 @@
       <section class="exportDialog">
         <header class="dialogHeader">
           <div class="dialogHeaderMain">
-            <div class="dialogEyebrow">{{ $t('exportPage.eyebrow') }}</div>
             <h1>{{ $t('exportPage.title') }}</h1>
             <p>{{ $t('exportPage.description') }}</p>
           </div>
-          <div class="dialogHeaderActions">
-            <button
-              type="button"
-              class="headerActionBtn"
-              :aria-label="$t('exportPage.backHome')"
-              @click="goHome"
-            >
-              {{ $t('exportPage.backHome') }}
-            </button>
-            <button
-              type="button"
-              class="headerActionBtn primary"
-              :aria-label="$t('exportPage.backEdit')"
-              @click="goEdit"
-            >
-              {{ $t('exportPage.backEdit') }}
-            </button>
-          </div>
-          <button
-            type="button"
-            class="dialogCloseBtn"
-            :aria-label="$t('dialog.close')"
-            @click="closeDialog"
-          >
-            ×
-          </button>
         </header>
 
         <div class="dialogBody">
@@ -51,136 +24,122 @@
               }"
               @click="selectFormat(item)"
             >
-              <span class="formatMarker">{{ item.displayName.slice(0, 2) }}</span>
-              <span class="formatNavLabel">{{ item.displayName }}</span>
-              <span
-                v-if="exportState.exportType === item.type && !item.disabled"
-                class="formatSelected"
-                aria-hidden="true"
-              >
-                ✓
-              </span>
-              <span v-if="item.disabled" class="formatHint">{{
+              <span>{{ item.displayName }}</span>
+              <span v-if="item.disabled" class="badgeSoon">{{
                 $t('exportPage.upcoming')
               }}</span>
             </button>
           </aside>
 
-          <main class="dialogContent" v-loading="previewLoading">
-            <div class="contentShell">
-              <section class="contentMain">
-                <div class="contentHeader">
-                  <strong>{{ currentFormat.displayName }}</strong>
-                  <span class="contentExt">.{{ currentFileExtension }}</span>
+          <section class="settingsPanel">
+            <div class="settingsHeader">
+              <h2>{{ currentFormat.displayName }}</h2>
+              <span class="tagExtension">.{{ currentFileExtension }}</span>
+            </div>
+
+            <div class="settingGroup">
+              <label class="settingLabel" for="exportFileName">{{
+                $t('exportPage.fileName')
+              }}</label>
+              <div class="inputWrapper">
+                <el-input
+                  id="exportFileName"
+                  v-model="exportState.fileName"
+                  maxlength="80"
+                  @keydown.stop
+                />
+                <div class="inputSuffix">.{{ currentFileExtension }}</div>
+              </div>
+            </div>
+
+            <div class="settingGroup">
+              <label class="settingLabel">{{
+                $t('exportPage.descriptionLabel')
+              }}</label>
+              <div class="infoText">
+                <span class="infoDot"></span>
+                <span>{{ currentFormat.desc }}</span>
+              </div>
+            </div>
+
+            <div class="settingGroup">
+              <label class="settingLabel">{{ $t('exportPage.optionsLabel') }}</label>
+
+              <div v-if="isDisabledFormat" class="emptyOption">
+                {{ $t('exportPage.disabledTip') }}
+              </div>
+
+              <template v-else>
+                <div class="toggleRow" v-if="showConfigOption">
+                  <span>{{ $t('exportPage.includeConfig') }}</span>
+                  <el-switch v-model="exportState.withConfig" />
                 </div>
-                <div class="formRow">
-                  <label class="formLabel" for="exportFileName">{{
-                    $t('exportPage.fileName')
-                  }}</label>
-                  <div class="formValue">
+
+                <div class="toggleRow stacked" v-if="showImageOptions">
+                  <span>{{ $t('exportPage.imageFormat') }}</span>
+                  <el-radio-group v-model="exportState.imageFormat">
+                    <el-radio value="png">PNG</el-radio>
+                    <el-radio value="jpg">JPG</el-radio>
+                  </el-radio-group>
+                </div>
+
+                <div class="toggleRow stacked" v-if="showPaddingOptions">
+                  <span>{{ $t('exportPage.paddingX') }}</span>
+                  <el-input-number
+                    v-model="exportState.paddingX"
+                    :min="0"
+                    :max="500"
+                  />
+                </div>
+
+                <div class="toggleRow stacked" v-if="showPaddingOptions">
+                  <span>{{ $t('exportPage.paddingY') }}</span>
+                  <el-input-number
+                    v-model="exportState.paddingY"
+                    :min="0"
+                    :max="500"
+                  />
+                </div>
+
+                <div class="settingGroup nested" v-if="showFooterOption">
+                  <label class="settingLabel">{{ $t('exportPage.extraText') }}</label>
+                  <div class="inputWrapper single">
                     <el-input
-                      id="exportFileName"
-                      v-model="exportState.fileName"
-                      maxlength="80"
+                      v-model="exportState.extraText"
+                      :placeholder="$t('exportPage.extraTextPlaceholder')"
                       @keydown.stop
                     />
-                    <div class="fileSuffix">.{{ currentFileExtension }}</div>
                   </div>
                 </div>
 
-                <div class="formRow">
-                  <span class="formLabel">{{ $t('exportPage.descriptionLabel') }}</span>
-                  <div class="formValue">
-                    <div class="descBadge">{{ currentFormat.desc }}</div>
-                  </div>
+                <div class="toggleRow" v-if="showTransparentOption">
+                  <span>{{ $t('exportPage.transparentBg') }}</span>
+                  <el-switch v-model="exportState.isTransparent" />
                 </div>
 
-                <div class="formRow optionGroupRow">
-                  <span class="formLabel">{{ $t('exportPage.optionsLabel') }}</span>
-                  <div class="formValue optionGroup">
-                    <div v-if="isDisabledFormat" class="emptyOption">
-                      {{ $t('exportPage.disabledTip') }}
-                    </div>
-
-                    <template v-else>
-                      <div class="optionInlineRow" v-if="showConfigOption">
-                        <span class="optionName">{{ $t('exportPage.includeConfig') }}</span>
-                        <el-switch v-model="exportState.withConfig" />
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showImageOptions">
-                        <span class="optionName">{{ $t('exportPage.imageFormat') }}</span>
-                        <el-radio-group v-model="exportState.imageFormat">
-                          <el-radio value="png">PNG</el-radio>
-                          <el-radio value="jpg">JPG</el-radio>
-                        </el-radio-group>
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showPaddingOptions">
-                        <span class="optionName">{{ $t('exportPage.paddingX') }}</span>
-                        <el-input-number
-                          v-model="exportState.paddingX"
-                          :min="0"
-                          :max="500"
-                        />
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showPaddingOptions">
-                        <span class="optionName">{{ $t('exportPage.paddingY') }}</span>
-                        <el-input-number
-                          v-model="exportState.paddingY"
-                          :min="0"
-                          :max="500"
-                        />
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showFooterOption">
-                        <span class="optionName">{{ $t('exportPage.extraText') }}</span>
-                        <el-input
-                          v-model="exportState.extraText"
-                          :placeholder="$t('exportPage.extraTextPlaceholder')"
-                          @keydown.stop
-                        />
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showTransparentOption">
-                        <span class="optionName">{{ $t('exportPage.transparentBg') }}</span>
-                        <el-switch v-model="exportState.isTransparent" />
-                      </div>
-
-                      <div class="optionInlineRow" v-if="showFitBgOption">
-                        <span class="optionName">{{ $t('exportPage.fitBg') }}</span>
-                        <el-switch v-model="exportState.isFitBg" />
-                      </div>
-
-                      <div v-if="!hasVisibleOptions" class="emptyOption">
-                        {{ $t('exportPage.noExtraOptions') }}
-                      </div>
-                    </template>
-                  </div>
+                <div class="toggleRow" v-if="showFitBgOption">
+                  <span>{{ $t('exportPage.fitBg') }}</span>
+                  <el-switch v-model="exportState.isFitBg" />
                 </div>
-              </section>
 
-              <aside class="previewPanel">
-                <div class="previewPanelHeader">
-                  <strong>{{ $t('exportPage.preview') }}</strong>
-                  <span>{{ $t('exportPage.previewDesc') }}</span>
+                <div v-if="!hasVisibleOptions" class="emptyOption">
+                  {{ $t('exportPage.noExtraOptions') }}
                 </div>
-                <div class="previewSurface">
-                  <div ref="previewRef" class="previewCanvas"></div>
-                </div>
-              </aside>
+              </template>
             </div>
-          </main>
+          </section>
+
+          <aside class="previewPanel" v-loading="previewLoading">
+            <div class="previewTitle">{{ $t('exportPage.preview') }}</div>
+            <div class="previewHeader">{{ $t('exportPage.previewDesc') }}</div>
+            <div class="previewSurface">
+              <div ref="previewRef" class="previewCanvas"></div>
+            </div>
+          </aside>
         </div>
 
         <footer class="dialogFooter">
-          <div class="statusText">
-            {{ statusText }}
-          </div>
-          <el-button :disabled="exporting" @click="goEdit">{{
-            $t('search.cancel')
-          }}</el-button>
+          <div class="statusText">{{ statusText }}</div>
           <el-button
             type="primary"
             :loading="exporting"
@@ -191,7 +150,6 @@
           </el-button>
         </footer>
       </section>
-
     </div>
   </div>
 </template>
@@ -307,41 +265,41 @@ const loadMindMapRuntime = async () => {
     mindMapRuntimePromise = Promise.all([
       import('simple-mind-map'),
       import('simple-mind-map-plugin-themes')
-    ]).then(([mindMapModule, themesModule]) => {
-      const MindMap = mindMapModule.default
-      const Themes = themesModule.default
-      Themes.init(MindMap)
-      if (typeof globalThis.MoreThemes?.init === 'function') {
-        globalThis.MoreThemes.init(MindMap)
-      }
-      return {
-        MindMap
-      }
-    }).catch(error => {
-      mindMapRuntimePromise = null
-      throw error
-    })
+    ])
+      .then(([mindMapModule, themesModule]) => {
+        const MindMap = mindMapModule.default
+        const Themes = themesModule.default
+        Themes.init(MindMap)
+        if (typeof globalThis.MoreThemes?.init === 'function') {
+          globalThis.MoreThemes.init(MindMap)
+        }
+        return {
+          MindMap
+        }
+      })
+      .catch(error => {
+        mindMapRuntimePromise = null
+        throw error
+      })
   }
   return mindMapRuntimePromise
 }
 
 const loadExportBasePlugin = async () => {
   if (!exportBasePluginPromise) {
-    exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js').then(
-      module => module.default
-    ).catch(error => {
-      exportBasePluginPromise = null
-      throw error
-    })
+    exportBasePluginPromise = import('simple-mind-map/src/plugins/Export.js')
+      .then(module => module.default)
+      .catch(error => {
+        exportBasePluginPromise = null
+        throw error
+      })
   }
   return exportBasePluginPromise
 }
 
 const loadExportPdfPlugin = async () => {
   if (!exportPdfPluginPromise) {
-    exportPdfPluginPromise = import(
-      'simple-mind-map/src/plugins/ExportPDF.js'
-    )
+    exportPdfPluginPromise = import('simple-mind-map/src/plugins/ExportPDF.js')
       .then(module => module.default)
       .catch(error => {
         exportPdfPluginPromise = null
@@ -370,13 +328,15 @@ const loadRichTextPlugins = async () => {
     richTextPluginsPromise = Promise.all([
       import('simple-mind-map/src/plugins/RichText.js'),
       import('simple-mind-map/src/plugins/Formula.js')
-    ]).then(([richTextModule, formulaModule]) => ({
-      RichText: richTextModule.default,
-      Formula: formulaModule.default
-    })).catch(error => {
-      richTextPluginsPromise = null
-      throw error
-    })
+    ])
+      .then(([richTextModule, formulaModule]) => ({
+        RichText: richTextModule.default,
+        Formula: formulaModule.default
+      }))
+      .catch(error => {
+        richTextPluginsPromise = null
+        throw error
+      })
   }
   return richTextPluginsPromise
 }
@@ -396,7 +356,6 @@ export default {
       extendedIconList: [],
       exportContext,
       exportState: createExportStateFromFileRef(exportContext.fileRef),
-      boundExportKeydown: null,
       boundPreviewResize: null,
       previewResizeFrame: 0
     }
@@ -419,7 +378,9 @@ export default {
     },
     currentFormat() {
       return (
-        this.exportFormats.find(item => item.type === this.exportState.exportType) ||
+        this.exportFormats.find(
+          item => item.type === this.exportState.exportType
+        ) ||
         this.exportFormats[0] ||
         createFallbackExportFormat(this.$t)
       )
@@ -440,10 +401,14 @@ export default {
       return this.exportState.exportType === 'png'
     },
     showPaddingOptions() {
-      return ['png', 'svg', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      return ['png', 'svg', 'pdf', 'pdf-hd'].includes(
+        this.exportState.exportType
+      )
     },
     showFooterOption() {
-      return ['png', 'svg', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      return ['png', 'svg', 'pdf', 'pdf-hd'].includes(
+        this.exportState.exportType
+      )
     },
     showTransparentOption() {
       return ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
@@ -477,13 +442,11 @@ export default {
     }
   },
   async mounted() {
-    this.bindExportKeydown()
     this.bindPreviewResize()
     await ensureBootstrapDocumentState()
     await this.initPreview()
   },
   beforeUnmount() {
-    this.unbindExportKeydown()
     this.unbindPreviewResize()
     this.clearPreviewResizeFrame()
     if (this.mindMap) {
@@ -523,45 +486,11 @@ export default {
       throw new Error('导出预览容器尺寸尚未就绪')
     },
 
-    onMaskClick() {
-      if (this.exporting) {
-        return
-      }
-      this.closeDialog()
-    },
-
-    async closeDialog() {
+    async onMaskClick() {
       if (this.exporting) {
         return
       }
       await this.goEdit()
-    },
-
-    onKeydown(event) {
-      if (this.exporting) {
-        return
-      }
-      if (event.key !== 'Escape') {
-        return
-      }
-      event.preventDefault()
-      this.closeDialog()
-    },
-
-    bindExportKeydown() {
-      if (typeof window === 'undefined' || this.boundExportKeydown) {
-        return
-      }
-      this.boundExportKeydown = event => this.onKeydown(event)
-      window.addEventListener('keydown', this.boundExportKeydown)
-    },
-
-    unbindExportKeydown() {
-      if (typeof window === 'undefined' || !this.boundExportKeydown) {
-        return
-      }
-      window.removeEventListener('keydown', this.boundExportKeydown)
-      this.boundExportKeydown = null
     },
 
     bindPreviewResize() {
@@ -615,10 +544,6 @@ export default {
       this.exportState.exportType = item.type
     },
 
-    async goHome() {
-      await this.$router.push('/home')
-    },
-
     async goEdit() {
       await this.$router.push('/edit')
     },
@@ -667,7 +592,9 @@ export default {
           el: previewEl,
           data: root,
           fit: true,
+          readonly: true,
           layout,
+          mousewheelAction: 'zoom',
           theme: theme?.template || fallbackData.theme.template,
           themeConfig: theme?.config || fallbackData.theme.config,
           viewData: view,
@@ -789,131 +716,102 @@ export default {
   position: fixed;
   inset: 0;
   z-index: 4000;
-  background: transparent;
-  color: rgba(26, 26, 26, 0.88);
+  color: #111827;
 
   &.isDark {
-    color: hsla(0, 0%, 100%, 0.86);
+    color: hsla(0, 0%, 100%, 0.9);
 
     .exportDialog,
-    .formatRail,
-    .dialogContent,
-    .formatNavItem,
-    .descBadge,
-    .optionGroup,
     .dialogFooter {
-      background: #2b2f36;
-      border-color: hsla(0, 0%, 100%, 0.08);
-      color: inherit;
+      background: #171b22;
+      border-color: rgba(255, 255, 255, 0.08);
     }
 
-    .dialogHeader p,
-    .optionName,
-    .statusText,
-    .emptyOption,
-    .formLabel {
-      color: hsla(0, 0%, 100%, 0.56);
-    }
-
-    .dialogHeader {
-      border-bottom-color: hsla(0, 0%, 100%, 0.08);
-    }
-
-    .headerActionBtn {
-      background: #363b3f;
-      border-color: hsla(0, 0%, 100%, 0.1);
-      color: inherit;
-    }
-
-    .formatNavItem.active {
-      background: rgba(64, 158, 255, 0.14);
-      border-color: rgba(64, 158, 255, 0.32);
-    }
-
-    .contentExt,
-    .formatMarker,
-    .descBadge {
-      background: rgba(64, 158, 255, 0.14);
-      border-color: rgba(64, 158, 255, 0.28);
-    }
-
-    .contentMain,
+    .dialogHeader,
+    .sidebar,
+    .settingsPanel,
     .previewPanel,
-    .previewSurface {
-      background: #23272e;
-      border-color: hsla(0, 0%, 100%, 0.08);
+    .toggleRow,
+    .inputWrapper {
+      border-color: rgba(255, 255, 255, 0.08);
     }
 
-    .dialogCloseBtn:hover {
-      background: hsla(0, 0%, 100%, 0.08);
-    }
-
-    .formatRail {
-      background: #23272e;
-    }
-
-    .formatNavItem:hover:not(.active) {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: hsla(0, 0%, 100%, 0.06);
-    }
-
-    .formatNavLabel,
-    .contentHeader strong,
-    .previewPanelHeader strong,
-    .dialogHeaderMain h1 {
-      color: hsla(0, 0%, 100%, 0.92);
-    }
-
-    .dialogEyebrow,
-    .formatSelected,
-    .formatHint {
-      color: #76b9ff;
-    }
-
-    .previewPanelHeader span {
+    .dialogHeaderMain p,
+    .settingLabel,
+    .infoText,
+    .previewHeader,
+    .previewHint,
+    .statusText,
+    .inputSuffix,
+    .emptyOption {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
-    .fileSuffix {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: hsla(0, 0%, 100%, 0.08);
-      color: hsla(0, 0%, 100%, 0.56);
+    .sidebar {
+      background: #15181e;
     }
 
-    .formRow {
-      border-bottom-color: hsla(0, 0%, 100%, 0.06);
+    .settingsPanel {
+      background: #171b22;
     }
 
-    .contentHeader {
-      border-bottom-color: hsla(0, 0%, 100%, 0.06);
-    }
-
-    .dialogFooter {
-      border-top-color: hsla(0, 0%, 100%, 0.08);
+    .previewPanel {
+      background: #171b22;
     }
 
     .previewSurface {
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(14, 18, 24, 0.36)),
-        #1f242b;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0)
+          0 0 / 20px 20px,
+        #11151b;
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .formatNavItem {
+      color: hsla(0, 0%, 100%, 0.72);
+
+      &:hover:not(.active):not(.disabled) {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      &.active {
+        background: #f3f4f6;
+        color: #0f0f0f;
+      }
+    }
+
+    .tagExtension {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: hsla(0, 0%, 100%, 0.62);
+    }
+
+    .inputSuffix {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .infoDot {
+      background: hsla(0, 0%, 100%, 0.3);
+    }
+
+    .badgeSoon {
+      background: rgba(255, 255, 255, 0.08);
+      color: hsla(0, 0%, 100%, 0.56);
     }
 
     :deep(.el-input__wrapper),
     :deep(.el-input-number__decrease),
     :deep(.el-input-number__increase) {
-      background: #343941;
-      box-shadow: 0 0 0 1px hsla(0, 0%, 100%, 0.1) inset;
+      background: #242a33;
       color: hsla(0, 0%, 100%, 0.86);
+      box-shadow: none;
     }
 
     :deep(.el-input__inner),
     :deep(.el-input-number .el-input__inner) {
       color: hsla(0, 0%, 100%, 0.88);
-    }
-
-    :deep(.el-radio-group) {
-      gap: 8px;
     }
 
     :deep(.el-radio) {
@@ -923,108 +821,55 @@ export default {
     :deep(.el-radio__input.is-checked + .el-radio__label) {
       color: #8ec5ff;
     }
+
+    .exportOverlay {
+      background: rgba(9, 12, 16, 0.66);
+      backdrop-filter: blur(18px) saturate(0.82);
+    }
   }
 }
 
 .exportOverlay {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(12px);
+  background: rgba(245, 247, 250, 0.74);
+  backdrop-filter: blur(18px) saturate(0.78);
 }
 
 .exportDialog {
-  width: min(1020px, calc(100% - 120px));
-  min-height: min(660px, calc(100vh - 120px));
+  width: min(1280px, calc(100vw - 80px));
+  height: min(860px, calc(100vh - 80px));
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.16);
   overflow: hidden;
 }
 
 .dialogHeader {
+  min-height: 64px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 22px 12px;
+  align-items: center;
+  padding: 0 32px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  position: relative;
 }
 
 .dialogHeaderMain {
-  min-width: 0;
-
   h1 {
-    margin: 2px 0 4px;
-    font-size: 18px;
-    line-height: 1.2;
-    font-weight: 700;
+    margin: 0 0 2px;
+    font-size: 16px;
+    font-weight: 600;
   }
 
   p {
-    max-width: 620px;
     font-size: 12px;
-    line-height: 1.5;
-    color: rgba(26, 26, 26, 0.56);
-  }
-}
-
-.dialogEyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #409eff;
-  text-transform: uppercase;
-}
-
-.dialogHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.dialogCloseBtn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  color: inherit;
-  padding: 0;
-  border-radius: 50%;
-  transition: background 0.2s ease;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.05);
-  }
-}
-
-.headerActionBtn {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
-  cursor: pointer;
-  color: inherit;
-
-  &.primary {
-    background: #409eff;
-    border-color: #409eff;
-    color: #fff;
+    color: #9ca3af;
   }
 }
 
@@ -1032,286 +877,260 @@ export default {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 198px minmax(0, 1fr);
+  grid-template-columns: 240px 420px minmax(0, 1fr);
 }
 
 .formatRail {
-  padding: 10px 8px 10px 10px;
+  padding: 16px 12px;
+  background: #fcfcfc;
   border-right: 1px solid rgba(0, 0, 0, 0.06);
-  background: #f7f8fa;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .formatNavItem {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 48px;
-  padding: 9px 12px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 10px 16px;
+  border-radius: 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
   background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s ease;
+
+  &:hover:not(.active):not(.disabled) {
+    background: #f3f4f6;
+  }
 
   &.active {
-    background: #fff;
-    border-color: rgba(64, 158, 255, 0.2);
+    background: #0f0f0f;
+    color: #fff;
   }
 
   &.disabled {
-    opacity: 0.64;
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
-.formatMarker {
-  width: 28px;
-  height: 28px;
+.badgeSoon {
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: rgba(64, 158, 255, 0.12);
-  color: #409eff;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-weight: 400;
 }
 
-.formatNavLabel {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.formatSelected {
-  font-size: 16px;
-  line-height: 1;
-  color: #409eff;
-}
-
-.formatHint {
-  font-size: 12px;
-  color: #409eff;
-}
-
-.dialogContent {
-  min-width: 0;
-  padding: 14px 24px 18px;
+.settingsPanel {
+  padding: 40px;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
   overflow-y: auto;
+  background: #fcfcfc;
 }
 
-.contentShell {
-  min-height: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
-  gap: 18px;
-}
-
-.contentMain,
-.previewPanel {
-  min-width: 0;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 10px;
-  background: #fbfcfe;
-}
-
-.contentMain {
-  padding: 18px 18px 8px;
-}
-
-.contentHeader {
+.settingsHeader {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 32px;
 
-  strong {
-    font-size: 16px;
-    font-weight: 700;
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
   }
 }
 
-.contentExt {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 58px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 6px;
-  background: rgba(64, 158, 255, 0.08);
-  border: 1px solid rgba(64, 158, 255, 0.18);
-  color: #409eff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.formRow {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.optionGroupRow {
-  align-items: flex-start;
-}
-
-.formLabel {
-  width: 120px;
-  flex-shrink: 0;
-  padding-top: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(26, 26, 26, 0.68);
-}
-
-.formValue {
-  flex: 1;
-  min-width: 0;
-}
-
-.descBadge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  max-width: 100%;
-  padding: 0 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(64, 158, 255, 0.28);
-  background: rgba(64, 158, 255, 0.08);
-  color: #409eff;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.formValue {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.fileSuffix {
-  flex-shrink: 0;
-  min-width: 58px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: #f5f7fa;
+.tagExtension {
+  padding: 2px 8px;
+  border-radius: 4px;
   border: 1px solid rgba(0, 0, 0, 0.06);
-  color: rgba(26, 26, 26, 0.56);
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.settingGroup {
+  margin-bottom: 32px;
+}
+
+.settingGroup.nested {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.settingLabel {
+  display: block;
+  margin-bottom: 8px;
   font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
 }
 
-.optionGroup {
+.inputWrapper {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+
+  &:focus-within {
+    border-color: #9ca3af;
+  }
+
+  &.single {
+    display: block;
+  }
 }
 
-.optionInlineRow {
+.inputSuffix {
+  padding: 10px 12px;
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.infoText {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9ca3af;
+}
+
+.infoDot {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(156, 163, 175, 0.72);
+}
+
+.toggleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  min-height: 36px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 14px;
 }
 
-.optionName {
-  font-size: 13px;
-  color: rgba(26, 26, 26, 0.68);
+.toggleRow.stacked {
+  align-items: flex-start;
 }
 
 .emptyOption {
   font-size: 13px;
-  color: rgba(26, 26, 26, 0.48);
-}
-
-.dialogFooter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 22px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  background: #fff;
-}
-
-.statusText {
-  margin-right: auto;
-  font-size: 13px;
-  color: rgba(26, 26, 26, 0.56);
+  color: #9ca3af;
 }
 
 .previewPanel {
   display: flex;
   flex-direction: column;
-  padding: 14px;
-  gap: 12px;
+  padding: 24px;
+  background: #fcfcfc;
 }
 
-.previewPanelHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.previewTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
 
-  strong {
-    font-size: 14px;
-    font-weight: 700;
-  }
-
-  span {
-    font-size: 12px;
-    line-height: 1.5;
-    color: rgba(26, 26, 26, 0.56);
-  }
+.previewHeader {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 8px;
 }
 
 .previewSurface {
   flex: 1;
-  min-height: 420px;
-  border-radius: 10px;
+  min-height: 0;
+  border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
+    radial-gradient(circle at 1px 1px, rgba(229, 231, 235, 0.9) 1px, transparent 0)
+      0 0 / 20px 20px,
+    #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .previewCanvas {
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  cursor: grab;
+}
+
+:deep(.previewCanvas .smm-mind-map-container) {
+  width: 100%;
+  height: 100%;
+}
+
+.dialogFooter {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 32px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
+}
+
+.statusText {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+:deep(.el-input) {
+  flex: 1;
+}
+
+:deep(.el-input__wrapper) {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+:deep(.el-input__inner) {
+  font-size: 14px;
 }
 
 :deep(.el-input-number) {
-  width: 220px;
+  width: 180px;
 }
 
-@media (max-width: 960px) {
-  .exportOverlay {
-    padding: 12px;
-  }
+:deep(.el-input-number .el-input__wrapper) {
+  box-shadow: none;
+}
 
+:deep(.el-radio-group) {
+  display: flex;
+  gap: 18px;
+}
+
+@media (max-width: 1080px) {
   .exportDialog {
-    width: 100%;
-    min-height: calc(100vh - 24px);
-  }
-
-  .dialogHeader,
-  .dialogFooter {
-    padding-left: 16px;
-    padding-right: 16px;
+    width: calc(100vw - 32px);
+    height: calc(100vh - 32px);
   }
 
   .dialogBody {
@@ -1324,13 +1143,9 @@ export default {
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
-  .dialogContent {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .contentShell {
-    grid-template-columns: 1fr;
+  .settingsPanel,
+  .previewPanel {
+    padding: 20px 16px;
   }
 
   .previewSurface {
@@ -1339,49 +1154,45 @@ export default {
 }
 
 @media (max-width: 720px) {
+  .exportOverlay {
+    padding: 12px;
+  }
+
   .dialogHeader,
-  .formRow,
-  .optionInlineRow,
+  .dialogFooter {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .dialogFooter {
     flex-direction: column;
     align-items: stretch;
   }
-
-  .dialogHeaderActions {
-    width: 100%;
-  }
-
-  .headerActionBtn {
-    flex: 1;
-  }
-
-  .formLabel {
-    width: auto;
-    padding-top: 0;
-  }
-
-  .statusText {
-    margin-right: 0;
-  }
 }
 
-:deep(.el-input__wrapper),
-:deep(.el-textarea__inner),
-:deep(.el-input-number .el-input__wrapper),
-:deep(.el-radio-group),
-:deep(.el-switch) {
-  font-size: 14px;
-}
+.exportPage.isDark {
+  .formatRail {
+    background: #171b22;
+    border-right-color: rgba(255, 255, 255, 0.08);
+  }
 
-:deep(.el-input__wrapper),
-:deep(.el-textarea__inner),
-:deep(.el-input-number .el-input__wrapper) {
-  border-radius: 6px;
-}
+  .formatNavItem {
+    color: hsla(0, 0%, 100%, 0.72);
 
-:deep(.el-radio-group) {
-  display: flex;
-  align-items: center;
-  gap: 18px;
+    &:hover:not(.active):not(.disabled) {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    &.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  .badgeSoon {
+    background: rgba(255, 255, 255, 0.08);
+    color: hsla(0, 0%, 100%, 0.56);
+  }
 }
 </style>

@@ -64,14 +64,14 @@ export default {
   display: flex;
   align-items: center;
 
-  &.isDark{
+  &.isDark {
     .btn {
-      color: hsla(0,0%,100%,.6);
+      color: var(--navigator-text, hsla(0, 0%, 100%, 0.72));
     }
   }
 
   .item {
-    margin-right: 12px;
+    margin-right: 6px;
 
     &:last-of-type {
       margin-right: 0;
@@ -80,7 +80,7 @@ export default {
 
   .btn {
     cursor: pointer;
-    font-size: 18px;
+    font-size: 16px;
   }
 }
 </style>

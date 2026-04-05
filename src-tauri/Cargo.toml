@@ -1,6 +1,6 @@
 [package]
 name = "mind-map-desktop"
-version = "0.2.9"
+version = "0.2.10"
 description = "MindMap"
 authors = ["Codex"]
 edition = "2021"

@@ -380,6 +380,47 @@ jobs:
             "WINDOWS_TIMESTAMP_URL=$env:WINDOWS_TIMESTAMP_URL_VALUE" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
 
+      - name: Prepare macOS signing environment
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_B64: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD_VALUE: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY_VALUE: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE_B64" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD_VALUE" ] || [ -z "$APPLE_SIGNING_IDENTITY_VALUE" ]; then
+            echo "macOS signing secrets are incomplete. Build will continue without codesigning."
+            exit 0
+          fi
+
+          CERT_PATH="$RUNNER_TEMP/mindmap-apple-signing.p12"
+          if ! python - <<'PY' "$CERT_PATH"; then
+import base64
+import os
+import sys
+
+cert = os.environ.get("APPLE_CERTIFICATE_B64", "").strip()
+path = sys.argv[1]
+try:
+    raw = base64.b64decode(cert, validate=True)
+except Exception:
+    sys.exit(1)
+with open(path, "wb") as fh:
+    fh.write(raw)
+PY
+            echo "APPLE_CERTIFICATE is not valid base64. Build will continue without codesigning."
+            exit 0
+          fi
+
+          if ! openssl pkcs12 -in "$CERT_PATH" -nokeys -passin "pass:$APPLE_CERTIFICATE_PASSWORD_VALUE" -noout >/dev/null 2>&1; then
+            echo "APPLE_CERTIFICATE or APPLE_CERTIFICATE_PASSWORD is invalid. Build will continue without codesigning."
+            exit 0
+          fi
+
+          echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE_B64" >> "$GITHUB_ENV"
+          echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD_VALUE" >> "$GITHUB_ENV"
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_VALUE" >> "$GITHUB_ENV"
+
       - name: Apply Windows signing config
         if: startsWith(matrix.os, 'windows') && env.WINDOWS_CERTIFICATE_SHA1 != ''
         shell: pwsh
@@ -443,9 +484,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .
@@ -461,9 +502,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .

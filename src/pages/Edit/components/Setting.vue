@@ -207,6 +207,15 @@
           >
         </div>
       </div>
+      <div class="row">
+        <div class="rowItem">
+          <el-checkbox
+            v-model="localConfigs.showToolbarLabels"
+            @change="updateLocalConfig('showToolbarLabels', $event)"
+            >{{ $t('setting.showToolbarLabels') }}</el-checkbox
+          >
+        </div>
+      </div>
       <!-- 是否一直显示展开收起按钮 -->
       <div class="row">
         <div class="rowItem">
@@ -467,6 +476,7 @@ export default {
       checkingForUpdates: false,
       localConfigs: {
         isShowScrollbar: false,
+        showToolbarLabels: true,
         enableDragImport: false,
         enableAi: false
       }
@@ -679,23 +689,7 @@ export default {
           )
           return
         }
-        if (result.status === 'release-page-only') {
-          this.$confirm(
-            this.$t('setting.updateReleasePageOnly'),
-            this.$t('setting.checkUpdate'),
-            {
-              confirmButtonText: this.$t('setting.openReleasePage'),
-              cancelButtonText: this.$t('setting.cancel'),
-              type: 'info'
-            }
-          )
-            .then(() => {
-              return openExternalUrl(result.url)
-            })
-            .catch(() => {})
-          return
-        }
-        this.$message.info(this.$t('setting.updateSourceNotConfigured'))
+        this.$message.info(this.$t('setting.updateCheckFailed'))
       } catch (error) {
         console.error('checkForUpdates failed', error)
         this.$message.error(
@@ -711,8 +705,7 @@ export default {
 
 <style lang="less" scoped>
 .sidebarContent {
-  padding: 16px;
-  padding-top: 12px;
+  padding: 14px 16px 16px;
 
   &.isDark {
     .title {
@@ -729,12 +722,12 @@ export default {
   }
 
   .title {
-    font-size: 14px;
+    font-size: 13px;
     font-family: PingFangSC-Medium, PingFang SC;
     font-weight: 600;
     color: rgba(26, 26, 26, 0.9);
-    margin-bottom: 12px;
-    margin-top: 20px;
+    margin-bottom: 8px;
+    margin-top: 16px;
 
     &.noTop {
       margin-top: 0;
@@ -742,13 +735,12 @@ export default {
   }
 
   .row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    padding: 12px 14px;
-    border-radius: 8px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
+    display: block;
+    margin-bottom: 4px;
+    padding: 5px 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
 
     .rowItem {
       display: flex;
@@ -756,12 +748,14 @@ export default {
       margin-bottom: 0;
       width: 100%;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
+      min-height: 28px;
 
       .name {
         font-size: 12px;
-        margin-right: 10px;
+        margin-right: 8px;
         white-space: nowrap;
+        line-height: 1.4;
       }
 
       .value {
@@ -779,7 +773,7 @@ export default {
       }
 
       &.infoRow {
-        min-width: 220px;
+        min-width: 0;
         justify-content: space-between;
       }
     }

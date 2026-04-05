@@ -11,7 +11,9 @@ export const getReleaseApiUrl = () => String(__APP_RELEASE_API_URL__ || '').trim
 
 export const fetchLatestRelease = async () => {
   const releaseApiUrl = getReleaseApiUrl()
-  if (!releaseApiUrl) return null
+  if (!releaseApiUrl) {
+    throw new Error('未配置 GitHub Release 更新源')
+  }
   const controller =
     typeof AbortController === 'function' ? new AbortController() : null
   const timer = setTimeout(() => {
@@ -37,19 +39,5 @@ export const fetchLatestRelease = async () => {
 
 export const checkForUpdates = async currentVersion => {
   const latestRelease = await fetchLatestRelease()
-  if (latestRelease) {
-    return createManualUpdateResult(currentVersion, latestRelease)
-  }
-
-  const releaseUrl = getReleasePageUrl()
-  if (releaseUrl) {
-    return {
-      status: 'release-page-only',
-      url: releaseUrl
-    }
-  }
-
-  return {
-    status: 'not-configured'
-  }
+  return createManualUpdateResult(currentVersion, latestRelease)
 }

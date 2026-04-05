@@ -288,76 +288,85 @@ export default {
 
 <style lang="less" scoped>
 .searchContainer {
-  background-color: #fff;
-  padding: 16px;
-  width: 296px;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.96);
+  padding: 14px;
+  width: 312px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12);
   position: fixed;
-  top: 110px;
-  right: -296px;
-  transition: all 0.3s;
+  top: 92px;
+  right: -320px;
+  transition:
+    right 0.24s ease,
+    opacity 0.24s ease,
+    transform 0.24s ease;
   z-index: 1200;
+  backdrop-filter: blur(16px);
+  color: rgba(15, 23, 42, 0.9);
 
   &.isDark {
-    background-color: #363b3f;
-    color: hsla(0, 0%, 100%, 0.85);
+    background-color: rgba(24, 28, 34, 0.96);
+    color: rgba(255, 255, 255, 0.96);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.32);
 
     .closeBtnBox {
-      color: hsla(0, 0%, 100%, 0.85);
-      background-color: #2b3034;
-      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.92);
+      background-color: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.08);
     }
 
     .searchInputBox {
       .searchInfo {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: rgba(255, 255, 255, 0.92);
       }
     }
 
     :deep(.el-input__wrapper) {
-      background-color: #2b3034;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+      background-color: rgba(255, 255, 255, 0.04);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
     }
 
     :deep(.el-input__inner),
     :deep(.el-input__inner::placeholder) {
-      color: hsla(0, 0%, 100%, 0.85);
+      color: rgba(255, 255, 255, 0.96);
     }
 
     :deep(.el-input-group__append) {
-      background-color: #2f3539;
-      color: hsla(0, 0%, 100%, 0.78);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+      background-color: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
     }
 
     :deep(.el-button) {
-      background-color: #2f3539;
-      border-color: rgba(255, 255, 255, 0.12);
-      color: hsla(0, 0%, 100%, 0.85);
+      background-color: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.96);
     }
 
     :deep(.el-button:hover),
     :deep(.el-button:focus) {
-      background-color: #3a4146;
-      border-color: rgba(255, 255, 255, 0.2);
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.14);
       color: #fff;
     }
 
     :deep(.el-button.is-disabled) {
-      background-color: #2b3034;
+      background-color: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.08);
-      color: hsla(0, 0%, 100%, 0.35);
+      color: rgba(255, 255, 255, 0.42);
     }
 
     .searchResultList {
-      background-color: #363b3f;
+      background-color: rgba(24, 28, 34, 0.98);
+      border-color: rgba(255, 255, 255, 0.08);
 
       .searchResultItem {
-        color: hsla(0, 0%, 100%, 0.85);
+        color: rgba(255, 255, 255, 0.96);
 
         &::before {
-          background-color: hsla(0, 0%, 100%, 0.5);
+          background-color: rgba(255, 255, 255, 0.88);
         }
 
         &:hover {
@@ -367,7 +376,7 @@ export default {
 
       .empty {
         .text {
-          color: hsla(0, 0%, 100%, 0.6);
+          color: rgba(255, 255, 255, 0.92);
         }
       }
     }
@@ -385,20 +394,31 @@ export default {
 
   .closeBtnBox {
     position: absolute;
-    right: -5px;
-    top: -5px;
-    width: 20px;
-    height: 20px;
-    background-color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 50%;
+    right: 14px;
+    top: 14px;
+    width: 28px;
+    height: 28px;
+    background-color: transparent;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 8px;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: none;
     z-index: 2;
     padding: 0;
+    color: rgba(15, 23, 42, 0.78);
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(15, 23, 42, 0.06);
+      border-color: rgba(15, 23, 42, 0.1);
+      color: rgba(15, 23, 42, 0.96);
+    }
 
     .closeBtn {
       font-size: 12px;
@@ -408,14 +428,28 @@ export default {
 
   .searchInputBox {
     position: relative;
+    padding-right: 40px;
+
+    :deep(.el-input__wrapper) {
+      min-height: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08) inset;
+    }
+
+    :deep(.el-input__inner),
+    :deep(.el-input__inner::placeholder),
+    :deep(.el-input__icon) {
+      color: inherit;
+    }
 
     .searchInfo {
       position: absolute;
-      right: 70px;
+      right: 82px;
       top: 50%;
       transform: translateY(-50%);
-      color: #909090;
-      font-size: 14px;
+      color: rgba(15, 23, 42, 0.64);
+      font-size: 12px;
+      font-weight: 600;
     }
   }
 
@@ -425,9 +459,10 @@ export default {
     top: 100%;
     width: 100%;
     background-color: #fff;
-    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12);
     border-radius: 12px;
-    margin-top: 5px;
+    margin-top: 8px;
     overflow-y: auto;
     padding: 12px 0;
 

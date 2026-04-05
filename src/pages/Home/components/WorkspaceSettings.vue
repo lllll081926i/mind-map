@@ -413,21 +413,7 @@ export default {
           )
           return
         }
-        if (result.status === 'release-page-only') {
-          this.$confirm(
-            this.$t('setting.updateReleasePageOnly'),
-            this.$t('setting.checkUpdate'),
-            {
-              confirmButtonText: this.$t('setting.openReleasePage'),
-              cancelButtonText: this.$t('dialog.cancel'),
-              type: 'info'
-            }
-          )
-            .then(() => openExternalUrl(result.url))
-            .catch(() => {})
-          return
-        }
-        this.$message.info(this.$t('setting.updateSourceNotConfigured'))
+        this.$message.info(this.$t('setting.updateCheckFailed'))
       } catch (error) {
         this.$message.error(error?.message || this.$t('setting.updateCheckFailed'))
       } finally {

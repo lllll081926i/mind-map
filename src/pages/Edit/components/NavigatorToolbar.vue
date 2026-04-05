@@ -122,41 +122,21 @@
       <Demonstrate :isDark="isDark" :mindMap="mindMap"></Demonstrate>
     </div>
     <div class="item">
-      <el-dropdown @command="handleCommand">
+      <el-tooltip
+        effect="dark"
+        :content="$t('navigatorToolbar.shortcutKeys')"
+        placement="top"
+      >
         <div
-          class="btn moreBtn"
+          class="btn iconfont iconjianpan"
           role="button"
           tabindex="0"
-          :aria-label="$t('toolbar.more')"
-        >
-          ...
-        </div>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="shortcutKey">
-              <span class="iconfont iconjianpan"></span>
-              {{ $t('navigatorToolbar.shortcutKeys') }}
-            </el-dropdown-item>
-            <el-dropdown-item v-if="enableAi" command="aiChat">
-              <span class="iconfont iconAIshengcheng"></span>
-              {{ $t('navigatorToolbar.ai') }}
-            </el-dropdown-item>
-            <el-dropdown-item command="github">
-              <span class="iconfont icongithub"></span>
-              Github
-            </el-dropdown-item>
-            <el-dropdown-item command="site">
-              <span class="iconfont iconwangzhan"></span>
-              {{ $t('navigatorToolbar.site') }}
-            </el-dropdown-item>
-            <el-dropdown-item disabled
-              >{{ $t('navigatorToolbar.current') }}v{{
-                version
-              }}</el-dropdown-item
-            >
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+          :aria-label="$t('navigatorToolbar.shortcutKeys')"
+          @click="openShortcutKey"
+          @keydown.enter.prevent="openShortcutKey"
+          @keydown.space.prevent="openShortcutKey"
+        ></div>
+      </el-tooltip>
     </div>
   </div>
 </template>
@@ -167,7 +147,6 @@ import Fullscreen from './Fullscreen.vue'
 import MouseAction from './MouseAction.vue'
 import { storeData } from '@/api'
 import { mapState } from 'pinia'
-import pkg from 'simple-mind-map/package.json'
 import Demonstrate from './Demonstrate.vue'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
 import { useAppStore } from '@/stores/app'
@@ -181,8 +160,7 @@ import { useThemeStore } from '@/stores/theme'
 import {
   applyLocalConfigPatch,
   setActiveSidebar,
-  setIsReadonly,
-  setIsSourceCodeEdit
+  setIsReadonly
 } from '@/stores/runtime'
 
 // 导航器工具栏
@@ -200,7 +178,6 @@ export default {
   },
   data() {
     return {
-      version: pkg.version,
       openMiniMap: false
     }
   },
@@ -213,8 +190,7 @@ export default {
       extendThemeGroupList: 'extendThemeGroupList'
     }),
     ...mapState(useSettingsStore, {
-      localConfig: 'localConfig',
-      enableAi: store => store.localConfig.enableAi
+      localConfig: 'localConfig'
     })
   },
   methods: {
@@ -230,6 +206,10 @@ export default {
 
     showSearch() {
       emitShowSearch()
+    },
+
+    openShortcutKey() {
+      setActiveSidebar('shortcutKey')
     },
 
     getAllThemes() {
@@ -308,48 +288,8 @@ export default {
       })
     },
 
-    handleCommand(command) {
-      if (command === 'shortcutKey') {
-        setActiveSidebar('shortcutKey')
-        return
-      } else if (command === 'aiChat') {
-        setActiveSidebar('ai')
-        return
-      }
-      let url = ''
-      switch (command) {
-        case 'github':
-          url = 'https://github.com/lllll081926i/mind-map'
-          break
-        case 'helpDoc':
-          url = 'https://wanglin2.github.io/mind-map-docs/help/help1.html'
-          break
-        case 'devDoc':
-          url =
-            'https://wanglin2.github.io/mind-map-docs/start/introduction.html'
-          break
-        case 'site':
-          url = 'https://wanglin2.github.io/mind-map-docs/'
-          break
-        case 'issue':
-          url = 'https://github.com/lllll081926i/mind-map/issues/new'
-          break
-
-        default:
-          break
-      }
-      const a = document.createElement('a')
-      a.href = url
-      a.target = '_blank'
-      a.click()
-    },
-
     backToRoot() {
       this.mindMap.renderer.setRootNodeCenter()
-    },
-
-    openSourceCodeEdit() {
-      setIsSourceCodeEdit(true)
     }
   }
 }
@@ -357,28 +297,48 @@ export default {
 
 <style lang="less" scoped>
 .navigatorContainer {
-  padding: 0 10px;
+  --navigator-surface: rgba(255, 255, 255, 0.9);
+  --navigator-border: rgba(15, 23, 42, 0.08);
+  --navigator-shadow: 0 20px 44px rgba(15, 23, 42, 0.14);
+  --navigator-text: rgba(15, 23, 42, 0.72);
+  --navigator-text-strong: rgba(15, 23, 42, 0.92);
+  --navigator-btn-hover: rgba(15, 23, 42, 0.06);
+  --navigator-btn-active: rgba(15, 23, 42, 0.1);
+  --navigator-btn-border: transparent;
+  --navigator-divider: rgba(15, 23, 42, 0.08);
+  padding: 0 12px;
   position: fixed;
   right: 20px;
   bottom: 20px;
-  background: hsla(0, 0%, 100%, 0.8);
-  border-radius: 5px;
-  opacity: 0.8;
-  height: 44px;
+  background: var(--navigator-surface);
+  border-radius: 18px;
+  border: 1px solid var(--navigator-border);
+  box-shadow: var(--navigator-shadow);
+  height: 52px;
   font-size: 12px;
   display: flex;
   align-items: center;
+  backdrop-filter: blur(18px);
+  z-index: 1200;
 
   &.isDark {
-    background: #262a2e;
+    --navigator-surface: rgba(24, 28, 34, 0.94);
+    --navigator-border: rgba(255, 255, 255, 0.08);
+    --navigator-shadow: 0 24px 52px rgba(0, 0, 0, 0.34);
+    --navigator-text: hsla(0, 0%, 100%, 0.72);
+    --navigator-text-strong: #fff;
+    --navigator-btn-hover: hsla(0, 0%, 100%, 0.08);
+    --navigator-btn-active: hsla(0, 0%, 100%, 0.14);
+    --navigator-btn-border: transparent;
+    --navigator-divider: hsla(0, 0%, 100%, 0.1);
 
     .item {
       a {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: var(--navigator-text);
       }
 
       .btn {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: var(--navigator-text);
       }
     }
   }
@@ -388,10 +348,19 @@ export default {
     align-items: center;
     height: 100%;
     flex: 0 0 auto;
-    margin-right: 8px;
+    margin-right: 6px;
+    position: relative;
 
     &:last-of-type {
       margin-right: 0;
+    }
+
+    &:not(:last-of-type)::after {
+      content: '';
+      width: 1px;
+      height: 20px;
+      background: var(--navigator-divider);
+      margin-left: 6px;
     }
 
     :deep(.mouseActionContainer),
@@ -405,27 +374,38 @@ export default {
     }
 
     a {
-      color: #303133;
+      color: var(--navigator-text);
       text-decoration: none;
     }
 
     > .btn,
     :deep(.btn) {
       cursor: pointer;
-      font-size: 18px;
-      width: 24px;
-      height: 24px;
+      color: var(--navigator-text);
+      font-size: 16px;
+      width: 30px;
+      height: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
       line-height: 1;
-      flex: 0 0 24px;
-    }
+      flex: 0 0 30px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.18s ease,
+        box-shadow 0.2s ease;
 
-    .moreBtn {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 1px;
+      &:hover {
+        color: var(--navigator-text-strong);
+        background: var(--navigator-btn-hover);
+        border-color: var(--navigator-btn-border);
+        transform: translateY(-1px);
+        box-shadow: none;
+      }
     }
   }
 }
@@ -435,7 +415,7 @@ export default {
     left: 20px;
     overflow-x: auto;
     overflow-y: hidden;
-    height: 60px;
+    height: 58px;
   }
 }
 </style>

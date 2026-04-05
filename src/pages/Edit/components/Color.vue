@@ -81,6 +81,8 @@ export default {
 
 <style lang="less" scoped>
 .colorContainer {
+  width: 100%;
+
   &.isDark {
     .moreColor {
       color: hsla(0, 0%, 100%, 0.6);
@@ -102,28 +104,35 @@ export default {
 }
 
 .colorList {
-  width: 240px;
-  display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
+  gap: 6px;
 
   .colorItem {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 15px;
-    height: 15px;
-    margin-right: 5px;
-    margin-bottom: 5px;
+    width: 100%;
+    min-width: 18px;
+    aspect-ratio: 1;
+    min-height: 18px;
     cursor: pointer;
+    border-radius: 4px;
+    overflow: hidden;
   }
 }
 
 .moreColor {
   display: flex;
   align-items: center;
+  width: 100%;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
 
   span {
-    margin-right: 5px;
+    margin-right: 0;
   }
 
   .currentColorPreview {
@@ -131,7 +140,6 @@ export default {
     height: 18px;
     border: 1px solid #dcdfe6;
     border-radius: 4px;
-    margin-right: 8px;
     flex-shrink: 0;
 
     &.isTransparent {
@@ -147,6 +155,10 @@ export default {
 
   :deep(.el-color-picker__trigger) {
     border-radius: 6px;
+  }
+
+  :deep(.el-color-picker) {
+    flex-shrink: 0;
   }
 }
 </style>

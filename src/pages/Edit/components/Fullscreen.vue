@@ -84,16 +84,17 @@ export default {
 .fullscreenContainer {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 6px;
 
   &.isDark {
     .btn {
-      color: hsla(0, 0%, 100%, 0.6);
+      color: var(--navigator-text, hsla(0, 0%, 100%, 0.72));
     }
   }
 
   .btn {
     cursor: pointer;
+    font-size: 16px;
   }
 }
 </style>

@@ -122,18 +122,18 @@ export default {
 .scaleContainer {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 
   &.isDark {
     .btn {
-      color: hsla(0, 0%, 100%, 0.6);
+      color: var(--navigator-text, hsla(0, 0%, 100%, 0.72));
     }
 
     .scaleInfo {
-      color: hsla(0, 0%, 100%, 0.6);
+      color: var(--navigator-text, hsla(0, 0%, 100%, 0.72));
 
       input {
-        color: hsla(0, 0%, 100%, 0.6);
+        color: inherit;
       }
     }
   }
@@ -142,7 +142,7 @@ export default {
     cursor: pointer;
 
     .btnLabel {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
       line-height: 1;
     }
@@ -151,13 +151,22 @@ export default {
   .scaleInfo {
     display: flex;
     align-items: center;
+    min-width: 52px;
+    justify-content: center;
+    color: var(--navigator-text, rgba(15, 23, 42, 0.72));
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 
     input {
-      width: 35px;
+      width: 34px;
       text-align: center;
       background-color: transparent;
       border: none;
       outline: none;
+      color: inherit;
+      font-size: inherit;
+      font-weight: inherit;
     }
   }
 }

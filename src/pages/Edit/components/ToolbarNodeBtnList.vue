@@ -1,5 +1,8 @@
 <template>
-  <div class="toolbarNodeBtnList" :class="[dir, { isDark: isDark }]">
+  <div
+    class="toolbarNodeBtnList"
+    :class="[dir, { isDark: isDark, hideText: !showText }]"
+  >
     <template v-for="item in list">
       <div
         v-if="item === 'back'"
@@ -32,7 +35,7 @@
         }"
         @click="$bus.$emit('startPainter')"
       >
-        <span class="icon iconfont iconjiedian"></span>
+        <span class="icon iconfont edit-icon-painter"></span>
         <span class="text">{{ $t('toolbar.painter') }}</span>
       </div>
       <div
@@ -205,6 +208,10 @@ export default {
       type: String,
       default: 'h' // h（水平排列）、v（垂直排列）
     },
+    showText: {
+      type: Boolean,
+      default: true
+    },
     list: {
       type: Array,
       default() {
@@ -343,33 +350,46 @@ export default {
       color: hsla(0, 0%, 100%, 0.9);
 
       .icon {
-        background: transparent;
-        border-color: transparent;
+        background: var(--toolbar-icon-bg, rgba(255, 255, 255, 0.06));
+        border-color: var(--toolbar-icon-border, transparent);
+        box-shadow: var(--toolbar-icon-shadow, none);
       }
 
       &:hover {
         &:not(.disabled) {
           .icon {
-            background: hsla(0, 0%, 100%, 0.05);
+            background: var(--toolbar-icon-hover-bg, hsla(0, 0%, 100%, 0.09));
+            border-color: var(--toolbar-icon-hover-border, transparent);
           }
         }
       }
 
+      &.active {
+        .icon {
+          background: var(--toolbar-icon-active-bg, hsla(0, 0%, 100%, 0.12));
+          border-color: var(--toolbar-icon-active-border, transparent);
+        }
+      }
+
       &.disabled {
-        color: #54595f;
+        color: var(--toolbar-disabled-color, #54595f);
       }
     }
   }
 
   .toolbarBtn {
-    display: flex;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
     flex-direction: column;
     cursor: pointer;
-    margin-right: 8px;
-    min-width: 40px;
+    min-width: 38px;
     flex-shrink: 0;
+    color: var(--toolbar-text-color, rgba(15, 23, 42, 0.72));
+    margin-right: 4px;
+    transition:
+      color 0.2s ease,
+      transform 0.22s ease;
 
     &:last-of-type {
       margin-right: 0;
@@ -377,54 +397,94 @@ export default {
 
     &:hover {
       &:not(.disabled) {
+        color: var(--toolbar-text-hover-color, rgba(15, 23, 42, 0.92));
+        transform: translateY(-1px);
+
         .icon {
-          background: #f5f5f5;
+          background: var(--toolbar-icon-hover-bg, rgba(15, 23, 42, 0.06));
+          border-color: var(--toolbar-icon-hover-border, transparent);
+          box-shadow: var(--toolbar-icon-hover-shadow, none);
         }
       }
     }
 
     &.active {
+      color: var(--toolbar-text-hover-color, rgba(15, 23, 42, 0.92));
+
       .icon {
-        background: #f5f5f5;
+        background: var(--toolbar-icon-active-bg, rgba(15, 23, 42, 0.08));
+        border-color: var(--toolbar-icon-active-border, transparent);
+        box-shadow: var(--toolbar-icon-active-shadow, none);
       }
     }
 
     &.disabled {
-      color: #bcbcbc;
+      color: var(--toolbar-disabled-color, rgba(15, 23, 42, 0.24));
       cursor: not-allowed;
       pointer-events: none;
     }
 
     .icon {
-      display: flex;
-      height: 26px;
-      background: #fff;
-      border-radius: 4px;
-      border: 1px solid #e9e9e9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      background: var(--toolbar-icon-bg, transparent);
+      border-radius: 6px;
+      border: 1px solid var(--toolbar-icon-border, transparent);
       justify-content: center;
       flex-direction: column;
       text-align: center;
-      padding: 0 5px;
+      padding: 0 6px;
+      font-size: 15px;
+      line-height: 1;
+      box-shadow: var(--toolbar-icon-shadow, none);
+      transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.22s ease;
     }
 
     .text {
-      margin-top: 3px;
-      line-height: 1.2;
+      margin-top: 2px;
+      line-height: 1.1;
       text-align: center;
       white-space: nowrap;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: var(--toolbar-subtle-text-color, #737373);
+      transition:
+        opacity 0.18s ease,
+        transform 0.18s ease;
+    }
+  }
+
+  &.hideText:not(.v) {
+    .toolbarBtn {
+      min-width: 32px;
+
+      .text {
+        display: none;
+      }
     }
   }
 
   &.v {
     display: block;
-    width: 120px;
+    width: 156px;
     flex-wrap: wrap;
 
     .toolbarBtn {
       flex-direction: row;
       justify-content: flex-start;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       width: 100%;
+      min-height: 42px;
+      border-radius: 8px;
+      padding: 0 8px;
       margin-right: 0;
 
       &:last-of-type {
@@ -433,12 +493,20 @@ export default {
 
       .icon {
         margin-right: 10px;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        border-radius: 6px;
       }
 
       .text {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        margin-top: 0;
+        font-size: 11px;
+        transform: none;
+        color: inherit;
       }
     }
   }
