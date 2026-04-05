@@ -357,15 +357,27 @@ jobs:
         run: npm ci
 
       - name: Import Windows code signing certificate
-        if: startsWith(matrix.os, 'windows') && secrets.WINDOWS_CERTIFICATE != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != ''
+        if: startsWith(matrix.os, 'windows')
         shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_B64: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD_VALUE: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE_SHA1_VALUE: ${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}
+          WINDOWS_TIMESTAMP_URL_VALUE: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
         run: |
+          if (-not $env:WINDOWS_CERTIFICATE_B64 -or -not $env:WINDOWS_CERTIFICATE_PASSWORD_VALUE) {
+            Write-Host 'Windows signing secrets are not configured. Skip certificate import.'
+            exit 0
+          }
           $certPath = Join-Path $env:RUNNER_TEMP 'mindmap-signing.pfx'
-          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}"))
-          $securePassword = ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force
+          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_B64))
+          $securePassword = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD_VALUE -AsPlainText -Force
           Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword | Out-Null
-          if ("${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}") {
-            "WINDOWS_CERTIFICATE_SHA1=${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ($env:WINDOWS_CERTIFICATE_SHA1_VALUE) {
+            "WINDOWS_CERTIFICATE_SHA1=$env:WINDOWS_CERTIFICATE_SHA1_VALUE" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          if ($env:WINDOWS_TIMESTAMP_URL_VALUE) {
+            "WINDOWS_TIMESTAMP_URL=$env:WINDOWS_TIMESTAMP_URL_VALUE" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
 
       - name: Apply Windows signing config
@@ -382,8 +394,8 @@ jobs:
           }
           $config.bundle.windows.certificateThumbprint = $env:WINDOWS_CERTIFICATE_SHA1
           $config.bundle.windows.digestAlgorithm = 'sha256'
-          if ("${{ secrets.WINDOWS_TIMESTAMP_URL }}") {
-            $config.bundle.windows.timestampUrl = "${{ secrets.WINDOWS_TIMESTAMP_URL }}"
+          if ($env:WINDOWS_TIMESTAMP_URL) {
+            $config.bundle.windows.timestampUrl = $env:WINDOWS_TIMESTAMP_URL
           }
           $config | ConvertTo-Json -Depth 100 | Set-Content $configPath -Encoding utf8
 
