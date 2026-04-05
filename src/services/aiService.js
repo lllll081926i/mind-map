@@ -1,6 +1,7 @@
 import Ai from '@/utils/ai'
 import { isDesktopApp } from '@/platform'
 import {
+  buildAiProxyAuthHeaders,
   normalizeAiConfig,
   shouldUseLocalProxyHealthcheck,
   validateAiConfig
@@ -107,7 +108,8 @@ export const checkAiAvailability = async ({
       fetcher,
       `http://localhost:${validation.config.port}/ai/test`,
       {
-        method: 'GET'
+        method: 'GET',
+        headers: buildAiProxyAuthHeaders()
       },
       AI_HEALTHCHECK_TIMEOUT_MS
     )

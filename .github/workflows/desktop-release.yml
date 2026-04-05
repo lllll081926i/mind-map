@@ -74,6 +74,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Lint
         run: npm run lint
 
@@ -104,6 +107,9 @@ jobs:
 
       - name: Build frontend app
         run: npm run frontend:build
+
+      - name: E2E
+        run: npm run test:e2e
 
       - name: Verify frontend build artifacts
         shell: bash
@@ -350,6 +356,37 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Import Windows code signing certificate
+        if: startsWith(matrix.os, 'windows') && secrets.WINDOWS_CERTIFICATE != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != ''
+        shell: pwsh
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP 'mindmap-signing.pfx'
+          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}"))
+          $securePassword = ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force
+          Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword | Out-Null
+          if ("${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}") {
+            "WINDOWS_CERTIFICATE_SHA1=${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
+      - name: Apply Windows signing config
+        if: startsWith(matrix.os, 'windows') && env.WINDOWS_CERTIFICATE_SHA1 != ''
+        shell: pwsh
+        run: |
+          $configPath = 'src-tauri/tauri.release.conf.json'
+          $config = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
+          if (-not $config.ContainsKey('bundle')) {
+            $config.bundle = @{}
+          }
+          if (-not $config.bundle.ContainsKey('windows')) {
+            $config.bundle.windows = @{}
+          }
+          $config.bundle.windows.certificateThumbprint = $env:WINDOWS_CERTIFICATE_SHA1
+          $config.bundle.windows.digestAlgorithm = 'sha256'
+          if ("${{ secrets.WINDOWS_TIMESTAMP_URL }}") {
+            $config.bundle.windows.timestampUrl = "${{ secrets.WINDOWS_TIMESTAMP_URL }}"
+          }
+          $config | ConvertTo-Json -Depth 100 | Set-Content $configPath -Encoding utf8
+
       - name: Build frontend
         run: npm run frontend:build
 
@@ -394,6 +431,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .
@@ -409,6 +449,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .

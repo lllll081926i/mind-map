@@ -10,7 +10,7 @@ import nodeModifyWidthMethods from './nodeModifyWidth'
 import nodeCooperateMethods from './nodeCooperate'
 import quickCreateChildBtnMethods from './quickCreateChildBtn'
 import nodeLayoutMethods from './nodeLayout'
-import { CONSTANTS } from '../../../constants/constant'
+import { CONSTANTS, ERROR_TYPES } from '../../../constants/constant'
 import { copyNodeTree, createUid, addXmlns } from '../../../utils/index'
 
 //  节点类
@@ -604,79 +604,101 @@ class MindMapNode {
   // forceRender：强制渲染，无论是否处于画布可视区域
   // async：异步渲染
   render(callback = () => {}, forceRender = false, async = false) {
-    // 节点
-    // 重新渲染连线
-    this.renderLine()
-    const { openPerformance, performanceConfig } = this.mindMap.opt
-    // 强制渲染、或没有开启性能模式、或不在画布可视区域内不渲染节点内容
-    // 根节点不进行懒加载，始终渲染，因为滚动条插件依赖根节点进行计算
-    if (
-      forceRender ||
-      !openPerformance ||
-      this.checkIsInClient(performanceConfig.padding) ||
-      this.isRoot
-    ) {
-      if (!this.group) {
-        // 创建组
-        this.group = new G()
-        this.group.addClass('smm-node')
-        this.group.css({
-          cursor: 'default'
-        })
-        this.bindGroupEvent()
-        this.nodeDraw.add(this.group)
-        this.layout()
-        this.update(forceRender)
-      } else {
-        if (!this.nodeDraw.has(this.group)) {
-          this.nodeDraw.add(this.group)
-        }
-        if (this.needLayout) {
-          this.needLayout = false
-          this.layout()
-        }
-        this.updateExpandBtnPlaceholderRect()
-        this.update(forceRender)
-      }
-    } else if (openPerformance && performanceConfig.removeNodeWhenOutCanvas) {
-      this.removeSelf()
-    }
-    // 子节点
-    if (
-      this.children &&
-      this.children.length &&
-      this.getData('expand') !== false
-    ) {
-      let index = 0
-      this.children.forEach(item => {
-        const renderChild = () => {
-          item.render(
-            () => {
-              index++
-              if (index >= this.children.length) {
-                callback()
-              }
-            },
-            forceRender,
-            async
-          )
-        }
-        if (async) {
-          setTimeout(renderChild, 0)
-        } else {
-          renderChild()
-        }
-      })
-    } else {
+    let isCallbackCalled = false
+    const finishRender = () => {
+      if (isCallbackCalled) return
+      isCallbackCalled = true
       callback()
     }
-    // 手动插入的节点立即获得焦点并且开启编辑模式
-    if (this.nodeData.inserting) {
-      delete this.nodeData.inserting
-      this.active()
-      // setTimeout(() => {
-      this.mindMap.emit('node_dblclick', this, null, true)
-      // }, 0)
+    try {
+      // 节点
+      // 重新渲染连线
+      this.renderLine()
+      const { openPerformance, performanceConfig } = this.mindMap.opt
+      // 强制渲染、或没有开启性能模式、或不在画布可视区域内不渲染节点内容
+      // 根节点不进行懒加载，始终渲染，因为滚动条插件依赖根节点进行计算
+      if (
+        forceRender ||
+        !openPerformance ||
+        this.checkIsInClient(performanceConfig.padding) ||
+        this.isRoot
+      ) {
+        if (!this.group) {
+          // 创建组
+          this.group = new G()
+          this.group.addClass('smm-node')
+          this.group.css({
+            cursor: 'default'
+          })
+          this.bindGroupEvent()
+          this.nodeDraw.add(this.group)
+          this.layout()
+          this.update(forceRender)
+        } else {
+          if (!this.nodeDraw.has(this.group)) {
+            this.nodeDraw.add(this.group)
+          }
+          if (this.needLayout) {
+            this.needLayout = false
+            this.layout()
+          }
+          this.updateExpandBtnPlaceholderRect()
+          this.update(forceRender)
+        }
+      } else if (openPerformance && performanceConfig.removeNodeWhenOutCanvas) {
+        this.removeSelf()
+      }
+      // 子节点
+      if (
+        this.children &&
+        this.children.length &&
+        this.getData('expand') !== false
+      ) {
+        let index = 0
+        this.children.forEach(item => {
+          const renderChild = () => {
+            try {
+              item.render(
+                () => {
+                  index++
+                  if (index >= this.children.length) {
+                    finishRender()
+                  }
+                },
+                forceRender,
+                async
+              )
+            } catch (error) {
+              this.mindMap.opt.errorHandler(ERROR_TYPES.EXEC_COMMAND_ERROR, error)
+              index++
+              if (index >= this.children.length) {
+                finishRender()
+              }
+            }
+          }
+          if (async) {
+            setTimeout(renderChild, 0)
+          } else {
+            renderChild()
+          }
+        })
+      } else {
+        finishRender()
+      }
+      // 手动插入的节点立即获得焦点并且开启编辑模式
+      if (this.nodeData.inserting) {
+        delete this.nodeData.inserting
+        this.active()
+        // setTimeout(() => {
+        this.mindMap.emit('node_dblclick', this, null, true)
+        // }, 0)
+      }
+    } catch (error) {
+      this.mindMap.opt.errorHandler(ERROR_TYPES.EXEC_COMMAND_ERROR, error)
+      if (!isCallbackCalled) {
+        isCallbackCalled = true
+        callback()
+      }
     }
   }
 

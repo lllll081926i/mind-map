@@ -150,6 +150,7 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
     'https://api.github.com/repos/lllll081926i/mind-map/releases/latest'
   const releaseUrl = process.env.APP_RELEASE_URL || defaultReleaseUrl
   const releaseApiUrl = process.env.APP_RELEASE_API_URL || defaultReleaseApiUrl
+  const aiProxyToken = String(process.env.AI_PROXY_TOKEN || '').trim()
 
   return {
     plugins: [
@@ -168,7 +169,6 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
         '@': path.resolve(__dirname, 'src'),
         buffer: require.resolve('buffer/'),
         events: require.resolve('events/'),
-        punycode: require.resolve('punycode/'),
         stream: require.resolve('stream-browserify'),
         util: utilShimPath
       }
@@ -180,6 +180,7 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
       __APP_RUNTIME__: JSON.stringify('desktop'),
       __APP_RELEASE_URL__: JSON.stringify(releaseUrl),
       __APP_RELEASE_API_URL__: JSON.stringify(releaseApiUrl),
+      __APP_AI_PROXY_TOKEN__: JSON.stringify(aiProxyToken),
       __VUE_OPTIONS_API__: true,
       __VUE_PROD_DEVTOOLS__: false
     },
@@ -188,7 +189,6 @@ module.exports = defineConfig(({ command, mode: _mode }) => {
       include: [
         'buffer',
         'events',
-        'punycode',
         'stream-browserify',
         ...elementPlusOptimizedDeps
       ]

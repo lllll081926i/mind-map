@@ -549,6 +549,13 @@ class Render {
     this.mindMap.emit('node_tree_render_end')
   }
 
+  // 渲染异常兜底，避免状态机卡死导致后续无法重试
+  handleRenderError(error) {
+    this.hasWaitRendering = false
+    this.mindMap.opt.errorHandler(ERROR_TYPES.EXEC_COMMAND_ERROR, error)
+    this.onRenderEnd()
+  }
+
   // 渲染
   render(callback, source) {
     this.addRenderParams(callback, source)
@@ -560,57 +567,69 @@ class Render {
 
   // 真正的渲染
   _render() {
-    // 切换主题时，被收起的节点需要添加样式复位的标注
-    if (this.checkHasRenderSource(CONSTANTS.CHANGE_THEME)) {
-      this.resetUnExpandNodeStyle()
-    }
-    // 如果当前还没有渲染完毕，不再触发渲染
-    if (this.isRendering) {
-      // 等待当前渲染完毕后再进行一次渲染
-      this.hasWaitRendering = true
-      return
-    }
-    this.isRendering = true
-    // 节点缓存
-    this.lastNodeCache = this.nodeCache
-    this.nodeCache = {}
-    // 重新渲染需要清除激活状态
-    if (this.reRender) {
-      this.clearActiveNodeList()
-    }
-    // 如果没有节点数据
-    if (!this.renderTree) {
-      this.onRenderEnd()
-      return
-    }
-    this.mindMap.emit('node_tree_render_start')
-    // 计算布局
-    this.root = null
-    this.layout.doLayout(root => {
-      // 删除本次渲染时不再需要的节点
-      Object.keys(this.lastNodeCache).forEach(uid => {
-        if (!this.nodeCache[uid]) {
-          // 从激活节点列表里删除
-          this.removeNodeFromActiveList(this.lastNodeCache[uid])
-          this.emitNodeActiveEvent()
-          // 调用节点的销毁方法
-          this.lastNodeCache[uid].destroy()
-        }
-      })
-      // 更新根节点
-      this.root = root
-      // 渲染节点
-      this.root.render(() => {
-        this.isRendering = false
-        if (this.hasWaitRendering) {
-          this.hasWaitRendering = false
-          this.render()
-          return
-        }
+    try {
+      // 切换主题时，被收起的节点需要添加样式复位的标注
+      if (this.checkHasRenderSource(CONSTANTS.CHANGE_THEME)) {
+        this.resetUnExpandNodeStyle()
+      }
+      // 如果当前还没有渲染完毕，不再触发渲染
+      if (this.isRendering) {
+        // 等待当前渲染完毕后再进行一次渲染
+        this.hasWaitRendering = true
+        return
+      }
+      this.isRendering = true
+      // 节点缓存
+      this.lastNodeCache = this.nodeCache
+      this.nodeCache = {}
+      // 重新渲染需要清除激活状态
+      if (this.reRender) {
+        this.clearActiveNodeList()
+      }
+      // 如果没有节点数据
+      if (!this.renderTree) {
         this.onRenderEnd()
+        return
+      }
+      this.mindMap.emit('node_tree_render_start')
+      // 计算布局
+      this.root = null
+      this.layout.doLayout(root => {
+        try {
+          // 删除本次渲染时不再需要的节点
+          Object.keys(this.lastNodeCache).forEach(uid => {
+            if (!this.nodeCache[uid]) {
+              // 从激活节点列表里删除
+              this.removeNodeFromActiveList(this.lastNodeCache[uid])
+              this.emitNodeActiveEvent()
+              // 调用节点的销毁方法
+              this.lastNodeCache[uid].destroy()
+            }
+          })
+          // 更新根节点
+          this.root = root
+          // 渲染节点
+          this.root.render(() => {
+            try {
+              this.isRendering = false
+              if (this.hasWaitRendering) {
+                this.hasWaitRendering = false
+                this.render()
+                return
+              }
+              this.onRenderEnd()
+            } catch (error) {
+              this.handleRenderError(error)
+            }
+          })
+        } catch (error) {
+          this.handleRenderError(error)
+        }
       })
-    })
-    this.emitNodeActiveEvent()
+      this.emitNodeActiveEvent()
+    } catch (error) {
+      this.handleRenderError(error)
+    }
   }
 
   // 当某个自定义节点内容改变后，可以调用该方法实时更新该节点大小和整体节点的定位

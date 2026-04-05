@@ -230,14 +230,23 @@ export default {
       this.initFormData()
     },
 
-    confirm() {
-      this.$refs.ruleFormRef.validate(valid => {
-        if (valid) {
-          this.close()
-          applyLocalConfigPatch(normalizeAiConfig(this.ruleForm))
-          this.$message.success(this.$t('ai.configSaveSuccessTip'))
-        }
-      })
+    async confirm() {
+      const valid = await this.$refs.ruleFormRef
+        .validate()
+        .then(() => true)
+        .catch(() => false)
+      if (!valid) {
+        return
+      }
+      try {
+        await applyLocalConfigPatch(normalizeAiConfig(this.ruleForm))
+      } catch (error) {
+        console.error('save ai config failed', error)
+        this.$message.error(error?.message || this.$t('home.actionFailed'))
+        return
+      }
+      this.close()
+      this.$message.success(this.$t('ai.configSaveSuccessTip'))
     }
   }
 }

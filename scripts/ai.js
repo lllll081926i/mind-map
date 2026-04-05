@@ -1,3 +1,11 @@
+/**
+ * @typedef {{
+ *   authToken?: string
+ *   allowedOrigin?: string
+ *   host?: string
+ * }} ProxyServerOptions
+ */
+
 const express = require('express')
 const axios = require('axios')
 const net = require('net')
@@ -6,12 +14,18 @@ const DEFAULT_PORT = 3456
 const DEFAULT_TIMEOUT = 300000
 const DEFAULT_BODY_LIMIT = '256kb'
 const AUTH_HEADER_NAME = 'x-ai-proxy-token'
+const DEFAULT_ALLOWED_ORIGIN = 'http://localhost:5173'
 
+/** @param {unknown} value */
 const parsePortNumber = value => {
   const port = Number(value)
   return Number.isInteger(port) && port > 0 ? port : null
 }
 
+/**
+ * @param {string[]} [argv]
+ * @param {NodeJS.ProcessEnv} [env]
+ */
 const getProxyPort = (argv = [], env = process.env) => {
   for (let i = 0; i < argv.length; i++) {
     const item = argv[i]
@@ -35,11 +49,23 @@ const getProxyPort = (argv = [], env = process.env) => {
 const port = getProxyPort(process.argv.slice(2), process.env)
 const proxyAuthToken = String(process.env.AI_PROXY_TOKEN || '').trim()
 
+/** @param {unknown} value */
+const resolveProxyAuthToken = value => {
+  const normalizedToken = String(value || '').trim()
+  if (!normalizedToken) {
+    throw new Error('AI_PROXY_TOKEN 未配置，AI 本地代理拒绝无认证启动')
+  }
+  return normalizedToken
+}
+
+/** @param {number} port */
 const isPortUsed = port => {
   return new Promise(resolve => {
     const server = net.createServer()
+    /** @param {NodeJS.ErrnoException} err */
     server.once('error', err => {
-      if (err.code === 'EADDRINUSE') {
+      const normalizedError = /** @type {NodeJS.ErrnoException} */ (err)
+      if (normalizedError.code === 'EADDRINUSE') {
         resolve(true)
       } else {
         resolve(false)
@@ -52,13 +78,22 @@ const isPortUsed = port => {
   })
 }
 
-const createServe = (runtimePort = port) => {
+/**
+ * @param {number} [runtimePort]
+ * @param {ProxyServerOptions} [options]
+ */
+const createServe = (
+  runtimePort = port,
+  { authToken = proxyAuthToken, allowedOrigin = DEFAULT_ALLOWED_ORIGIN, host } = {}
+) => {
+  const requiredAuthToken = resolveProxyAuthToken(authToken)
   const app = express()
   app.use(express.json({ limit: DEFAULT_BODY_LIMIT }))
   app.use(express.urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }))
 
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:5173')
+  /** @type {import('express').RequestHandler} */
+  const applyCorsHeaders = (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', allowedOrigin)
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
     res.header(
       'Access-Control-Allow-Headers',
@@ -68,15 +103,13 @@ const createServe = (runtimePort = port) => {
       return res.sendStatus(204)
     }
     next()
-  })
+  }
+  app.use(applyCorsHeaders)
 
-  app.use((req, res, next) => {
-    if (!proxyAuthToken) {
-      next()
-      return
-    }
+  /** @type {import('express').RequestHandler} */
+  const requireProxyToken = (req, res, next) => {
     const requestToken = String(req.headers[AUTH_HEADER_NAME] || '').trim()
-    if (requestToken !== proxyAuthToken) {
+    if (requestToken !== requiredAuthToken) {
       res.status(401).json({
         code: 401,
         msg: 'AI 代理认证失败',
@@ -85,9 +118,10 @@ const createServe = (runtimePort = port) => {
       return
     }
     next()
-  })
+  }
+  app.use(requireProxyToken)
 
-  app.get('/ai/test', (req, res) => {
+  app.get('/ai/test', (_req, res) => {
     res
       .json({
         code: 0,
@@ -128,7 +162,8 @@ const createServe = (runtimePort = port) => {
     }
   })
 
-  app.use(async (error, req, res, _next) => {
+  /** @type {import('express').ErrorRequestHandler} */
+  const handleProxyError = async (error, _req, res, _next) => {
     const payload = await normalizeProxyError(error)
     if (res.headersSent) {
       console.error('AI proxy error after headers sent:', payload)
@@ -139,18 +174,26 @@ const createServe = (runtimePort = port) => {
       msg: payload.message,
       detail: payload.detail
     })
-  })
+  }
+  app.use(handleProxyError)
 
-  app.listen(runtimePort, () => {
+  const onListen = () => {
     console.log(`app listening on port ${runtimePort}`)
-  })
+  }
+  const server = host
+    ? app.listen(runtimePort, host, onListen)
+    : app.listen(runtimePort, onListen)
+  return server
 }
 
+/** @param {NodeJS.ReadableStream | null | undefined} stream */
 const readStreamBody = async stream => {
   if (!stream || typeof stream.on !== 'function') return ''
   return new Promise(resolve => {
+    /** @type {string[]} */
     const chunks = []
     stream.setEncoding('utf8')
+    /** @param {string} chunk */
     stream.on('data', chunk => {
       chunks.push(chunk)
     })
@@ -163,6 +206,7 @@ const readStreamBody = async stream => {
   })
 }
 
+/** @param {any} error */
 const normalizeProxyError = async error => {
   const status = error?.response?.status || error?.status || 500
   let message = error?.message || '请求失败'
@@ -210,16 +254,23 @@ if (require.main === module) {
       console.error(`端口 ${port} 被占用`)
       process.exitCode = 1
     } else {
-      createServe(port)
+      try {
+        createServe(port)
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : error)
+        process.exitCode = 1
+      }
     }
   })
 }
 
 module.exports = {
   DEFAULT_PORT,
+  AUTH_HEADER_NAME,
   port,
   getProxyPort,
   isPortUsed,
   createServe,
+  resolveProxyAuthToken,
   normalizeProxyError
 }

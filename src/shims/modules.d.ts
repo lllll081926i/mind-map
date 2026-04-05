@@ -42,3 +42,5 @@ declare module 'simple-mind-map-plugin-themes/themeImgMap' {
   const themeImgMap: Record<string, string>
   export default themeImgMap
 }
+
+declare const __APP_AI_PROXY_TOKEN__: string

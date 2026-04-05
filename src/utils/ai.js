@@ -1,4 +1,5 @@
 import {
+  buildAiProxyAuthHeaders,
   buildAiRequestConfig,
   consumeOpenAICompatibleStreamText,
   parseOpenAICompatibleStreamChunk
@@ -40,9 +41,9 @@ class BrowserAiTransport {
       const res = await fetch(`http://localhost:${this.options.port}/ai/chat`, {
         signal: this.controller.signal,
         method: 'POST',
-        headers: {
+        headers: buildAiProxyAuthHeaders({
           'Content-Type': 'application/json'
-        },
+        }),
         body: JSON.stringify(request)
       })
       if (!res.ok) {

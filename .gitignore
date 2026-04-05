@@ -21,6 +21,7 @@ vite-headless.err
 .tmp-desktop*.log
 .tmp-frontend*.log
 test-results/
+playwright-report/
 docs/plans/
 .keys/
 .env

@@ -311,7 +311,7 @@ const loadMindMapRuntime = async () => {
       const MindMap = mindMapModule.default
       const Themes = themesModule.default
       Themes.init(MindMap)
-      if (typeof globalThis.MoreThemes !== 'undefined') {
+      if (typeof globalThis.MoreThemes?.init === 'function') {
         globalThis.MoreThemes.init(MindMap)
       }
       return {

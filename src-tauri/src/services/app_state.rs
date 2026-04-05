@@ -6,6 +6,8 @@ const META_STATE_FILE_NAME: &str = "app_state_meta.json";
 const DOCUMENT_STATE_FILE_NAME: &str = "app_state_document.json";
 const LEGACY_STATE_FILE_NAME: &str = "app_state.json";
 const MAX_RECENT_FILES: usize = 20;
+const AI_KEY_CONFIG_FIELD: &str = "key";
+const AI_KEYRING_USERNAME: &str = "default";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -131,6 +133,107 @@ fn split_state(state: &DesktopState) -> (DesktopMetaState, DesktopDocumentState)
       mind_map_config: state.mind_map_config.clone(),
     },
   )
+}
+
+fn ai_keyring_service(app: &tauri::AppHandle) -> String {
+  format!("{}.ai-config", app.config().identifier)
+}
+
+fn create_ai_key_entry(app: &tauri::AppHandle) -> Result<keyring::Entry, String> {
+  keyring::Entry::new(&ai_keyring_service(app), AI_KEYRING_USERNAME)
+    .map_err(|error| format!("初始化 AI 密钥存储失败: {}", error))
+}
+
+fn extract_ai_key_from_config(ai_config: &serde_json::Value) -> Option<String> {
+  ai_config
+    .as_object()
+    .and_then(|object| object.get(AI_KEY_CONFIG_FIELD))
+    .and_then(|value| value.as_str())
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+    .map(str::to_string)
+}
+
+fn strip_ai_key_from_config(ai_config: &serde_json::Value) -> serde_json::Value {
+  let Some(object) = ai_config.as_object() else {
+    return ai_config.clone();
+  };
+  let mut sanitized = object.clone();
+  sanitized.remove(AI_KEY_CONFIG_FIELD);
+  serde_json::Value::Object(sanitized)
+}
+
+fn inject_ai_key_into_config(
+  ai_config: &serde_json::Value,
+  secret: Option<String>,
+) -> serde_json::Value {
+  let Some(object) = ai_config.as_object() else {
+    return ai_config.clone();
+  };
+  let mut hydrated = object.clone();
+  if let Some(secret) = secret.filter(|value| !value.trim().is_empty()) {
+    hydrated.insert(
+      AI_KEY_CONFIG_FIELD.to_string(),
+      serde_json::Value::String(secret),
+    );
+  }
+  serde_json::Value::Object(hydrated)
+}
+
+fn read_ai_key_from_secure_store(app: &tauri::AppHandle) -> Option<String> {
+  let entry = match create_ai_key_entry(app) {
+    Ok(entry) => entry,
+    Err(error) => {
+      eprintln!("[MindMap] 警告: {}", error);
+      return None;
+    }
+  };
+  match entry.get_password() {
+    Ok(password) => Some(password),
+    Err(keyring::Error::NoEntry) => None,
+    Err(error) => {
+      eprintln!("[MindMap] 警告: 读取 AI 密钥失败，将继续使用无密钥状态: {}", error);
+      None
+    }
+  }
+}
+
+fn write_ai_key_to_secure_store(
+  app: &tauri::AppHandle,
+  secret: Option<&str>,
+) -> Result<(), String> {
+  let entry = create_ai_key_entry(app)?;
+  if let Some(secret) = secret.map(str::trim).filter(|value| !value.is_empty()) {
+    return entry
+      .set_password(secret)
+      .map_err(|error| format!("写入 AI 密钥失败: {}", error));
+  }
+  match entry.delete_credential() {
+    Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
+    Err(error) => Err(format!("删除 AI 密钥失败: {}", error)),
+  }
+}
+
+fn hydrate_meta_state_with_secret(
+  app: &tauri::AppHandle,
+  mut state: DesktopMetaState,
+) -> DesktopMetaState {
+  state.ai_config = inject_ai_key_into_config(
+    &state.ai_config,
+    read_ai_key_from_secure_store(app),
+  );
+  state
+}
+
+fn sanitize_meta_state_for_write(
+  app: &tauri::AppHandle,
+  state: &DesktopMetaState,
+) -> Result<DesktopMetaState, String> {
+  let secret = extract_ai_key_from_config(&state.ai_config);
+  write_ai_key_to_secure_store(app, secret.as_deref())?;
+  let mut sanitized = state.clone();
+  sanitized.ai_config = strip_ai_key_from_config(&state.ai_config);
+  Ok(sanitized)
 }
 
 async fn state_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -314,13 +417,14 @@ pub async fn read_meta_state_raw(app: &tauri::AppHandle) -> Result<DesktopMetaSt
     .await
     .map_err(|error| format!("检查元状态文件失败 ({}): {}", path.display(), error))?
   {
-    return read_json_file(path, default_meta_state()).await;
+    let state = read_json_file(path, default_meta_state()).await?;
+    return Ok(hydrate_meta_state_with_secret(app, state));
   }
   if let Some(legacy_state) = migrate_legacy_state(app).await? {
     let (meta_state, _) = split_state(&legacy_state);
-    return Ok(meta_state);
+    return Ok(hydrate_meta_state_with_secret(app, meta_state));
   }
-  Ok(default_meta_state())
+  Ok(hydrate_meta_state_with_secret(app, default_meta_state()))
 }
 
 pub async fn read_document_state_raw(
@@ -360,7 +464,8 @@ pub async fn write_meta_state(
   app: &tauri::AppHandle,
   state: &DesktopMetaState,
 ) -> Result<(), String> {
-  write_json_file(meta_state_file_path(app).await?, state).await
+  let sanitized = sanitize_meta_state_for_write(app, state)?;
+  write_json_file(meta_state_file_path(app).await?, &sanitized).await
 }
 
 pub async fn write_document_state(
@@ -372,6 +477,44 @@ pub async fn write_document_state(
 
 pub async fn write_state(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), String> {
   let (meta_state, document_state) = split_state(state);
-  write_json_file(meta_state_file_path(app).await?, &meta_state).await?;
+  let sanitized_meta_state = sanitize_meta_state_for_write(app, &meta_state)?;
+  write_json_file(meta_state_file_path(app).await?, &sanitized_meta_state).await?;
   write_json_file(document_state_file_path(app).await?, &document_state).await
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{
+    extract_ai_key_from_config, inject_ai_key_into_config, strip_ai_key_from_config,
+  };
+
+  #[test]
+  fn strip_ai_key_from_config_removes_plaintext_secret() {
+    let ai_config = serde_json::json!({
+      "provider": "openai",
+      "baseUrl": "https://api.openai.com",
+      "key": "demo-secret"
+    });
+
+    let sanitized = strip_ai_key_from_config(&ai_config);
+
+    assert_eq!(extract_ai_key_from_config(&sanitized), None);
+    assert_eq!(sanitized["provider"], "openai");
+  }
+
+  #[test]
+  fn inject_ai_key_into_config_restores_secret_for_runtime() {
+    let ai_config = serde_json::json!({
+      "provider": "openai",
+      "baseUrl": "https://api.openai.com"
+    });
+
+    let hydrated = inject_ai_key_into_config(&ai_config, Some("runtime-secret".into()));
+
+    assert_eq!(
+      extract_ai_key_from_config(&hydrated).as_deref(),
+      Some("runtime-secret")
+    );
+    assert_eq!(hydrated["provider"], "openai");
+  }
 }

@@ -1,7 +1,34 @@
+/**
+ * @typedef {{
+ *   value: string
+ *   labelKey: string
+ *   protocol: string
+ *   adapter: string
+ *   defaultBaseUrl: string
+ *   defaultApiPath: string
+ *   defaultMethod: string
+ * }} AiProviderMeta
+ */
+
+/**
+ * @typedef {{
+ *   provider: string
+ *   protocol: string
+ *   baseUrl: string
+ *   apiPath: string
+ *   api: string
+ *   key: string
+ *   model: string
+ *   port: number | string | null
+ *   method: string
+ * }} AiConfig
+ */
+
 const DEFAULT_PORT = 3456
 const DEFAULT_METHOD = 'POST'
 const DEFAULT_PROTOCOL = 'openai-compatible'
 const DEFAULT_PROVIDER = 'volcanoArk'
+export const AI_PROXY_AUTH_HEADER_NAME = 'x-ai-proxy-token'
 
 export const AI_PROVIDER_LIST = [
   {
@@ -63,15 +90,19 @@ export const AI_CONFIG_KEYS = [
   'method'
 ]
 
+/** @param {Record<string, unknown>} [input] */
 export const separateAppAndAiConfig = input => {
+  /** @type {Record<string, unknown>} */
   const localConfig = {}
+  /** @type {Record<string, unknown>} */
   const aiConfig = {}
-  Object.keys(input || {}).forEach(key => {
+  const source = input || {}
+  Object.keys(source).forEach(key => {
     if (AI_CONFIG_KEYS.includes(key)) {
-      aiConfig[key] = input[key]
+      aiConfig[key] = source[key]
       return
     }
-    localConfig[key] = input[key]
+    localConfig[key] = source[key]
   })
   return {
     localConfig,
@@ -79,22 +110,47 @@ export const separateAppAndAiConfig = input => {
   }
 }
 
+/** @param {boolean} isDesktop */
 export const shouldUseLocalProxyHealthcheck = isDesktop => {
   return !isDesktop
 }
 
+export const getAiProxyAuthToken = () => {
+  return typeof __APP_AI_PROXY_TOKEN__ === 'string'
+    ? __APP_AI_PROXY_TOKEN__.trim()
+    : ''
+}
+
+/** @param {Record<string, string>} [headers] */
+export const buildAiProxyAuthHeaders = (headers = {}) => {
+  const token = getAiProxyAuthToken()
+  if (!token) {
+    return {
+      ...headers
+    }
+  }
+  return {
+    ...headers,
+    [AI_PROXY_AUTH_HEADER_NAME]: token
+  }
+}
+
+/** @param {unknown} value */
 const trimTrailingSlash = value => String(value || '').replace(/\/+$/, '')
 
+/** @param {unknown} value */
 const normalizeApiPath = value => {
   const path = String(value || '').trim()
   if (!path) return ''
   return path.startsWith('/') ? path : `/${path}`
 }
 
+/** @param {unknown} value */
 const isBlankValue = value => {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
+/** @param {unknown} value */
 export const parseAiPort = value => {
   if (isBlankValue(value)) {
     return {
@@ -112,6 +168,10 @@ export const parseAiPort = value => {
   }
 }
 
+/**
+ * @param {unknown} baseUrl
+ * @param {unknown} apiPath
+ */
 export const buildApiUrl = (baseUrl, apiPath) => {
   const normalizedBaseUrl = trimTrailingSlash(baseUrl)
   const normalizedApiPath = normalizeApiPath(apiPath)
@@ -119,6 +179,7 @@ export const buildApiUrl = (baseUrl, apiPath) => {
   return `${normalizedBaseUrl}${normalizedApiPath}`
 }
 
+/** @param {unknown} provider */
 export const getAiProviderMeta = provider => {
   return (
     AI_PROVIDER_LIST.find(item => item.value === provider) ||
@@ -127,6 +188,7 @@ export const getAiProviderMeta = provider => {
   )
 }
 
+/** @param {unknown} api */
 const detectProviderByApi = api => {
   const url = String(api || '')
   if (!url) return 'volcanoArk'
@@ -137,6 +199,7 @@ const detectProviderByApi = api => {
   return 'customOpenAI'
 }
 
+/** @param {unknown} api */
 const parseLegacyApi = api => {
   const value = String(api || '').trim()
   if (!value) {
@@ -160,8 +223,10 @@ const parseLegacyApi = api => {
   }
 }
 
+/** @param {unknown} provider */
 export const getDefaultAiConfig = provider => {
   const meta = getAiProviderMeta(provider || DEFAULT_PROVIDER)
+  /** @type {AiConfig} */
   return {
     provider: meta.value,
     protocol: meta.protocol,
@@ -175,6 +240,7 @@ export const getDefaultAiConfig = provider => {
   }
 }
 
+/** @param {Record<string, unknown> | null | undefined} config */
 export const normalizeAiConfig = config => {
   const input = config || {}
   const meta = getAiProviderMeta(input.provider || detectProviderByApi(input.api))
@@ -196,6 +262,7 @@ export const normalizeAiConfig = config => {
       : String(input.port).trim()
   const method = String(input.method || defaults.method || DEFAULT_METHOD).toUpperCase()
 
+  /** @type {AiConfig} */
   return {
     provider: meta.value,
     protocol: input.protocol || meta.protocol || defaults.protocol || DEFAULT_PROTOCOL,
@@ -209,6 +276,7 @@ export const normalizeAiConfig = config => {
   }
 }
 
+/** @param {Record<string, unknown> | null | undefined} config */
 export const validateAiConfig = config => {
   const parsedPort = parseAiPort(config && config.port)
   if (!parsedPort.empty && !parsedPort.valid) {
@@ -236,6 +304,7 @@ export const validateAiConfig = config => {
   return { valid: true, config: normalized }
 }
 
+/** @param {Record<string, unknown> | null | undefined} config */
 export const buildAiRequestConfig = config => {
   const normalized = normalizeAiConfig(config)
   return {
@@ -253,6 +322,9 @@ export const buildAiRequestConfig = config => {
   }
 }
 
+/**
+ * @param {{ choices?: Array<{ delta?: { content?: string } }> } | null | undefined} item
+ */
 export const parseOpenAICompatibleStreamChunk = item => {
   if (!item || !Array.isArray(item.choices)) return ''
   return item.choices
@@ -263,6 +335,10 @@ export const parseOpenAICompatibleStreamChunk = item => {
     .join('')
 }
 
+/**
+ * @param {string} pending
+ * @param {string} chunk
+ */
 export const consumeOpenAICompatibleStreamText = (pending, chunk) => {
   const source = `${String(pending || '')}${String(chunk || '')}`
   if (!source) {

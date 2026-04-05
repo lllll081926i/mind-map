@@ -1,4 +1,4 @@
-import { CONSTANTS } from '../../constants/constant'
+import { CONSTANTS, ERROR_TYPES } from '../../constants/constant'
 
 //  视图操作类
 class View {
@@ -227,7 +227,9 @@ class View {
   transform() {
     try {
       this.limitMindMapInCanvas()
-    } catch (error) {}
+    } catch (error) {
+      this.mindMap.opt.errorHandler(ERROR_TYPES.VIEW_TRANSFORM_ERROR, error)
+    }
     this.mindMap.draw.transform({
       origin: [0, 0],
       scale: this.scale,

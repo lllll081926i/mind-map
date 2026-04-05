@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=MindMap
+Comment=Open MindMap documents
+Exec=mind-map-desktop %F
+Icon=application-x-mindmap-smm
+MimeType=application/x-mindmap-smm;
+Categories=Office;
+StartupNotify=true
+NoDisplay=true

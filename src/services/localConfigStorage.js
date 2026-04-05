@@ -4,7 +4,7 @@ import { separateAppAndAiConfig } from '@/utils/aiProviders.mjs'
 export const persistLocalConfig = config => {
   const state = getBootstrapState()
   const { localConfig, aiConfig } = separateAppAndAiConfig(config)
-  void saveBootstrapStatePatch({
+  return saveBootstrapStatePatch({
     localConfig: {
       ...state.localConfig,
       ...localConfig
@@ -13,8 +13,6 @@ export const persistLocalConfig = config => {
       ...state.aiConfig,
       ...aiConfig
     }
-  }).catch(error => {
-    console.error('persistLocalConfig failed', error)
   })
 }
 

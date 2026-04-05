@@ -38,6 +38,9 @@ class Export {
     const imageList = svg.find(tagName)
     return imageList.map(async item => {
       const imgUlr = getUrlFn(item)
+      if (!imgUlr) {
+        return
+      }
       // 已经是data:URL形式不用转换
       if (/^data:/.test(imgUlr) || imgUlr === 'none') {
         return
@@ -84,11 +87,12 @@ class Export {
       return item.attr('src')
     })
     const taskList = [...task1, ...task2]
-    try {
-      await Promise.all(taskList)
-    } catch (error) {
-      errorHandler(ERROR_TYPES.EXPORT_LOAD_IMAGE_ERROR, error)
-    }
+    const taskResults = await Promise.allSettled(taskList)
+    taskResults.forEach(result => {
+      if (result.status === 'rejected') {
+        errorHandler(ERROR_TYPES.EXPORT_LOAD_IMAGE_ERROR, result.reason)
+      }
+    })
     // 开启了节点富文本编辑，需要增加一些样式
     if (this.mindMap.richText) {
       const foreignObjectList = svg.find('foreignObject')

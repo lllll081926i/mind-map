@@ -262,7 +262,7 @@ const loadMindMapRuntime = async () => {
           .usePlugin(mindMapLayoutProModule.default)
           .usePlugin(nodeBase64ImageStorageModule.default)
         themesModule.default.init(MindMap)
-        if (typeof globalThis.MoreThemes !== 'undefined') {
+        if (typeof globalThis.MoreThemes?.init === 'function') {
           globalThis.MoreThemes.init(MindMap)
         }
         return {

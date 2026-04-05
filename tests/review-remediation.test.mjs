@@ -184,12 +184,24 @@ const commandSource = fs.readFileSync(
   path.resolve('simple-mind-map/src/core/command/Command.js'),
   'utf8'
 )
+const renderCoreSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/core/render/Render.js'),
+  'utf8'
+)
+const mindMapNodeSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/core/render/node/MindMapNode.js'),
+  'utf8'
+)
 const viewSource = fs.readFileSync(
   path.resolve('simple-mind-map/src/core/view/View.js'),
   'utf8'
 )
 const styleSource = fs.readFileSync(
   path.resolve('simple-mind-map/src/core/render/node/Style.js'),
+  'utf8'
+)
+const simpleMindMapConstantsSource = fs.readFileSync(
+  path.resolve('simple-mind-map/src/constants/constant.js'),
   'utf8'
 )
 const desktopPlatformSource = fs.readFileSync(
@@ -556,4 +568,23 @@ test('核心库里已确认的真实 bug 被修正', () => {
   assert.match(styleSource, /Style\.cacheStyle\.set\(el, /)
   assert.match(styleSource, /Style\.cacheStyle\.get\(el\)/)
   assert.doesNotMatch(styleSource, /Style\.cacheStyle = null/)
+})
+
+test('核心渲染链路补齐错误边界与错误码常量', () => {
+  assert.match(simpleMindMapConstantsSource, /EXEC_COMMAND_ERROR:\s*'exec_command_error'/)
+  assert.match(renderCoreSource, /try\s*\{[\s\S]*this\.layout\.doLayout/)
+  assert.match(
+    renderCoreSource,
+    /this\.mindMap\.opt\.errorHandler\(ERROR_TYPES\.EXEC_COMMAND_ERROR, error\)/
+  )
+  assert.match(renderCoreSource, /this\.hasWaitRendering = false/)
+  assert.match(mindMapNodeSource, /catch\s*\(error\)\s*\{[\s\S]*callback\(\)/)
+})
+
+test('主题扩展运行时会先校验 MoreThemes\\.init 是否可调用', () => {
+  assert.match(editSource, /typeof globalThis\.MoreThemes\?\.init === 'function'/)
+  assert.match(
+    exportPageSource,
+    /typeof globalThis\.MoreThemes\?\.init === 'function'/
+  )
 })

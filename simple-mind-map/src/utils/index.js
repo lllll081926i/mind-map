@@ -154,7 +154,9 @@ export const simpleDeepClone = data => {
   if (typeof structuredClone === 'function') {
     try {
       return structuredClone(data)
-    } catch (error) {}
+    } catch (error) {
+      // 某些浏览器对象或第三方实例不支持 structuredClone，降级到 JSON 方案。
+    }
   }
   try {
     return JSON.parse(JSON.stringify(data))
@@ -1229,7 +1231,9 @@ export const checkSmmFormatData = data => {
       if (typeof parsedData === 'object' && parsedData.simpleMindMap) {
         smmData = parsedData.data
       }
-    } catch (error) {}
+    } catch (error) {
+      // 非 JSON 字符串按普通文本处理即可，这里不需要中断粘贴流程。
+    }
   } else if (typeof data === 'object' && data.simpleMindMap) {
     // 否则如果是对象，则检查属性标志
     smmData = data.data
@@ -1470,23 +1474,26 @@ export const getNodeTreeBoundingRect = (
   let maxY = -Infinity
   const walk = (root, isRoot) => {
     if (!(isRoot && excludeSelf) && root.group) {
-      try {
-        const { x, y, width, height } = root.group
-          .findOne('.smm-node-shape')
-          .rbox()
-        if (x < minX) {
-          minX = x
+      const shape = root.group.findOne('.smm-node-shape')
+      if (shape) {
+        try {
+          const { x, y, width, height } = shape.rbox()
+          if (x < minX) {
+            minX = x
+          }
+          if (x + width > maxX) {
+            maxX = x + width
+          }
+          if (y < minY) {
+            minY = y
+          }
+          if (y + height > maxY) {
+            maxY = y + height
+          }
+        } catch (e) {
+          // 某些节点在销毁或重建中可能暂时没有稳定的包围盒，忽略该节点继续计算。
         }
-        if (x + width > maxX) {
-          maxX = x + width
-        }
-        if (y < minY) {
-          minY = y
-        }
-        if (y + height > maxY) {
-          maxY = y + height
-        }
-      } catch (e) {}
+      }
     }
     if (!excludeGeneralization && root._generalizationList.length > 0) {
       root._generalizationList.forEach(item => {

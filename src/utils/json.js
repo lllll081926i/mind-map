@@ -1,5 +1,6 @@
 const BLOCKED_JSON_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 
+/** @param {unknown} value */
 const validateJsonValue = value => {
   if (!value || typeof value !== 'object') {
     return
@@ -10,14 +11,16 @@ const validateJsonValue = value => {
     })
     return
   }
-  Object.keys(value).forEach(key => {
+  const objectValue = /** @type {Record<string, unknown>} */ (value)
+  Object.keys(objectValue).forEach(key => {
     if (BLOCKED_JSON_KEYS.has(key)) {
       throw new Error('JSON 内容包含不安全字段')
     }
-    validateJsonValue(value[key])
+    validateJsonValue(objectValue[key])
   })
 }
 
+/** @param {unknown} input */
 export const parseExternalJsonSafely = input => {
   let parsed
   try {

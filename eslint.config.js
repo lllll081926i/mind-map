@@ -11,13 +11,14 @@ module.exports = [
       'dist-desktop/**',
       'node_modules/**',
       'docs/**',
+      'test-results/**',
+      'playwright-report/**',
       'src-tauri/target/**',
       'src-tauri/gen/**',
-      'simple-mind-map/**',
-      'simple-mind-map-plugin-themes/**',
       'simple-mind-map/dist/**',
       'simple-mind-map/types/**',
       'simple-mind-map/node_modules/**',
+      'simple-mind-map-plugin-themes/node_modules/**',
       'src/config/icon.js',
       'src/config/image.js'
     ]
@@ -38,6 +39,8 @@ module.exports = [
         __APP_PLATFORM__: 'readonly',
         __APP_RELEASE_URL__: 'readonly',
         __APP_RELEASE_API_URL__: 'readonly'
+        ,
+        __APP_AI_PROXY_TOKEN__: 'readonly'
       }
     },
     plugins: {
@@ -63,6 +66,34 @@ module.exports = [
       'vue/no-mutating-props': 'off',
       'vue/attribute-hyphenation': 'off',
       'vue/v-on-event-hyphenation': 'off'
+    }
+  },
+  {
+    files: [
+      'simple-mind-map/**/*.{js,mjs,cjs}',
+      'simple-mind-map-plugin-themes/**/*.{js,mjs,cjs}'
+    ],
+    languageOptions: {
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module'
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node
+      }
+    },
+    rules: {
+      'no-debugger': 'warn',
+      'no-console': 'off',
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-prototype-builtins': 'off',
+      'no-case-declarations': 'off',
+      'no-useless-assignment': 'off',
+      'no-control-regex': 'off',
+      'no-constant-binary-expression': 'off',
+      'no-async-promise-executor': 'off'
     }
   }
 ]

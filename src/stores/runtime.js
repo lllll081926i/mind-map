@@ -31,7 +31,7 @@ const ensureRuntimeStores = () => {
 
 const persistCompositeConfig = () => {
   const { settingsStore, aiStore } = ensureRuntimeStores()
-  persistLocalConfig({
+  return persistLocalConfig({
     ...settingsStore.localConfig,
     ...aiStore.config
   })
@@ -76,7 +76,27 @@ const applyCompositeConfig = (data, persist = true) => {
 export const getRuntimeStores = () => ensureRuntimeStores()
 
 export const applyLocalConfigPatch = data => {
-  applyCompositeConfig(data, true)
+  const { settingsStore, aiStore, appStore } = ensureRuntimeStores()
+  const previousLocalConfig = {
+    ...settingsStore.localConfig
+  }
+  const previousAiConfig = {
+    ...aiStore.config
+  }
+  const previousSidebar = appStore.activeSidebar
+  applyCompositeConfig(data, false)
+  return persistCompositeConfig().catch(error => {
+    settingsStore.replaceLocalConfig(previousLocalConfig)
+    aiStore.setConfig(previousAiConfig)
+    syncThemeFromLocalConfig()
+    if (!settingsStore.localConfig.enableAi && previousSidebar === 'ai') {
+      appStore.setActiveSidebar('')
+    } else {
+      appStore.setActiveSidebar(previousSidebar || '')
+    }
+    console.error('applyLocalConfigPatch failed', error)
+    throw error
+  })
 }
 
 export const syncRuntimeFromBootstrapState = state => {
