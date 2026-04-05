@@ -395,19 +395,19 @@ jobs:
 
           CERT_PATH="$RUNNER_TEMP/mindmap-apple-signing.p12"
           if ! python - <<'PY' "$CERT_PATH"; then
-import base64
-import os
-import sys
+          import base64
+          import os
+          import sys
 
-cert = os.environ.get("APPLE_CERTIFICATE_B64", "").strip()
-path = sys.argv[1]
-try:
-    raw = base64.b64decode(cert, validate=True)
-except Exception:
-    sys.exit(1)
-with open(path, "wb") as fh:
-    fh.write(raw)
-PY
+          cert = os.environ.get("APPLE_CERTIFICATE_B64", "").strip()
+          path = sys.argv[1]
+          try:
+              raw = base64.b64decode(cert, validate=True)
+          except Exception:
+              sys.exit(1)
+          with open(path, "wb") as fh:
+              fh.write(raw)
+          PY
             echo "APPLE_CERTIFICATE is not valid base64. Build will continue without codesigning."
             exit 0
           fi
