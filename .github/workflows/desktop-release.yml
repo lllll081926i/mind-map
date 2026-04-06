@@ -417,6 +417,36 @@ jobs:
             exit 0
           fi
 
+          PRECHECK_KEYCHAIN="$RUNNER_TEMP/mindmap-precheck.keychain-db"
+          PRECHECK_KEYCHAIN_PASSWORD="$(python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(24))
+PY
+)"
+
+          cleanup_keychain() {
+            security delete-keychain "$PRECHECK_KEYCHAIN" >/dev/null 2>&1 || true
+          }
+
+          trap cleanup_keychain EXIT
+
+          security create-keychain -p "$PRECHECK_KEYCHAIN_PASSWORD" "$PRECHECK_KEYCHAIN" >/dev/null 2>&1
+          security set-keychain-settings -lut 21600 "$PRECHECK_KEYCHAIN" >/dev/null 2>&1
+          security unlock-keychain -p "$PRECHECK_KEYCHAIN_PASSWORD" "$PRECHECK_KEYCHAIN" >/dev/null 2>&1
+
+          if ! security import "$CERT_PATH" -k "$PRECHECK_KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD_VALUE" -T /usr/bin/codesign -T /usr/bin/security >/dev/null 2>&1; then
+            echo "APPLE_CERTIFICATE cannot be imported by macOS security. Build will continue without codesigning."
+            exit 0
+          fi
+
+          if ! security find-identity -v -p codesigning "$PRECHECK_KEYCHAIN" | grep -F "$APPLE_SIGNING_IDENTITY_VALUE" >/dev/null 2>&1; then
+            echo "APPLE_SIGNING_IDENTITY is not available in the imported certificate. Build will continue without codesigning."
+            exit 0
+          fi
+
+          cleanup_keychain
+          trap - EXIT
+
           echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE_B64" >> "$GITHUB_ENV"
           echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD_VALUE" >> "$GITHUB_ENV"
           echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_VALUE" >> "$GITHUB_ENV"
