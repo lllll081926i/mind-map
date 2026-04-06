@@ -32,14 +32,38 @@
         </div>
       </div>
       <div class="row" v-if="activeTab === 'color'">
-            <Color
-              :color="style.backgroundColor"
-              @change="
-                color => {
-                  update('backgroundColor', color)
-                }
-              "
-            ></Color>
+        <Color
+          :color="style.backgroundColor"
+          @change="
+            color => {
+              update('backgroundColor', color)
+            }
+          "
+        ></Color>
+      </div>
+      <div class="row column editorBackgroundStyleRow">
+        <div class="rowItem">
+          <span class="name">{{ $t('baseStyle.editorBackgroundStyle') }}</span>
+        </div>
+        <div class="editorBackgroundStyleList">
+          <button
+            v-for="item in editorBackgroundStyleOptions"
+            :key="item.value"
+            type="button"
+            class="editorBackgroundStyleBtn"
+            :class="{
+              active: editorBackgroundStyle === item.value,
+              isDark: isDark
+            }"
+            @click="updateLocalConfig('editorBackgroundStyle', item.value)"
+          >
+            <span
+              class="editorBackgroundPreview"
+              :class="`preview-${item.value}`"
+            ></span>
+            <span class="editorBackgroundLabel">{{ item.label }}</span>
+          </button>
+        </div>
       </div>
       <div class="row column" v-if="activeTab === 'image'">
             <ImgUpload
@@ -838,7 +862,9 @@ import {
   rainbowLinesOptions
 } from '@/config/constant'
 import { useAppStore } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
+import { applyLocalConfigPatch } from '@/stores/runtime'
 
 // 基础样式
 export default {
@@ -915,6 +941,9 @@ export default {
     ...mapState(useAppStore, {
       activeSidebar: 'activeSidebar'
     }),
+    ...mapState(useSettingsStore, {
+      localConfig: 'localConfig'
+    }),
     ...mapState(useThemeStore, {
       isDark: 'isDark',
       bgList: 'bgList'
@@ -970,6 +999,25 @@ export default {
     },
     borderDasharrayList() {
       return borderDasharrayList[this.$i18n.locale] || borderDasharrayList.zh
+    },
+    editorBackgroundStyle() {
+      return this.localConfig.editorBackgroundStyle || 'blank'
+    },
+    editorBackgroundStyleOptions() {
+      return [
+        {
+          value: 'blank',
+          label: this.$t('baseStyle.backgroundStyleBlank')
+        },
+        {
+          value: 'dots',
+          label: this.$t('baseStyle.backgroundStyleDots')
+        },
+        {
+          value: 'rule',
+          label: this.$t('baseStyle.backgroundStyleRule')
+        }
+      ]
     }
   },
   watch: {
@@ -1149,6 +1197,12 @@ export default {
 
     useBg(bg) {
       this.update('backgroundImage', bg)
+    },
+
+    updateLocalConfig(key, value) {
+      applyLocalConfigPatch({
+        [key]: value
+      })
     }
   }
 }
@@ -1230,6 +1284,10 @@ export default {
       margin-bottom: 5px;
     }
 
+    &.editorBackgroundStyleRow {
+      margin-top: 4px;
+    }
+
     .btnGroup {
       width: 100%;
       display: flex;
@@ -1287,6 +1345,86 @@ export default {
           transform: rotateZ(-180deg);
         }
       }
+    }
+
+    .editorBackgroundStyleList {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .editorBackgroundStyleBtn {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      border: 1px solid #dcdfe6;
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease;
+
+      &:hover {
+        border-color: rgba(64, 158, 255, 0.42);
+      }
+
+      &.active {
+        border-color: #409eff;
+        background: rgba(64, 158, 255, 0.06);
+      }
+
+      &.isDark {
+        background: #36393d;
+        border-color: hsla(0, 0%, 100%, 0.12);
+
+        &.active {
+          border-color: #409eff;
+          background: rgba(64, 158, 255, 0.12);
+        }
+      }
+    }
+
+    .editorBackgroundPreview {
+      width: 100%;
+      aspect-ratio: 1.45;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background-color: #fcfcfb;
+
+      &.preview-dots {
+        background-image: radial-gradient(
+          circle,
+          rgba(148, 163, 184, 0.42) 1.1px,
+          transparent 1.1px
+        );
+        background-size: 14px 14px;
+      }
+
+      &.preview-rule {
+        background-image:
+          linear-gradient(
+            to right,
+            rgba(148, 163, 184, 0.16) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(148, 163, 184, 0.16) 1px,
+            transparent 1px
+          );
+        background-size: 18px 18px;
+      }
+    }
+
+    .editorBackgroundLabel {
+      font-size: 12px;
+      line-height: 1.2;
+      color: rgba(26, 26, 26, 0.88);
+      text-align: center;
     }
 
     .styleBtn {
@@ -1360,6 +1498,39 @@ export default {
           border-color: #409eff;
           color: #fff;
         }
+      }
+
+      .editorBackgroundPreview {
+        border-color: hsla(0, 0%, 100%, 0.08);
+        background-color: #2c3137;
+
+        &.preview-dots {
+          background-image: radial-gradient(
+            circle,
+            rgba(226, 232, 240, 0.2) 1px,
+            transparent 1px
+          );
+          background-size: 14px 14px;
+        }
+
+        &.preview-rule {
+          background-image:
+            linear-gradient(
+              to right,
+              rgba(226, 232, 240, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(226, 232, 240, 0.1) 1px,
+              transparent 1px
+            );
+          background-size: 18px 18px;
+        }
+      }
+
+      .editorBackgroundLabel {
+        color: rgba(255, 255, 255, 0.88);
       }
     }
   }

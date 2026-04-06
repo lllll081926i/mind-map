@@ -76,4 +76,7 @@ test('发布流程已接入代码签名配置入口', () => {
   assert.match(releaseWorkflowSource, /Apply Windows signing config/)
   assert.match(releaseWorkflowSource, /APPLE_CERTIFICATE:/)
   assert.match(releaseWorkflowSource, /APPLE_SIGNING_IDENTITY:/)
+  assert.match(releaseWorkflowSource, /security create-keychain/)
+  assert.match(releaseWorkflowSource, /security import/)
+  assert.match(releaseWorkflowSource, /security find-identity/)
 })

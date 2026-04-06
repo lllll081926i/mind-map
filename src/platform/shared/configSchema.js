@@ -8,6 +8,7 @@ export const DEFAULT_LOCAL_CONFIG = {
   isZenMode: false,
   openNodeRichText: true,
   showToolbarLabels: true,
+  editorBackgroundStyle: 'blank',
   useLeftKeySelectionRightKeyDrag: false,
   isShowScrollbar: false,
   isDark: false,

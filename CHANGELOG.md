@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-04-06
+
+### Changed
+- Added editable canvas background presets for the desktop editor with blank, dots, and grid styles stored as a global preference
+- Moved editor background rendering onto an isolated overlay layer so runtime inline styles no longer hide the preset texture
+
+### Fixed
+- Corrected the grid background preset to render intersecting horizontal and vertical lines instead of only horizontal rules
+- Hardened the macOS release workflow to preflight Apple certificates with real `security import` / keychain checks before handing signing config to Tauri
+
 ## [0.2.10] - 2026-04-05
 
 ### Changed

@@ -20,6 +20,7 @@
       class="mindMapContainer"
       id="mindMapContainer"
       ref="mindMapContainer"
+      :class="mindMapContainerClasses"
     ></div>
     <Count :mindMap="mindMap" v-if="!isZenMode"></Count>
     <Navigator
@@ -488,6 +489,15 @@ export default {
     },
     enableAi() {
       return this.localConfig.enableAi
+    },
+    editorBackgroundStyle() {
+      return this.localConfig.editorBackgroundStyle || 'blank'
+    },
+    editorBackgroundStyleClass() {
+      return `editor-bg-${this.editorBackgroundStyle}`
+    },
+    mindMapContainerClasses() {
+      return [this.editorBackgroundStyleClass]
     },
     primarySidebarComponent() {
       const key = this.activeSidebar
@@ -1327,6 +1337,51 @@ export default {
     top: 0px;
     width: 100%;
     height: 100%;
+    background-color: #fcfcfb;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-repeat: repeat;
+      background-position: left top;
+    }
+
+    &.editor-bg-blank {
+      &::before {
+        background-image: none;
+      }
+    }
+
+    &.editor-bg-dots {
+      &::before {
+        background-image: radial-gradient(
+          circle,
+          rgba(148, 163, 184, 0.28) 1.2px,
+          transparent 1.2px
+        );
+        background-size: 16px 16px;
+      }
+    }
+
+    &.editor-bg-rule {
+      &::before {
+        background-image:
+          linear-gradient(
+            to right,
+            rgba(148, 163, 184, 0.16) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(148, 163, 184, 0.16) 1px,
+            transparent 1px
+          );
+        background-size: 20px 20px;
+      }
+    }
   }
 }
 </style>

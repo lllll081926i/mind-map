@@ -2,6 +2,10 @@ const zh = {
   "baseStyle": {
     "title": "基础样式",
     "background": "背景",
+    "editorBackgroundStyle": "编辑页背景样式",
+    "backgroundStyleBlank": "空白",
+    "backgroundStyleDots": "点阵",
+    "backgroundStyleRule": "横格",
     "color": "颜色",
     "image": "图片",
     "imageRepeat": "图片重复",

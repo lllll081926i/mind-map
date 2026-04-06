@@ -27,6 +27,10 @@ const settingSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Setting.vue'),
   'utf8'
 )
+const configSchemaSource = fs.readFileSync(
+  path.resolve('src/platform/shared/configSchema.js'),
+  'utf8'
+)
 const outlineSidebarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/OutlineSidebar.vue'),
   'utf8'
@@ -83,6 +87,22 @@ test('基础样式、节点样式、主题面板保留核心分组', () => {
   assert.match(baseStyleSource, /基础样式|背景|连线/)
   assert.match(styleSource, /节点样式|文字|边框/)
   assert.match(themeSource, /主题/)
+})
+
+test('基础样式面板提供仅编辑页生效的背景样式偏好', () => {
+  assert.match(configSchemaSource, /editorBackgroundStyle/)
+  assert.match(baseStyleSource, /baseStyle\.editorBackgroundStyle/)
+  assert.match(baseStyleSource, /baseStyle\.backgroundStyleBlank/)
+  assert.match(baseStyleSource, /baseStyle\.backgroundStyleDots/)
+  assert.match(baseStyleSource, /baseStyle\.backgroundStyleRule/)
+  assert.match(baseStyleSource, /updateLocalConfig\('editorBackgroundStyle',/)
+  assert.match(editSource, /editorBackgroundStyleClass\(\)/)
+  assert.match(editSource, /mindMapContainerClasses\(\)/)
+  assert.match(editSource, /editor-bg-dots/)
+  assert.match(editSource, /editor-bg-rule/)
+  assert.match(editSource, /\.mindMapContainer[\s\S]*&::before/)
+  assert.match(editSource, /editor-bg-rule[\s\S]*linear-gradient\(\s*to right/)
+  assert.match(editSource, /editor-bg-rule[\s\S]*linear-gradient\(\s*to bottom/)
 })
 
 test('编辑页恢复设置侧边栏入口与挂载', () => {
