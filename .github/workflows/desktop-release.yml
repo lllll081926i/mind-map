@@ -418,11 +418,7 @@ jobs:
           fi
 
           PRECHECK_KEYCHAIN="$RUNNER_TEMP/mindmap-precheck.keychain-db"
-          PRECHECK_KEYCHAIN_PASSWORD="$(python - <<'PY'
-import secrets
-print(secrets.token_urlsafe(24))
-PY
-)"
+          PRECHECK_KEYCHAIN_PASSWORD="$(uuidgen)$(uuidgen)"
 
           cleanup_keychain() {
             security delete-keychain "$PRECHECK_KEYCHAIN" >/dev/null 2>&1 || true
