@@ -77,7 +77,7 @@ const createManualChunks = id => {
     if (isPathMatch(id, 'axios')) {
       return 'vendor-network'
     }
-    if (isPathMatch(id, 'markdown-it') || isPathMatch(id, 'markdown-it-checkbox')) {
+    if (isPathMatch(id, 'markdown-it')) {
       return 'vendor-markdown'
     }
     if (isPathMatch(id, 'dompurify')) {

@@ -291,7 +291,7 @@
 import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { ElNotification as Notification } from 'element-plus'
-import { getData } from '@/api'
+import { getConfig, getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import { parseExternalJsonSafely } from '@/utils/json'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
@@ -307,8 +307,7 @@ import {
   getLastDirectory,
   markDocumentDirty,
   setCurrentFileRef,
-  setLastDirectory,
-  updateCurrentFileRef
+  setLastDirectory
 } from '@/services/documentSession'
 import {
   onBootstrapStateReady,
@@ -324,6 +323,11 @@ import { getWorkspaceMetaState } from '@/services/workspaceState'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
+import {
+  clearRecoveryDraftForFile,
+  resolveFileContentWithRecovery,
+  writeRecoveryDraftForFile
+} from '@/services/recoveryStorage'
 
 const NodeImage = defineAsyncComponent(() => import('./NodeImage.vue'))
 const NodeHyperlink = defineAsyncComponent(() => import('./NodeHyperlink.vue'))
@@ -331,6 +335,46 @@ const NodeNote = defineAsyncComponent(() => import('./NodeNote.vue'))
 const NodeTag = defineAsyncComponent(() => import('./NodeTag.vue'))
 const Import = defineAsyncComponent(() => import('./Import.vue'))
 const LOCAL_FILE_WRITE_DEBOUNCE_MS = 1000
+const RECOVERY_WRITE_DEBOUNCE_MS = 2500
+
+const snapshotLocalFileRef = fileRef => {
+  if (!fileRef || typeof fileRef !== 'object') return null
+  const path = String(fileRef.path || '').trim()
+  if (!path) return null
+  return {
+    ...fileRef,
+    path,
+    name: String(fileRef.name || '').trim(),
+    mode: String(fileRef.mode || 'desktop').trim() || 'desktop'
+  }
+}
+
+const isSameLocalFileRef = (left, right) => {
+  const leftRef = snapshotLocalFileRef(left)
+  const rightRef = snapshotLocalFileRef(right)
+  if (!leftRef || !rightRef) return false
+  return leftRef.path === rightRef.path && leftRef.mode === rightRef.mode
+}
+
+const parseToolbarLocalFileContent = (str, invalidContentMessage) => {
+  let data = parseExternalJsonSafely(str)
+  if (!data || typeof data !== 'object') {
+    throw new Error(invalidContentMessage)
+  }
+  if (data.root) {
+    return {
+      data,
+      isFullDataFile: true
+    }
+  }
+  return {
+    data: {
+      ...createDefaultMindMapData(),
+      root: data
+    },
+    isFullDataFile: false
+  }
+}
 
 // 工具栏
 const defaultBtnList = [
@@ -378,7 +422,13 @@ export default {
       fileTreeVisible: false,
       rootDirName: '',
       fileTreeExpand: true,
+      isFullDataFile: true,
       waitingWriteToLocalFile: false,
+      pendingLocalFileRef: null,
+      localFileReadRequestId: 0,
+      localFileWriteRequestId: 0,
+      completedLocalFileWriteRequestId: 0,
+      currentLocalFileWriteRequestId: 0,
       layoutMeasureToken: 0,
       mountedPanels: {
         nodeImage: false,
@@ -468,6 +518,7 @@ export default {
     window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
     clearTimeout(this.timer)
+    clearTimeout(this.recoveryTimer)
   },
   methods: {
     handleBootstrapStateReady() {
@@ -680,14 +731,52 @@ export default {
 
     // 监听本地文件读写
     onWriteLocalFile(content) {
-      clearTimeout(this.timer)
-      if (getCurrentFileRef() && this.isHandleLocalFile) {
-        this.waitingWriteToLocalFile = true
-        markDocumentDirty(true)
+      if (this.timer) {
+        clearTimeout(this.timer)
+        this.completedLocalFileWriteRequestId = Math.max(
+          this.completedLocalFileWriteRequestId,
+          this.localFileWriteRequestId
+        )
       }
+      this.timer = null
+      const writeTask = this.createLocalWriteTask(content)
+      if (!writeTask) {
+        this.waitingWriteToLocalFile = this.hasPendingLocalWrite()
+        return
+      }
+      this.waitingWriteToLocalFile = true
+      markDocumentDirty(true)
+      this.scheduleRecoveryDraftWrite(writeTask)
       this.timer = setTimeout(() => {
-        this.writeLocalFile(content)
+        this.timer = null
+        void this.writeLocalFile(writeTask)
       }, LOCAL_FILE_WRITE_DEBOUNCE_MS)
+    },
+
+    scheduleRecoveryDraftWrite(writeTask) {
+      if (this.recoveryTimer) {
+        clearTimeout(this.recoveryTimer)
+      }
+      this.recoveryTimer = setTimeout(() => {
+        this.recoveryTimer = null
+        void this.writeRecoveryDraft(writeTask)
+      }, RECOVERY_WRITE_DEBOUNCE_MS)
+    },
+
+    async writeRecoveryDraft(writeTask) {
+      if (!writeTask?.fileRef || !writeTask.content) {
+        return
+      }
+      try {
+        await writeRecoveryDraftForFile({
+          fileRef: writeTask.fileRef,
+          data: writeTask.content,
+          config: getConfig(),
+          isFullDataFile: writeTask.isFullDataFile
+        })
+      } catch (error) {
+        console.error('writeRecoveryDraft failed', error)
+      }
     },
 
     onUnload(e) {
@@ -741,9 +830,7 @@ export default {
     // 编辑指定文件
     editLocalFile(data) {
       if (!data || data.mode !== 'desktop') return
-      setCurrentFileRef(data, data.mode)
-      syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
-      this.readFile()
+      void this.readFile(data)
     },
 
     // 导入指定文件
@@ -768,9 +855,10 @@ export default {
 
     openRecentFile(item) {
       if (!item || !item.path) return
-      setCurrentFileRef(item, item.mode || 'desktop')
-      syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
-      this.readFile()
+      void this.readFile({
+        ...item,
+        mode: item.mode || 'desktop'
+      })
     },
 
     // 打开本地文件
@@ -782,44 +870,25 @@ export default {
         if (!nextFileHandle) {
           return
         }
-        setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
-        syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
-        this.readFile()
+        const requestId = this.startLocalFileRead(nextFileHandle)
+        if (!requestId) return
+        const recoveredResult = await resolveFileContentWithRecovery(
+          nextFileHandle,
+          nextFileHandle.content
+        )
+        await this.applyLocalFileResult(
+          {
+            ...nextFileHandle,
+            content: recoveredResult.content,
+            recoveredFromDraft: recoveredResult.recovered
+          },
+          requestId
+        )
       } catch (error) {
         console.error('openLocalFile failed', error)
         if (error.toString().includes('aborted')) {
           return
         }
-        this.$message.warning(this.$t('toolbar.notSupportTip'))
-      }
-    },
-
-    // 读取本地文件
-    async readFile() {
-      try {
-        const currentFileRef = getCurrentFileRef()
-        if (!currentFileRef) return
-        const result = await platform.readMindMapFile(currentFileRef)
-        setIsHandleLocalFile(true)
-        this.setData(result.content)
-        updateCurrentFileRef(result)
-        await recordRecentFile({
-          ...currentFileRef,
-          ...result
-        })
-        markDocumentDirty(false)
-        this.refreshRecentFiles()
-        Notification.closeAll()
-        Notification({
-          title: this.$t('toolbar.tip'),
-          message: `${this.$t('toolbar.editingLocalFileTipFront')}${
-            result.name
-          }${this.$t('toolbar.editingLocalFileTipEnd')}`,
-          duration: 0,
-          showClose: true
-        })
-      } catch (error) {
-        console.error('readFile failed', error)
         const fileError = createDesktopFsError(error)
         this.$message.error(
           fileError.message || this.$t('toolbar.fileOpenFailed')
@@ -827,45 +896,166 @@ export default {
       }
     },
 
-    // 渲染读取的数据
-    setData(str) {
+    // 读取本地文件
+    async readFile(targetFileRef = null) {
+      const fileRef = snapshotLocalFileRef(targetFileRef || getCurrentFileRef())
+      if (!fileRef) return false
+      const requestId = this.startLocalFileRead(fileRef)
+      if (!requestId) return false
       try {
-        let data = parseExternalJsonSafely(str)
-        if (typeof data !== 'object') {
-          throw new Error(this.$t('toolbar.fileContentError'))
-        }
-        if (data.root) {
-          this.isFullDataFile = true
-        } else {
-          this.isFullDataFile = false
-          data = {
-            ...createDefaultMindMapData(),
-            root: data
-          }
-        }
-        this.$bus.$emit('setData', data)
+        const result = await platform.readMindMapFile(fileRef)
+        const recoveredResult = await resolveFileContentWithRecovery(
+          fileRef,
+          result.content
+        )
+        return await this.applyLocalFileResult(
+          {
+            ...fileRef,
+            ...result,
+            content: recoveredResult.content,
+            recoveredFromDraft: recoveredResult.recovered
+          },
+          requestId
+        )
       } catch (error) {
-        console.error('parse local file failed', error)
-        this.$message.error(this.$t('toolbar.fileOpenFailed'))
+        if (!this.isLatestLocalFileRead(requestId, fileRef)) {
+          return false
+        }
+        if (requestId === this.localFileReadRequestId) {
+          this.pendingLocalFileRef = null
+        }
+        console.error('readFile failed', error)
+        const fileError = createDesktopFsError(error)
+        this.$message.error(
+          fileError.message || this.$t('toolbar.fileOpenFailed')
+        )
+        return false
       }
     },
 
+    // 渲染读取的数据
+    setData(str) {
+      const normalized = parseToolbarLocalFileContent(
+        str,
+        this.$t('toolbar.fileContentError')
+      )
+      this.isFullDataFile = normalized.isFullDataFile
+      this.$bus.$emit('setData', normalized.data)
+      return normalized
+    },
+
+    startLocalFileRead(targetFileRef) {
+      const fileRef = snapshotLocalFileRef(targetFileRef)
+      if (!fileRef) return 0
+      this.pendingLocalFileRef = fileRef
+      return ++this.localFileReadRequestId
+    },
+
+    isLatestLocalFileRead(requestId, fileRef) {
+      return (
+        requestId === this.localFileReadRequestId &&
+        isSameLocalFileRef(this.pendingLocalFileRef, fileRef)
+      )
+    },
+
+    async applyLocalFileResult(fileResult, requestId) {
+      const fileRef = snapshotLocalFileRef(fileResult)
+      if (!fileRef) return false
+      try {
+        const normalized = parseToolbarLocalFileContent(
+          fileResult.content,
+          this.$t('toolbar.fileContentError')
+        )
+        if (!this.isLatestLocalFileRead(requestId, fileRef)) {
+          return false
+        }
+        const nextFileRef = {
+          ...fileRef,
+          name: String(fileResult.name || fileRef.name || '').trim(),
+          isFullDataFile: normalized.isFullDataFile
+        }
+        this.isFullDataFile = normalized.isFullDataFile
+        setCurrentFileRef(nextFileRef, nextFileRef.mode || 'desktop')
+        setIsHandleLocalFile(true)
+        this.$bus.$emit('setData', normalized.data, {
+          skipSave: true
+        })
+        await recordRecentFile(nextFileRef)
+        if (!this.isLatestLocalFileRead(requestId, fileRef)) {
+          return false
+        }
+        this.pendingLocalFileRef = null
+        markDocumentDirty(!!fileResult.recoveredFromDraft)
+        this.refreshRecentFiles()
+        syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
+        Notification.closeAll()
+        Notification({
+          title: this.$t('toolbar.tip'),
+          message: `${this.$t('toolbar.editingLocalFileTipFront')}${
+            nextFileRef.name
+          }${this.$t('toolbar.editingLocalFileTipEnd')}`,
+          duration: 0,
+          showClose: true
+        })
+        return true
+      } catch (error) {
+        if (
+          requestId === this.localFileReadRequestId &&
+          isSameLocalFileRef(this.pendingLocalFileRef, fileRef)
+        ) {
+          this.pendingLocalFileRef = null
+        }
+        throw error
+      }
+    },
+
+    createLocalWriteTask(content) {
+      const fileRef = snapshotLocalFileRef(getCurrentFileRef())
+      if (!fileRef || !this.isHandleLocalFile) {
+        return null
+      }
+      const isFullDataFile =
+        typeof this.isFullDataFile === 'boolean'
+          ? this.isFullDataFile
+          : !!fileRef.isFullDataFile
+      return {
+        id: ++this.localFileWriteRequestId,
+        fileRef,
+        content,
+        isFullDataFile
+      }
+    },
+
+    hasPendingLocalWrite(requestId = 0) {
+      const completedRequestId = Math.max(
+        this.completedLocalFileWriteRequestId,
+        requestId
+      )
+      return (
+        !!this.timer ||
+        this.currentLocalFileWriteRequestId > completedRequestId ||
+        this.localFileWriteRequestId > completedRequestId
+      )
+    },
+
     // 写入本地文件
-    async writeLocalFile(content) {
-      const currentFileRef = getCurrentFileRef()
-      if (!currentFileRef || !this.isHandleLocalFile) {
-        this.waitingWriteToLocalFile = false
+    async writeLocalFile(writeTask) {
+      if (!writeTask) {
+        this.waitingWriteToLocalFile = this.hasPendingLocalWrite()
         return
       }
+      let writeSucceeded = false
+      this.currentLocalFileWriteRequestId = writeTask.id
       try {
-        if (!this.isFullDataFile) {
+        let content = writeTask.content
+        if (!writeTask.isFullDataFile) {
           content = content.root
         }
         const string = JSON.stringify(content)
-        await platform.writeMindMapFile(currentFileRef, string)
-        await recordRecentFile(currentFileRef)
-        markDocumentDirty(false)
+        await platform.writeMindMapFile(writeTask.fileRef, string)
+        await recordRecentFile(writeTask.fileRef)
         this.refreshRecentFiles()
+        writeSucceeded = true
       } catch (error) {
         console.error('writeLocalFile failed', error)
         const fileError = createDesktopFsError(error)
@@ -873,7 +1063,27 @@ export default {
           fileError.message || this.$t('toolbar.fileOpenFailed')
         )
       } finally {
-        this.waitingWriteToLocalFile = false
+        if (this.currentLocalFileWriteRequestId === writeTask.id) {
+          this.currentLocalFileWriteRequestId = 0
+        }
+        this.completedLocalFileWriteRequestId = Math.max(
+          this.completedLocalFileWriteRequestId,
+          writeTask.id
+        )
+        const hasPendingLocalWrite = this.hasPendingLocalWrite(writeTask.id)
+        this.waitingWriteToLocalFile = hasPendingLocalWrite
+        if (!hasPendingLocalWrite && writeSucceeded) {
+          if (this.recoveryTimer) {
+            clearTimeout(this.recoveryTimer)
+            this.recoveryTimer = null
+          }
+          try {
+            await clearRecoveryDraftForFile(writeTask.fileRef)
+          } catch (error) {
+            console.error('clearRecoveryDraftForFile failed', error)
+          }
+          markDocumentDirty(false)
+        }
       }
     },
 
@@ -891,6 +1101,7 @@ export default {
     // 创建本地文件
     async createLocalFile(content) {
       try {
+        const previousFileRef = snapshotLocalFileRef(getCurrentFileRef())
         const nextFileHandle = await platform.saveMindMapFileAs({
           suggestedName: this.$t('toolbar.defaultFileName'),
           content: JSON.stringify(content),
@@ -905,14 +1116,28 @@ export default {
           background: 'rgba(0, 0, 0, 0.7)'
         })
         try {
-          setCurrentFileRef(nextFileHandle, nextFileHandle.mode)
-          setIsHandleLocalFile(true)
-          syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
-          this.isFullDataFile = true
-          await recordRecentFile(nextFileHandle)
-          markDocumentDirty(false)
-          this.refreshRecentFiles()
-          await this.readFile()
+          const requestId = this.startLocalFileRead(nextFileHandle)
+          if (!requestId) return
+          await this.applyLocalFileResult(
+            {
+              ...nextFileHandle,
+              content: JSON.stringify(content)
+            },
+            requestId
+          )
+          if (this.recoveryTimer) {
+            clearTimeout(this.recoveryTimer)
+            this.recoveryTimer = null
+          }
+          await Promise.all(
+            [previousFileRef, nextFileHandle]
+              .filter(Boolean)
+              .map(item =>
+                clearRecoveryDraftForFile(item).catch(error => {
+                  console.error('clearRecoveryDraftForFile failed', error)
+                })
+              )
+          )
         } finally {
           loading.close()
         }

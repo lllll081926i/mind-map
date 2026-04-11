@@ -96,6 +96,9 @@ const tauriFsCommandSource = fs.readFileSync(
   path.resolve('src-tauri/src/commands/fs.rs'),
   'utf8'
 )
+const tauriRecoverySourcePath = path.resolve('src-tauri/src/services/recovery.rs')
+const tauriRecoveryCommandSourcePath = path.resolve('src-tauri/src/commands/recovery.rs')
+const recoveryStorageSourcePath = path.resolve('src/services/recoveryStorage.js')
 const legacyBusSource = fs.readFileSync(
   path.resolve('src/services/legacyBus.js'),
   'utf8'
@@ -209,6 +212,15 @@ const desktopPlatformSource = fs.readFileSync(
   'utf8'
 )
 const zhCnSource = fs.readFileSync(path.resolve('src/config/zh.js'), 'utf8')
+const tauriRecoverySource = fs.existsSync(tauriRecoverySourcePath)
+  ? fs.readFileSync(tauriRecoverySourcePath, 'utf8')
+  : ''
+const tauriRecoveryCommandSource = fs.existsSync(tauriRecoveryCommandSourcePath)
+  ? fs.readFileSync(tauriRecoveryCommandSourcePath, 'utf8')
+  : ''
+const recoveryStorageSource = fs.existsSync(recoveryStorageSourcePath)
+  ? fs.readFileSync(recoveryStorageSourcePath, 'utf8')
+  : ''
 
 test('根项目补齐 workspace、lint、typecheck 与 commitlint 配置', () => {
   assert.deepEqual(packageJson.workspaces, [
@@ -440,6 +452,101 @@ test('导出文件名、桌面 invoke 和文本文件读取都增加边界保护
   assert.match(tauriFsSource, /ensure_directory_scope_allowed/)
   assert.match(tauriFsCommandSource, /pub async fn read_text_file\(app: tauri::AppHandle, path: String\)/)
   assert.match(tauriFsCommandSource, /pub async fn write_text_file\(\s*app: tauri::AppHandle,/)
+})
+
+test('工具栏本地文件读写会绑定稳定请求上下文，避免切换文件后的串写与旧请求回写', () => {
+  assert.match(toolbarSource, /const snapshotLocalFileRef = fileRef =>/)
+  assert.match(toolbarSource, /const isSameLocalFileRef = \(left, right\) =>/)
+  assert.match(toolbarSource, /const parseToolbarLocalFileContent = \(str, invalidContentMessage\) =>/)
+  assert.match(toolbarSource, /localFileReadRequestId: 0/)
+  assert.match(toolbarSource, /localFileWriteRequestId: 0/)
+  assert.match(toolbarSource, /completedLocalFileWriteRequestId: 0/)
+  assert.match(toolbarSource, /currentLocalFileWriteRequestId: 0/)
+  assert.match(toolbarSource, /const writeTask = this\.createLocalWriteTask\(content\)/)
+  assert.match(toolbarSource, /await platform\.writeMindMapFile\(writeTask\.fileRef, string\)/)
+  assert.match(toolbarSource, /const hasPendingLocalWrite = this\.hasPendingLocalWrite\(writeTask\.id\)/)
+  assert.match(toolbarSource, /if \(!hasPendingLocalWrite && writeSucceeded\)/)
+  assert.match(toolbarSource, /return \+\+this\.localFileReadRequestId/)
+  assert.match(toolbarSource, /pendingLocalFileRef: null/)
+  assert.match(toolbarSource, /isLatestLocalFileRead\(requestId, fileRef\)/)
+})
+
+test('恢复文件子系统提供独立的 Tauri 服务与命令入口', () => {
+  assert.equal(fs.existsSync(tauriRecoverySourcePath), true)
+  assert.equal(fs.existsSync(tauriRecoveryCommandSourcePath), true)
+  assert.match(tauriRecoverySource, /pub struct RecoveryState/)
+  assert.match(tauriRecoverySource, /pub async fn read_recovery_state/)
+  assert.match(tauriRecoverySource, /pub async fn read_recovery_draft/)
+  assert.match(tauriRecoverySource, /pub async fn write_recovery_draft/)
+  assert.match(tauriRecoverySource, /pub async fn clear_recovery_draft/)
+  assert.match(tauriRecoverySource, /pub async fn clear_all_recovery_drafts/)
+  assert.match(tauriRecoverySource, /resource_dir\(\)/)
+  assert.match(tauriRecoverySource, /app_data_dir\(\)/)
+  assert.match(tauriRecoveryCommandSource, /pub async fn read_recovery_state\(/)
+  assert.match(tauriRecoveryCommandSource, /pub async fn write_recovery_draft\(/)
+  assert.match(tauriRecoveryCommandSource, /pub async fn clear_all_recovery_drafts\(/)
+})
+
+test('前端恢复服务会在启动恢复、文件打开和正式保存后清理三条路径接线', () => {
+  assert.equal(fs.existsSync(recoveryStorageSourcePath), true)
+  assert.match(recoveryStorageSource, /export\s+const\s+hydrateBootstrapStateFromRecovery/)
+  assert.match(recoveryStorageSource, /export\s+const\s+resolveFileContentWithRecovery/)
+  assert.match(recoveryStorageSource, /export\s+const\s+writeRecoveryDraftForFile/)
+  assert.match(recoveryStorageSource, /export\s+const\s+clearRecoveryDraftForFile/)
+  assert.match(toolbarSource, /writeRecoveryDraftForFile/)
+  assert.match(toolbarSource, /clearRecoveryDraftForFile/)
+  assert.match(workspaceActionsSource, /resolveFileContentWithRecovery/)
+  assert.match(mainSource, /hydrateBootstrapStateFromRecovery/)
+})
+
+test('工具栏只会在成功解析本地文件后再切换当前文件状态', () => {
+  const editLocalFileSection = toolbarSource.match(
+    /editLocalFile\(data\)\s*\{[\s\S]*?\n\s{4}\}/
+  )
+  const openRecentFileSection = toolbarSource.match(
+    /openRecentFile\(item\)\s*\{[\s\S]*?\n\s{4}\}/
+  )
+  const openLocalFileSection = toolbarSource.match(
+    /async openLocalFile\(\)\s*\{[\s\S]*?\n\s{4}\}/
+  )
+  assert.ok(editLocalFileSection)
+  assert.ok(openRecentFileSection)
+  assert.ok(openLocalFileSection)
+  assert.doesNotMatch(editLocalFileSection[0], /setCurrentFileRef\(/)
+  assert.doesNotMatch(openRecentFileSection[0], /setCurrentFileRef\(/)
+  assert.doesNotMatch(openLocalFileSection[0], /setCurrentFileRef\(/)
+  assert.match(toolbarSource, /const normalized = parseToolbarLocalFileContent\(/)
+  assert.match(toolbarSource, /setCurrentFileRef\(nextFileRef, nextFileRef\.mode \|\| 'desktop'\)/)
+  assert.match(toolbarSource, /setIsHandleLocalFile\(true\)/)
+  assert.match(toolbarSource, /Notification\(\{/)
+})
+
+test('桌面文件选择器返回的新路径会先登记到运行时白名单，再执行读写或目录遍历', () => {
+  assert.match(desktopPlatformSource, /const rememberPickedPath = async selectedPath =>/)
+  assert.match(desktopPlatformSource, /await invokeCommand\(\s*'remember_user_selected_path'/)
+  assert.match(desktopPlatformSource, /await rememberPickedPath\(selectedPath\)/)
+  assert.match(desktopPlatformSource, /await rememberPickedPath\(normalizedSelectedPath\)/)
+  assert.match(tauriFsCommandSource, /file_association::PendingAssociatedFiles/)
+  assert.match(tauriFsCommandSource, /pub fn remember_user_selected_path\(/)
+  assert.match(tauriFsCommandSource, /state\.push_paths\(vec!\[path\]\);/)
+})
+
+test('打开本地文件时会跳过程序化 setData 的自动保存，避免把新文件内容串写回旧文件', () => {
+  assert.match(editSource, /async setData\(data, options = \{\}\)/)
+  assert.match(editSource, /if \(!options\.skipSave\) \{\s*this\.manualSave\(\)\s*\}/)
+  assert.match(
+    toolbarSource,
+    /\$bus\.\$emit\(\s*'setData',\s*normalized\.data,\s*\{\s*skipSave:\s*true\s*\}\s*\)/
+  )
+  const applyLocalFileResultSection = toolbarSource.match(
+    /async applyLocalFileResult\(fileResult, requestId\)\s*\{[\s\S]*?\n\s{4}\}/
+  )
+  assert.ok(applyLocalFileResultSection)
+  assert.equal(
+    applyLocalFileResultSection[0].indexOf('setCurrentFileRef(') <
+      applyLocalFileResultSection[0].indexOf("$bus.$emit('setData'"),
+    true
+  )
 })
 
 test('状态文件写入使用临时文件加备份回滚，避免替换中途失败导致状态丢失', () => {

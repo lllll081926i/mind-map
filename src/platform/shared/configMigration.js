@@ -74,7 +74,8 @@ export const normalizeBootstrapMetaState = input => {
             path: input.currentDocument.path,
             name: String(input.currentDocument.name || ''),
             source: String(input.currentDocument.source || ''),
-            dirty: !!input.currentDocument.dirty
+            dirty: !!input.currentDocument.dirty,
+            isFullDataFile: !!input.currentDocument.isFullDataFile
           }
         : null
   }

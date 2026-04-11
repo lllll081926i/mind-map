@@ -8,6 +8,7 @@ const getFileName = filePath => {
 
 const browserFileStore = new Map()
 const MAX_BROWSER_FILE_STORE_SIZE = 12
+const browserRecoveryDraftStore = new Map()
 
 const setBrowserFileEntry = (path, entry) => {
   if (!path) return
@@ -27,6 +28,47 @@ const getBrowserFileEntry = path => {
   if (!entry) return null
   setBrowserFileEntry(path, entry)
   return entry
+}
+
+const normalizeBrowserRecoveryDraft = draft => {
+  if (!draft || !draft.sourcePath) return null
+  return {
+    documentId: String(draft.documentId || '').trim(),
+    title: String(draft.title || '').trim(),
+    sourcePath: String(draft.sourcePath || '').trim(),
+    updatedAt: Number(draft.updatedAt || Date.now()),
+    dirty: !!draft.dirty,
+    draftFile:
+      String(draft.draftFile || '').trim() ||
+      `${String(draft.documentId || '').trim() || 'draft'}.json`,
+    origin: String(draft.origin || 'memory').trim() || 'memory',
+    isFullDataFile: !!draft.isFullDataFile,
+    mindMapData:
+      draft.mindMapData && typeof draft.mindMapData === 'object'
+        ? draft.mindMapData
+        : null,
+    mindMapConfig:
+      draft.mindMapConfig && typeof draft.mindMapConfig === 'object'
+        ? draft.mindMapConfig
+        : null,
+    fileRef:
+      draft.fileRef && typeof draft.fileRef === 'object' ? draft.fileRef : null
+  }
+}
+
+const getBrowserRecoveryEntries = () => {
+  return Array.from(browserRecoveryDraftStore.values())
+    .filter(Boolean)
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .map(item => ({
+      documentId: item.documentId,
+      title: item.title,
+      sourcePath: item.sourcePath,
+      updatedAt: item.updatedAt,
+      dirty: item.dirty,
+      draftFile: item.draftFile,
+      origin: item.origin
+    }))
 }
 
 const readBrowserFileText = file => {
@@ -140,6 +182,8 @@ const createBrowserTauriModules = () => {
       switch (command) {
         case 'take_pending_associated_files':
           return []
+        case 'remember_user_selected_path':
+          return null
         case 'read_text_file': {
           const entry = getBrowserFileEntry(payload.path)
           if (!entry) {
@@ -156,16 +200,64 @@ const createBrowserTauriModules = () => {
           const nextEntry = {
             ...currentEntry,
             content: String(payload.content || ''),
-            pendingDownload: false
+            pendingDownload: !!currentEntry.pendingDownload
           }
+          const shouldDownload =
+            currentEntry.pendingDownload || nextEntry.pendingDownload
           setBrowserFileEntry(path, nextEntry)
-          if (currentEntry.pendingDownload) {
+          if (shouldDownload) {
             downloadBrowserFile({
-              name: currentEntry.name,
+              name: nextEntry.name,
               content: nextEntry.content
             })
           }
           return null
+        }
+        case 'read_recovery_state': {
+          return {
+            rootPath: 'memory://recovery',
+            origin: 'memory',
+            entries: getBrowserRecoveryEntries()
+          }
+        }
+        case 'read_recovery_draft': {
+          const sourcePath = String(payload.sourcePath || '').trim()
+          return normalizeBrowserRecoveryDraft(
+            browserRecoveryDraftStore.get(sourcePath) || null
+          )
+        }
+        case 'write_recovery_draft': {
+          const draft = normalizeBrowserRecoveryDraft({
+            ...(payload.draft || {}),
+            origin: 'memory'
+          })
+          if (!draft || !draft.sourcePath) {
+            throw new Error('恢复草稿缺少来源路径')
+          }
+          browserRecoveryDraftStore.set(draft.sourcePath, draft)
+          return draft
+        }
+        case 'clear_recovery_draft': {
+          const sourcePath = String(payload.sourcePath || '').trim()
+          const deletedCount = browserRecoveryDraftStore.delete(sourcePath)
+            ? 1
+            : 0
+          return {
+            rootPath: 'memory://recovery',
+            origin: 'memory',
+            deletedCount,
+            failedCount: 0
+          }
+        }
+        case 'clear_all_recovery_drafts': {
+          const deletedCount = browserRecoveryDraftStore.size
+          browserRecoveryDraftStore.clear()
+          return {
+            rootPath: 'memory://recovery',
+            origin: 'memory',
+            deletedCount,
+            failedCount: 0
+          }
         }
         case 'open_external_url': {
           if (typeof window !== 'undefined' && payload.url) {
@@ -265,6 +357,18 @@ const invokeCommand = async (
   }
 }
 
+const rememberPickedPath = async selectedPath => {
+  const normalizedPath = String(selectedPath || '').trim()
+  if (!normalizedPath) return
+  await invokeCommand(
+    'remember_user_selected_path',
+    {
+      path: normalizedPath
+    },
+    '登记用户选择路径失败'
+  )
+}
+
 export const desktopPlatform = {
   async readBootstrapState() {
     return invokeCommand('read_bootstrap_state', {}, '读取应用状态失败')
@@ -314,6 +418,48 @@ export const desktopPlatform = {
     )
   },
 
+  async readRecoveryState() {
+    return invokeCommand('read_recovery_state', {}, '读取恢复文件状态失败')
+  },
+
+  async readRecoveryDraft({ sourcePath } = {}) {
+    return invokeCommand(
+      'read_recovery_draft',
+      {
+        sourcePath
+      },
+      '读取恢复文件失败'
+    )
+  },
+
+  async writeRecoveryDraft(draft) {
+    return invokeCommand(
+      'write_recovery_draft',
+      {
+        draft
+      },
+      '写入恢复文件失败'
+    )
+  },
+
+  async clearRecoveryDraft({ sourcePath } = {}) {
+    return invokeCommand(
+      'clear_recovery_draft',
+      {
+        sourcePath
+      },
+      '清理恢复文件失败'
+    )
+  },
+
+  async clearAllRecoveryDrafts() {
+    return invokeCommand(
+      'clear_all_recovery_drafts',
+      {},
+      '清理恢复文件失败'
+    )
+  },
+
   async openMindMapFile(options = {}) {
     const { open } = await loadTauriModules()
     const selectedPath = await open({
@@ -330,6 +476,7 @@ export const desktopPlatform = {
     if (!selectedPath || Array.isArray(selectedPath)) {
       return null
     }
+    await rememberPickedPath(selectedPath)
     const content = await invokeCommand(
       'read_text_file',
       {
@@ -362,6 +509,7 @@ export const desktopPlatform = {
     })
     if (!selectedPath) return null
     const normalizedSelectedPath = ensureSmmFilePath(selectedPath)
+    await rememberPickedPath(normalizedSelectedPath)
     await invokeCommand(
       'write_text_file',
       {
@@ -413,6 +561,7 @@ export const desktopPlatform = {
     if (!selectedPath || Array.isArray(selectedPath)) {
       return null
     }
+    await rememberPickedPath(selectedPath)
     return {
       mode: 'desktop',
       path: selectedPath,

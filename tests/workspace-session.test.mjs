@@ -23,13 +23,15 @@ test('workspaceSession 会规范化 currentDocument', () => {
       path: 'D:/demo/test.smm',
       name: 'test.smm',
       source: 'desktop',
-      dirty: 1
+      dirty: 1,
+      isFullDataFile: true
     }),
     {
       path: 'D:/demo/test.smm',
       name: 'test.smm',
       source: 'desktop',
-      dirty: true
+      dirty: true,
+      isFullDataFile: true
     }
   )
 })
@@ -40,7 +42,8 @@ test('workspaceSession 能派生继续工作入口', () => {
       path: 'D:/demo/project.smm',
       name: 'project.smm',
       source: 'desktop',
-      dirty: true
+      dirty: true,
+      isFullDataFile: true
     }
   }
 
@@ -50,6 +53,7 @@ test('workspaceSession 能派生继续工作入口', () => {
     name: 'project.smm',
     source: 'desktop',
     dirty: true,
+    isFullDataFile: true,
     title: 'project'
   })
 })
@@ -62,7 +66,8 @@ test('workspaceSession 统一返回首页和编辑页可消费的会话状态', 
       path: 'D:/demo/a.smm',
       name: 'a.smm',
       source: 'desktop',
-      dirty: false
+      dirty: false,
+      isFullDataFile: true
     }
   })
 
@@ -71,4 +76,5 @@ test('workspaceSession 统一返回首页和编辑页可消费的会话状态', 
   assert.equal(session.hasResumeEntry, true)
   assert.equal(session.hasDirtyDraft, false)
   assert.equal(session.resumeEntry?.title, 'a')
+  assert.equal(session.currentDocument?.isFullDataFile, true)
 })

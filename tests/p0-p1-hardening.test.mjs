@@ -74,8 +74,19 @@ test('lint 入口已统一到 root flat config', () => {
 test('发布流程已接入代码签名配置入口', () => {
   assert.match(releaseWorkflowSource, /Import Windows code signing certificate/)
   assert.match(releaseWorkflowSource, /Apply Windows signing config/)
+  assert.match(releaseWorkflowSource, /id: macos_signing/)
+  assert.match(releaseWorkflowSource, /echo "enabled=false" >> "\$GITHUB_OUTPUT"/)
+  assert.match(releaseWorkflowSource, /echo "enabled=true" >> "\$GITHUB_OUTPUT"/)
   assert.match(releaseWorkflowSource, /APPLE_CERTIFICATE:/)
   assert.match(releaseWorkflowSource, /APPLE_SIGNING_IDENTITY:/)
+  assert.match(
+    releaseWorkflowSource,
+    /steps\.macos_signing\.outputs\.enabled == 'true' && secrets\.APPLE_CERTIFICATE/
+  )
+  assert.match(
+    releaseWorkflowSource,
+    /steps\.macos_signing\.outputs\.enabled == 'true' && secrets\.APPLE_SIGNING_IDENTITY/
+  )
   assert.match(releaseWorkflowSource, /security create-keychain/)
   assert.match(releaseWorkflowSource, /security import/)
   assert.match(releaseWorkflowSource, /security find-identity/)

@@ -37,7 +37,8 @@ export const normalizeWorkspaceCurrentDocument = currentDocument => {
     path,
     name: String(currentDocument.name || '').trim(),
     source: String(currentDocument.source || '').trim(),
-    dirty: !!currentDocument.dirty
+    dirty: !!currentDocument.dirty,
+    isFullDataFile: !!currentDocument.isFullDataFile
   }
 }
 

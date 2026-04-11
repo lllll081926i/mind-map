@@ -1158,7 +1158,7 @@ export default {
     },
 
     // 动态设置思维导图数据
-    async setData(data) {
+    async setData(data, options = {}) {
       this.handleShowLoading()
       if (hasExtendedNodeIcons(data)) {
         await this.ensureExtendedIconListLoaded(true)
@@ -1173,7 +1173,9 @@ export default {
         this.mindMap.setData(data)
       }
       this.mindMap?.view?.reset?.()
-      this.manualSave()
+      if (!options.skipSave) {
+        this.manualSave()
+      }
       // 如果导入的是富文本内容，那么自动开启富文本模式
       if (rootNodeData.data.richText && !this.openNodeRichText) {
         this.$bus.$emit('toggleOpenNodeRichText', true)

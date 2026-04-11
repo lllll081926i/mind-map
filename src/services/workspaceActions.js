@@ -24,6 +24,7 @@ import { getWorkspaceResumeEntry } from './workspaceSession.js'
 import { parseExternalJsonSafely } from '@/utils/json'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
+import { resolveFileContentWithRecovery } from '@/services/recoveryStorage'
 
 export const createWorkspaceTemplateData = (title = '思维导图') =>
   createDefaultMindMapData(title)
@@ -60,7 +61,10 @@ const parseMindMapContent = content => {
   if (!data || typeof data !== 'object') {
     throw new Error('文件内容不是有效的思维导图数据')
   }
-  return normalizeWorkspaceMindMapData(data)
+  return {
+    data: normalizeWorkspaceMindMapData(data),
+    isFullDataFile: !!data.root
+  }
 }
 
 const enterEditor = async router => {
@@ -82,12 +86,16 @@ export const resumeWorkspaceSession = async router => {
 }
 
 const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
-  const normalizedData = parseMindMapContent(content)
-  const recentProjectRef = createRecentProjectRef(fileRef)
+  const resolvedContent = await resolveFileContentWithRecovery(fileRef, content)
+  const normalizedData = parseMindMapContent(resolvedContent.content)
+  const recentProjectRef = {
+    ...createRecentProjectRef(fileRef),
+    isFullDataFile: normalizedData.isFullDataFile
+  }
   setCurrentFileRef(recentProjectRef, recentProjectRef.mode || 'desktop')
-  storeData(normalizedData)
+  storeData(normalizedData.data)
   setIsHandleLocalFile(true)
-  markDocumentDirty(false)
+  markDocumentDirty(!!resolvedContent.recovered)
   persistWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || ''))
   void recordRecentFile(recentProjectRef).catch(error => {
     console.warn('recordRecentFile failed', error)
@@ -96,8 +104,8 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   await enterEditor(router)
   return {
     fileRef: recentProjectRef,
-    content,
-    data: normalizedData
+    content: resolvedContent.content,
+    data: normalizedData.data
   }
 }
 

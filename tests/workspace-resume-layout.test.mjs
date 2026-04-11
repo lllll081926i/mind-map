@@ -19,6 +19,8 @@ const runtimeStoreSource = fs.readFileSync(
   path.resolve('src/stores/runtime.js'),
   'utf8'
 )
+const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8')
+const recoveryStoragePath = path.resolve('src/services/recoveryStorage.js')
 
 test('首页提供继续工作卡片并走统一恢复动作', () => {
   assert.match(homePageSource, /class="resumeCard"/)
@@ -40,4 +42,15 @@ test('editor 与 runtime store 已同步工作区派生状态', () => {
   assert.match(editorStoreSource, /syncWorkspaceSession/)
   assert.match(runtimeStoreSource, /getWorkspaceSessionState/)
   assert.match(runtimeStoreSource, /editorStore\.syncWorkspaceSession/)
+})
+
+test('应用启动时会读取恢复草稿并回填到 bootstrap 工作区状态', () => {
+  assert.equal(fs.existsSync(recoveryStoragePath), true)
+  const source = fs.readFileSync(recoveryStoragePath, 'utf8')
+
+  assert.match(source, /export\s+const\s+hydrateBootstrapStateFromRecovery/)
+  assert.match(source, /platform\.readRecoveryState\(/)
+  assert.match(source, /platform\.readRecoveryDraft\(/)
+  assert.match(source, /saveBootstrapStatePatch\(/)
+  assert.match(mainSource, /hydrateBootstrapStateFromRecovery/)
 })

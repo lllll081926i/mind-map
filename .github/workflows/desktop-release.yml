@@ -381,6 +381,7 @@ jobs:
           }
 
       - name: Prepare macOS signing environment
+        id: macos_signing
         if: matrix.os == 'macos-latest'
         shell: bash
         env:
@@ -388,6 +389,8 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD_VALUE: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY_VALUE: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+
           if [ -z "$APPLE_CERTIFICATE_B64" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD_VALUE" ] || [ -z "$APPLE_SIGNING_IDENTITY_VALUE" ]; then
             echo "macOS signing secrets are incomplete. Build will continue without codesigning."
             exit 0
@@ -443,9 +446,8 @@ jobs:
           cleanup_keychain
           trap - EXIT
 
-          echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE_B64" >> "$GITHUB_ENV"
-          echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD_VALUE" >> "$GITHUB_ENV"
-          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_VALUE" >> "$GITHUB_ENV"
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "macOS signing precheck passed. Codesigning will be enabled for this build."
 
       - name: Apply Windows signing config
         if: startsWith(matrix.os, 'windows') && env.WINDOWS_CERTIFICATE_SHA1 != ''
@@ -510,9 +512,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .
@@ -528,9 +530,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .

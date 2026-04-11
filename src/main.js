@@ -16,14 +16,17 @@ import 'element-plus/theme-chalk/el-notification.css'
 import '@/assets/icon-font/iconfont.css'
 import i18n from './i18n'
 import { Buffer } from 'buffer'
-import platform, { bootstrapPlatformState, isDesktopApp } from '@/platform'
+import platform, {
+  bootstrapPlatformState,
+  getBootstrapState,
+  isDesktopApp
+} from '@/platform'
 import pinia from '@/stores'
 import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
 import { emitBootstrapStateReady } from '@/services/appEvents'
 import legacyBus from '@/services/legacyBus'
-// import VConsole from 'vconsole'
-// const vConsole = new VConsole()
+import { hydrateBootstrapStateFromRecovery } from '@/services/recoveryStorage'
 
 let workspaceActionsPromise = null
 
@@ -162,6 +165,8 @@ const bootstrapApp = async () => {
   let bootstrapState = null
   try {
     bootstrapState = await bootstrapPlatformState()
+    await hydrateBootstrapStateFromRecovery(bootstrapState)
+    bootstrapState = getBootstrapState()
     syncRuntimeFromBootstrapState(bootstrapState)
   } catch (error) {
     console.error('bootstrapApp failed to restore platform state', error)

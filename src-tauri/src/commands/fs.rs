@@ -1,4 +1,7 @@
-use crate::services::app_fs::{self, DirectoryEntry};
+use crate::services::{
+  app_fs::{self, DirectoryEntry},
+  file_association::PendingAssociatedFiles,
+};
 
 fn validate_path_length(path: &str) -> Result<(), String> {
   if path.trim().is_empty() {
@@ -33,4 +36,14 @@ pub async fn list_directory_entries(
 ) -> Result<Vec<DirectoryEntry>, String> {
   validate_path_length(&path)?;
   app_fs::list_directory_entries(&app, &path).await
+}
+
+#[tauri::command]
+pub fn remember_user_selected_path(
+  state: tauri::State<'_, PendingAssociatedFiles>,
+  path: String,
+) -> Result<(), String> {
+  validate_path_length(&path)?;
+  state.push_paths(vec![path]);
+  Ok(())
 }

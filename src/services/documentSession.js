@@ -31,7 +31,8 @@ const syncBootstrapState = () => {
           path: sessionState.fileRef.path || '',
           name: sessionState.fileRef.name || '',
           source: sessionState.source || '',
-          dirty: !!sessionState.dirty
+          dirty: !!sessionState.dirty,
+          isFullDataFile: !!sessionState.fileRef.isFullDataFile
         }
       : null
   )
@@ -66,7 +67,8 @@ export const hydrateDocumentSession = () => {
       fileRef: {
         mode: 'desktop',
         path: currentDocument?.path || '',
-        name: currentDocument?.name || ''
+        name: currentDocument?.name || '',
+        isFullDataFile: !!currentDocument?.isFullDataFile
       },
       source: currentDocument?.source || 'desktop',
       dirty: !!currentDocument?.dirty

@@ -175,6 +175,32 @@
             </el-button>
           </div>
         </div>
+        <div class="appInfoCard recoveryInfoCard">
+          <div class="appInfoRow">
+            <span>恢复文件</span>
+            <strong>{{ recoverySummary.entries.length }} 个</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>当前目录</span>
+            <strong>{{ recoverySummary.rootPath || '未初始化' }}</strong>
+          </div>
+          <div class="appInfoRow">
+            <span>生效模式</span>
+            <strong>{{ recoverySummary.origin || '未初始化' }}</strong>
+          </div>
+          <p class="recoveryHint">
+            删除异常退出后用于恢复未保存内容的恢复文件，不影响正式文档和最近文件。
+          </p>
+          <div class="appInfoActions">
+            <el-button
+              size="small"
+              :loading="clearingRecoveryFiles"
+              @click="clearRecoveryFiles"
+            >
+              清理恢复文件
+            </el-button>
+          </div>
+        </div>
       </div>
 
       <div v-else-if="currentSection === 'font'" class="settingsSection">
@@ -273,6 +299,10 @@ import {
   checkForUpdates as runUpdateCheck
 } from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
+import {
+  clearAllRecoveryDrafts,
+  refreshRecoveryState
+} from '@/services/recoveryStorage'
 
 const AiConfigDialog = defineAsyncComponent(() =>
   import('@/pages/Edit/components/AiConfigDialog.vue')
@@ -310,7 +340,13 @@ export default {
       ],
       docConfig: defaultDocConfig(),
       checkingForUpdates: false,
+      clearingRecoveryFiles: false,
       showAiConfig: false,
+      recoverySummary: {
+        rootPath: '',
+        origin: '',
+        entries: []
+      },
       contextMenuTips: [
         '插入同级节点',
         '插入子级节点',
@@ -353,6 +389,9 @@ export default {
   created() {
     this.initDocConfig()
   },
+  mounted() {
+    void this.loadRecoverySummary()
+  },
   methods: {
     initDocConfig() {
       this.docConfig = {
@@ -373,6 +412,45 @@ export default {
         [key]: value
       }
       storeConfig(this.docConfig)
+    },
+
+    async loadRecoverySummary() {
+      try {
+        this.recoverySummary = await refreshRecoveryState()
+      } catch (error) {
+        console.error('loadRecoverySummary failed', error)
+      }
+    },
+
+    async clearRecoveryFiles() {
+      if (this.clearingRecoveryFiles) return
+      try {
+        await this.$confirm(
+          '确认清理恢复文件吗？此操作不会影响正式文档和最近文件。',
+          '清理恢复文件',
+          {
+            confirmButtonText: '清理',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+      } catch (_error) {
+        return
+      }
+      this.clearingRecoveryFiles = true
+      try {
+        const result = await clearAllRecoveryDrafts()
+        this.recoverySummary = await refreshRecoveryState()
+        this.$message.success(
+          `已清理 ${result?.deletedCount || 0} 个恢复文件，失败 ${
+            result?.failedCount || 0
+          } 个`
+        )
+      } catch (error) {
+        this.$message.error(error?.message || '清理恢复文件失败')
+      } finally {
+        this.clearingRecoveryFiles = false
+      }
     },
 
     async checkForUpdates() {
@@ -571,6 +649,14 @@ export default {
   padding: 18px;
 }
 
+.recoveryInfoCard {
+  strong {
+    max-width: 70%;
+    text-align: right;
+    word-break: break-all;
+  }
+}
+
 .appInfoRow,
 .shortcutRow {
   display: flex;
@@ -582,6 +668,13 @@ export default {
 
 .appInfoActions {
   padding-top: 12px;
+}
+
+.recoveryHint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(15, 23, 42, 0.62);
 }
 
 .shortcutRow code {

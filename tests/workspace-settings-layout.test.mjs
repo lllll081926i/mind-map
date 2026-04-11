@@ -23,3 +23,12 @@ test('首页设置页复用现有应用级设置项', () => {
   assert.match(source, /是否允许直接拖拽文件到页面进行导入/)
   assert.match(source, /是否开启AI功能/)
 })
+
+test('首页设置页提供恢复文件状态与清理入口', () => {
+  const source = fs.readFileSync(settingsPagePath, 'utf8')
+
+  assert.match(source, /恢复文件/)
+  assert.match(source, /清理恢复文件/)
+  assert.match(source, /recoverySummary/)
+  assert.match(source, /clearRecoveryFiles/)
+})
