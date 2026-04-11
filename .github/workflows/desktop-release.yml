@@ -507,14 +507,14 @@ jobs:
               })
             }
 
-      - name: Build desktop bundles for release
-        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id != ''
+      - name: Build desktop bundles for release with macOS codesigning
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id != '' && matrix.os == 'macos-latest' && steps.macos_signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .
@@ -525,14 +525,42 @@ jobs:
           uploadPlainBinary: ${{ matrix.upload_plain_binary }}
           includeUpdaterJson: false
 
-      - name: Build desktop bundles for workflow artifacts
-        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id == ''
+      - name: Build desktop bundles for release without macOS codesigning
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id != '' && (matrix.os != 'macos-latest' || steps.macos_signing.outputs.enabled != 'true')
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ steps.macos_signing.outputs.enabled == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+          releaseId: ${{ needs.create_release.outputs.release_id }}
+          tagName: ${{ needs.create_release.outputs.tag_name }}
+          assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          uploadPlainBinary: ${{ matrix.upload_plain_binary }}
+          includeUpdaterJson: false
+
+      - name: Build desktop bundles for workflow artifacts with macOS codesigning
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id == '' && matrix.os == 'macos-latest' && steps.macos_signing.outputs.enabled == 'true'
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+          assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          uploadPlainBinary: ${{ matrix.upload_plain_binary }}
+          includeUpdaterJson: false
+
+      - name: Build desktop bundles for workflow artifacts without macOS codesigning
+        if: matrix.portable_asset_suffix == '' && needs.create_release.outputs.release_id == '' && (matrix.os != 'macos-latest' || steps.macos_signing.outputs.enabled != 'true')
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_DMG_IGNORE_CI: ${{ matrix.dmg_ignore_ci || '' }}
         with:
           projectPath: .

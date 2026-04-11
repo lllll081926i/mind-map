@@ -77,15 +77,34 @@ test('发布流程已接入代码签名配置入口', () => {
   assert.match(releaseWorkflowSource, /id: macos_signing/)
   assert.match(releaseWorkflowSource, /echo "enabled=false" >> "\$GITHUB_OUTPUT"/)
   assert.match(releaseWorkflowSource, /echo "enabled=true" >> "\$GITHUB_OUTPUT"/)
-  assert.match(releaseWorkflowSource, /APPLE_CERTIFICATE:/)
-  assert.match(releaseWorkflowSource, /APPLE_SIGNING_IDENTITY:/)
   assert.match(
     releaseWorkflowSource,
-    /steps\.macos_signing\.outputs\.enabled == 'true' && secrets\.APPLE_CERTIFICATE/
+    /Build desktop bundles for release with macOS codesigning/
   )
   assert.match(
     releaseWorkflowSource,
-    /steps\.macos_signing\.outputs\.enabled == 'true' && secrets\.APPLE_SIGNING_IDENTITY/
+    /Build desktop bundles for release without macOS codesigning/
+  )
+  assert.match(
+    releaseWorkflowSource,
+    /Build desktop bundles for workflow artifacts with macOS codesigning/
+  )
+  assert.match(
+    releaseWorkflowSource,
+    /Build desktop bundles for workflow artifacts without macOS codesigning/
+  )
+  assert.match(
+    releaseWorkflowSource,
+    /matrix\.os == 'macos-latest' && steps\.macos_signing\.outputs\.enabled == 'true'/
+  )
+  assert.match(
+    releaseWorkflowSource,
+    /\(matrix\.os != 'macos-latest' \|\| steps\.macos_signing\.outputs\.enabled != 'true'\)/
+  )
+  assert.match(releaseWorkflowSource, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/)
+  assert.match(
+    releaseWorkflowSource,
+    /APPLE_SIGNING_IDENTITY: \$\{\{ secrets\.APPLE_SIGNING_IDENTITY \}\}/
   )
   assert.match(releaseWorkflowSource, /security create-keychain/)
   assert.match(releaseWorkflowSource, /security import/)
