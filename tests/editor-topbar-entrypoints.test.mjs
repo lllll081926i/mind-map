@@ -7,6 +7,10 @@ const toolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Toolbar.vue'),
   'utf8'
 )
+const searchSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Search.vue'),
+  'utf8'
+)
 const editIndexSource = fs.readFileSync(
   path.resolve('src/pages/Edit/Index.vue'),
   'utf8'
@@ -34,4 +38,37 @@ test('编辑页页面级入口合并到主工具栏，不再使用独立悬浮�
   assert.match(toolbarSource, /toolbar\.import/)
   assert.match(toolbarSource, /toolbar\.exportCenter/)
   assert.match(toolbarSource, /toolbar\.returnHome/)
+})
+
+test('编辑页顶部工具栏新增工作流状态区、搜索入口与快捷键入口', () => {
+  assert.match(toolbarSource, /class="toolbarStatus"/)
+  assert.match(toolbarSource, /class="toolbarQuickActions"/)
+  assert.match(toolbarSource, /toolbar\.searchAction/)
+  assert.match(toolbarSource, /toolbar\.shortcutAction/)
+  assert.match(toolbarSource, /toolbar\.statusSaved/)
+  assert.match(toolbarSource, /toolbar\.statusAutosaving/)
+  assert.match(toolbarSource, /toolbar\.statusRecovered/)
+  assert.match(toolbarSource, /emitShowSearch\(\)/)
+  assert.match(toolbarSource, /setActiveSidebar\('shortcutKey'\)/)
+})
+
+test('编辑页在切换上下文前会对未保存风险给出确认', () => {
+  assert.match(toolbarSource, /async confirmPotentialDataLoss\(/)
+  assert.match(toolbarSource, /toolbar\.leaveConfirmTitle/)
+  assert.match(toolbarSource, /toolbar\.leaveConfirmMessage/)
+  assert.match(toolbarSource, /await this\.confirmPotentialDataLoss\('returnHome'\)/)
+  assert.match(toolbarSource, /await this\.confirmPotentialDataLoss\('openFile'\)/)
+  assert.match(toolbarSource, /await this\.confirmPotentialDataLoss\('newFile'\)/)
+})
+
+test('搜索面板新增结果摘要、上下跳转与当前结果高亮', () => {
+  assert.match(searchSource, /class="searchTips"/)
+  assert.match(searchSource, /class="searchActions"/)
+  assert.match(searchSource, /class="resultSummary"/)
+  assert.match(searchSource, /class="searchResultItem"/)
+  assert.match(searchSource, /active:\s*activeResultIndex === index/)
+  assert.match(searchSource, /search\.resultsSummary/)
+  assert.match(searchSource, /search\.usageHint/)
+  assert.match(searchSource, /jumpToPrevResult\(\)/)
+  assert.match(searchSource, /jumpToNextResult\(\)/)
 })
