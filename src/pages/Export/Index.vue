@@ -37,6 +37,18 @@
               <span class="tagExtension">.{{ currentFileExtension }}</span>
             </div>
 
+            <div class="statusMetaList">
+              <div class="statusMetaItem">
+                <span>{{ $t('exportPage.currentDocumentLabel') }}</span>
+                <strong>{{ currentDocumentName }}</strong>
+              </div>
+              <div class="statusMetaItem">
+                <span>{{ $t('exportPage.rememberedLabel') }}</span>
+                <strong>{{ rememberedSummary }}</strong>
+              </div>
+            </div>
+            <p class="rememberedTip">{{ $t('exportPage.rememberedTip') }}</p>
+
             <div class="settingGroup">
               <label class="settingLabel" for="exportFileName">{{
                 $t('exportPage.fileName')
@@ -132,6 +144,7 @@
           <aside class="previewPanel" v-loading="previewLoading">
             <div class="previewTitle">{{ $t('exportPage.preview') }}</div>
             <div class="previewHeader">{{ $t('exportPage.previewDesc') }}</div>
+            <div class="previewWarmupHint">{{ $t('exportPage.warmupHint') }}</div>
             <div class="previewSurface">
               <div ref="previewRef" class="previewCanvas"></div>
             </div>
@@ -160,14 +173,16 @@ import { getConfig, getData } from '@/api'
 import { ensureBootstrapDocumentState } from '@/platform'
 import { getCurrentFileRef } from '@/services/documentSession'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
+import { useEditorStore } from '@/stores/editor'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { sanitizeFileName } from '@/utils'
 import {
-  createExportStateFromFileRef,
   getDesktopExportFormats,
   getResolvedExportType,
   isExportFormatDisabled,
+  persistExportStateSnapshot,
+  restorePersistedExportState,
   resolveExportContext
 } from '@/services/exportState'
 import defaultNodeImage from '@/assets/img/图片加载失败.svg'
@@ -344,6 +359,7 @@ const loadRichTextPlugins = async () => {
 export default {
   data() {
     const exportContext = resolveExportContext(getCurrentFileRef())
+    const exportState = restorePersistedExportState(exportContext.fileRef)
     return {
       previewLoading: true,
       exporting: false,
@@ -355,14 +371,18 @@ export default {
       },
       extendedIconList: [],
       exportContext,
-      exportState: createExportStateFromFileRef(exportContext.fileRef),
+      exportState,
       boundPreviewResize: null,
-      previewResizeFrame: 0
+      previewResizeFrame: 0,
+      exportWarmupTimer: 0
     }
   },
   computed: {
     ...mapState(useThemeStore, {
       isDark: 'isDark'
+    }),
+    ...mapState(useEditorStore, {
+      currentDocument: 'currentDocument'
     }),
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
@@ -429,6 +449,19 @@ export default {
         this.showFitBgOption
       ].some(Boolean)
     },
+    rememberedSummary() {
+      const summaryList = [
+        this.currentFormat.displayName,
+        `.${this.currentFileExtension}`
+      ]
+      if (this.showConfigOption && this.exportState.withConfig) {
+        summaryList.push(this.$t('exportPage.includeConfig'))
+      }
+      if (this.showTransparentOption && this.exportState.isTransparent) {
+        summaryList.push(this.$t('exportPage.transparentBg'))
+      }
+      return summaryList.join(' / ')
+    },
     statusText() {
       if (this.isDisabledFormat) {
         return this.$t('exportPage.statusDisabled')
@@ -439,16 +472,44 @@ export default {
       return this.$t('exportPage.statusReady', {
         extension: this.currentFileExtension
       })
+    },
+    currentDocumentName() {
+      return (
+        this.currentDocument?.name ||
+        this.exportContext.fileRef?.name ||
+        `${this.exportContext.fileName}.smm`
+      )
+    }
+  },
+  watch: {
+    exportState: {
+      deep: true,
+      handler() {
+        persistExportStateSnapshot({
+          ...this.exportState,
+          fileRef: this.exportContext.fileRef
+        })
+      }
+    },
+    'exportState.exportType'() {
+      this.scheduleExportWarmup()
+    },
+    'exportState.imageFormat'() {
+      if (this.exportState.exportType === 'png') {
+        this.scheduleExportWarmup()
+      }
     }
   },
   async mounted() {
     this.bindPreviewResize()
+    this.scheduleExportWarmup()
     await ensureBootstrapDocumentState()
     await this.initPreview()
   },
   beforeUnmount() {
     this.unbindPreviewResize()
     this.clearPreviewResizeFrame()
+    this.clearExportWarmupTask()
     if (this.mindMap) {
       this.mindMap.destroy()
       this.mindMap = null
@@ -499,6 +560,28 @@ export default {
       }
       this.boundPreviewResize = () => this.syncPreviewViewport()
       window.addEventListener('resize', this.boundPreviewResize)
+    },
+
+    clearExportWarmupTask() {
+      if (!this.exportWarmupTimer) {
+        return
+      }
+      clearTimeout(this.exportWarmupTimer)
+      this.exportWarmupTimer = 0
+    },
+
+    scheduleExportWarmup() {
+      this.clearExportWarmupTask()
+      this.exportWarmupTimer = window.setTimeout(() => {
+        this.exportWarmupTimer = 0
+        const resolvedType =
+          this.exportState.exportType === 'png'
+            ? this.exportState.imageFormat
+            : getResolvedExportType(this.exportState.exportType)
+        void this.ensureExportPluginsInstalled(resolvedType).catch(error => {
+          console.warn('scheduleExportWarmup failed', error)
+        })
+      }, 120)
     },
 
     unbindPreviewResize() {
@@ -697,6 +780,7 @@ export default {
         this.$notify.success({
           title: this.$t('exportPage.exportDoneTitle'),
           message: this.$t('exportPage.exportDoneMessage', {
+            fileName: safeFileName,
             extension: this.currentFileExtension
           })
         })
@@ -740,10 +824,13 @@ export default {
     .settingLabel,
     .infoText,
     .previewHeader,
+    .previewWarmupHint,
     .previewHint,
     .statusText,
     .inputSuffix,
-    .emptyOption {
+    .emptyOption,
+    .rememberedTip,
+    .statusMetaItem span {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
@@ -757,6 +844,12 @@ export default {
 
     .previewPanel {
       background: #171b22;
+    }
+
+    .statusMetaItem,
+    .previewWarmupHint {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.08);
     }
 
     .previewSurface {
@@ -963,6 +1056,40 @@ export default {
   margin-bottom: 32px;
 }
 
+.statusMetaList {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.statusMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(15, 23, 42, 0.02);
+
+  span {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  strong {
+    font-size: 13px;
+    color: #111827;
+    word-break: break-all;
+  }
+}
+
+.rememberedTip {
+  margin-bottom: 28px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
 .settingGroup.nested {
   margin-top: 16px;
   margin-bottom: 0;
@@ -1056,6 +1183,16 @@ export default {
   font-size: 13px;
   color: #9ca3af;
   margin-bottom: 8px;
+}
+
+.previewWarmupHint {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(15, 23, 42, 0.02);
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .previewSurface {

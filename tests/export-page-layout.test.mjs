@@ -37,6 +37,9 @@ test('独立导出页包含文件名、说明、选项与导出操作区', () =>
   assert.match(source, /class="previewSurface"/)
   assert.match(source, /\$t\('exportPage\.preview'\)/)
   assert.match(source, /\$t\('exportPage\.previewDesc'\)/)
+  assert.match(source, /class="statusMetaList"/)
+  assert.match(source, /\$t\('exportPage\.currentDocumentLabel'\)/)
+  assert.match(source, /\$t\('exportPage\.rememberedLabel'\)/)
 })
 
 test('导出弹窗仅通过遮罩关闭，不再保留右上角按钮或 Esc 关闭', () => {
@@ -82,4 +85,21 @@ test('导出预览区扩大可视面积并允许拖动缩放预览', () => {
   assert.doesNotMatch(source, /pointer-events:\s*none/)
   assert.match(source, /cursor:\s*grab/)
   assert.doesNotMatch(source, /class="previewHint"/)
+})
+
+test('导出页会记住上次导出选项并预热当前格式的导出插件', () => {
+  const source = fs.readFileSync(exportPagePath, 'utf8')
+
+  assert.match(source, /restorePersistedExportState/)
+  assert.match(source, /persistExportStateSnapshot/)
+  assert.match(source, /rememberedSummary/)
+  assert.match(source, /\$t\('exportPage\.rememberedTip'\)/)
+  assert.match(source, /scheduleExportWarmup\(\)/)
+})
+
+test('导出完成反馈会包含文件名和扩展名', () => {
+  const source = fs.readFileSync(exportPagePath, 'utf8')
+
+  assert.match(source, /\$t\('exportPage\.exportDoneMessage',\s*\{\s*fileName:/)
+  assert.match(source, /extension:\s*this\.currentFileExtension/)
 })
