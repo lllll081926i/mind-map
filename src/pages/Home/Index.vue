@@ -98,6 +98,28 @@
           </div>
         </section>
 
+        <section class="workspaceSignals">
+          <div class="sectionHeader">
+            <h2>{{ $t('home.workspaceSignalsTitle') }}</h2>
+          </div>
+          <div class="signalGrid">
+            <article class="signalCard">
+              <span>{{ $t('home.signalResumeTitle') }}</span>
+              <strong>{{ resumeSignalValue }}</strong>
+            </article>
+            <article class="signalCard">
+              <span>{{ $t('home.signalRecentTitle') }}</span>
+              <strong>
+                {{ $t('home.signalRecentValue', { count: recentFiles.length }) }}
+              </strong>
+            </article>
+            <article class="signalCard">
+              <span>{{ $t('home.signalDirectoryTitle') }}</span>
+              <strong>{{ lastDirectory || $t('home.signalDirectoryEmpty') }}</strong>
+            </article>
+          </div>
+        </section>
+
         <header class="mainHeader">
           <h2>{{ $t('home.recentTitle') }}</h2>
           <button
@@ -138,6 +160,61 @@
           </svg>
           <p>{{ $t('home.emptyTitle') }}</p>
         </div>
+
+        <section class="quickStartSection">
+          <div class="sectionHeader">
+            <h2>{{ $t('home.quickStartTitle') }}</h2>
+          </div>
+          <div class="quickStartList">
+            <article class="quickStartCard">
+              <div>
+                <strong>{{ $t('home.quickStartCreateTitle') }}</strong>
+                <p>{{ $t('home.quickStartCreateDesc') }}</p>
+              </div>
+              <button type="button" class="inlineActionButton" @click="createBlankProject">
+                {{ $t('home.createNew') }}
+              </button>
+            </article>
+            <article class="quickStartCard">
+              <div>
+                <strong>{{ $t('home.quickStartEditTitle') }}</strong>
+                <p>{{ $t('home.quickStartEditDesc') }}</p>
+              </div>
+              <button type="button" class="inlineActionButton" @click="openLocalFile">
+                {{ $t('home.openLocalFile') }}
+              </button>
+            </article>
+            <article class="quickStartCard">
+              <div>
+                <strong>{{ $t('home.quickStartExportTitle') }}</strong>
+                <p>{{ $t('home.quickStartExportDesc') }}</p>
+              </div>
+              <button type="button" class="inlineActionButton" @click="openExportCenter">
+                {{ $t('home.quickStartExportTitle') }}
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <section class="experienceSection">
+          <div class="sectionHeader">
+            <h2>{{ $t('home.experienceTipsTitle') }}</h2>
+          </div>
+          <div class="experienceGrid">
+            <article class="experienceCard">
+              <strong>{{ $t('home.searchTipTitle') }}</strong>
+              <p>{{ $t('home.searchTipDesc') }}</p>
+            </article>
+            <article class="experienceCard">
+              <strong>{{ $t('home.exportTipTitle') }}</strong>
+              <p>{{ $t('home.exportTipDesc') }}</p>
+            </article>
+            <article class="experienceCard">
+              <strong>{{ $t('home.recoveryTipTitle') }}</strong>
+              <p>{{ $t('home.recoveryTipDesc') }}</p>
+            </article>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -167,7 +244,8 @@ export default {
     return {
       busy: false,
       homeRefreshFrame: 0,
-      homeRefreshTimer: 0
+      homeRefreshTimer: 0,
+      workspaceWarmupTimer: 0
     }
   },
   computed: {
@@ -180,13 +258,20 @@ export default {
     }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
-    })
+    }),
+    resumeSignalValue() {
+      return this.hasResumeEntry
+        ? this.$t('home.signalResumeReady')
+        : this.$t('home.signalResumeEmpty')
+    }
   },
   mounted() {
     this.scheduleRefreshHomeData()
+    this.scheduleWarmupWorkspaceActions()
   },
   beforeUnmount() {
     this.clearHomeRefreshTask()
+    this.clearWorkspaceWarmupTask()
   },
   methods: {
     clearHomeRefreshTask() {
@@ -200,6 +285,13 @@ export default {
       }
     },
 
+    clearWorkspaceWarmupTask() {
+      if (this.workspaceWarmupTimer) {
+        clearTimeout(this.workspaceWarmupTimer)
+        this.workspaceWarmupTimer = 0
+      }
+    },
+
     scheduleRefreshHomeData() {
       this.clearHomeRefreshTask()
       this.homeRefreshFrame = requestAnimationFrame(() => {
@@ -209,6 +301,16 @@ export default {
           void this.refreshHomeData()
         }, 80)
       })
+    },
+
+    scheduleWarmupWorkspaceActions() {
+      this.clearWorkspaceWarmupTask()
+      this.workspaceWarmupTimer = window.setTimeout(() => {
+        this.workspaceWarmupTimer = 0
+        void loadWorkspaceActions().catch(error => {
+          console.warn('warmup workspace actions failed', error)
+        })
+      }, 160)
     },
 
     async refreshHomeData() {
@@ -291,7 +393,33 @@ export default {
       })
     },
 
+    async openExportCenter() {
+      if (!this.hasResumeEntry) {
+        this.$message.info(this.$t('home.continueEmpty'))
+        return
+      }
+      await this.runWorkspaceAction(async () => {
+        const { resumeWorkspaceSession } = await loadWorkspaceActions()
+        const result = await resumeWorkspaceSession(this.$router)
+        if (result) {
+          await this.$router.push('/export')
+        }
+      })
+    },
+
     async clearRecents() {
+      if (this.recentFiles.length <= 0) return
+      try {
+        await this.$confirm(
+          this.$t('home.clearRecentsConfirmMessage'),
+          this.$t('home.clearRecentsConfirmTitle'),
+          {
+            type: 'warning'
+          }
+        )
+      } catch (_error) {
+        return
+      }
       await this.runWorkspaceAction(async () => {
         const { clearWorkspaceRecentFiles } = await loadWorkspaceActions()
         await clearWorkspaceRecentFiles()
@@ -334,10 +462,14 @@ export default {
     .resumeMain span,
     .resumeMain .resumeHint,
     .resumeEmpty p,
+    .signalCard span,
+    .signalCard strong,
     .recentMain span,
     .recentMeta,
     .textButton,
-    .emptyState p {
+    .emptyState p,
+    .quickStartCard p,
+    .experienceCard p {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
@@ -368,10 +500,14 @@ export default {
 
     .actionText strong,
     .resumeHeader h2,
+    .sectionHeader h2,
     .resumeMain strong,
     .resumeAction,
     .mainHeader h2,
     .recentMain strong,
+    .quickStartCard strong,
+    .experienceCard strong,
+    .inlineActionButton,
     .textButton:hover:not(:disabled) {
       color: hsla(0, 0%, 100%, 0.92);
     }
@@ -392,6 +528,20 @@ export default {
 
     .resumeEmpty {
       border-color: hsla(0, 0%, 100%, 0.1);
+    }
+
+    .signalCard,
+    .quickStartCard,
+    .experienceCard {
+      background: rgba(255, 255, 255, 0.02);
+      border-color: hsla(0, 0%, 100%, 0.08);
+    }
+
+    .signalCard:hover,
+    .quickStartCard:hover,
+    .experienceCard:hover {
+      border-color: hsla(0, 0%, 100%, 0.14);
+      background: rgba(255, 255, 255, 0.04);
     }
 
     .dirtyBadge {
@@ -572,10 +722,11 @@ export default {
   display: flex;
   flex-direction: column;
   background: #fff;
+  gap: 32px;
 }
 
 .resumeSection {
-  margin-bottom: 32px;
+  margin-bottom: 0;
 }
 
 .resumeHeader {
@@ -675,7 +826,7 @@ export default {
   align-items: center;
   padding-bottom: 16px;
   border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 32px;
+  margin-bottom: 0;
 
   h2 {
     font-size: 16px;
@@ -706,6 +857,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: -20px;
 }
 
 .recentItem {
@@ -766,7 +918,7 @@ export default {
 }
 
 .emptyState {
-  flex: 1;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -790,6 +942,130 @@ export default {
   }
 }
 
+.sectionHeader {
+  margin-bottom: 12px;
+
+  h2 {
+    font-size: 16px;
+    font-weight: 500;
+    color: #111827;
+  }
+}
+
+.workspaceSignals,
+.quickStartSection,
+.experienceSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.signalGrid,
+.quickStartList,
+.experienceGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.signalGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.quickStartList,
+.experienceGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.signalCard,
+.quickStartCard,
+.experienceCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  padding: 16px 18px;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.signalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  span {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  strong {
+    font-size: 14px;
+    color: #111827;
+    word-break: break-all;
+  }
+}
+
+.quickStartCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+
+  strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #111827;
+  }
+
+  p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #6b7280;
+  }
+}
+
+.experienceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  strong {
+    font-size: 14px;
+    color: #111827;
+  }
+
+  p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #6b7280;
+  }
+}
+
+.inlineActionButton {
+  align-self: flex-start;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+    background: #f9fafb;
+  }
+}
+
 @media (max-width: 980px) {
   .workspaceShell {
     flex-direction: column;
@@ -799,6 +1075,12 @@ export default {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
+  }
+
+  .signalGrid,
+  .quickStartList,
+  .experienceGrid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -821,6 +1103,10 @@ export default {
   .resumeCard {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .workspaceMain {
+    gap: 24px;
   }
 }
 </style>
