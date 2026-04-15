@@ -170,8 +170,9 @@
 <script>
 import { mapState } from 'pinia'
 import { getConfig, getData } from '@/api'
-import { ensureBootstrapDocumentState } from '@/platform'
-import { getCurrentFileRef } from '@/services/documentSession'
+import platform, { ensureBootstrapDocumentState } from '@/platform'
+import { getCurrentFileRef, getLastDirectory } from '@/services/documentSession'
+import { buildMindMapHtmlDocument } from '@/services/htmlExport'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
 import { useEditorStore } from '@/stores/editor'
 import { useSettingsStore } from '@/stores/settings'
@@ -739,7 +740,24 @@ export default {
           exportPaddingX: Number(this.exportState.paddingX) || 0,
           exportPaddingY: Number(this.exportState.paddingY) || 0
         })
-        if (['smm', 'json'].includes(this.exportState.exportType)) {
+        if (this.exportState.exportType === 'html') {
+          const svgMarkup = await this.mindMap.export('svg', false, safeFileName)
+          const htmlContent = buildMindMapHtmlDocument({
+            fileName: safeFileName,
+            svgMarkup
+          })
+          const fileRef = await platform.saveTextFileAs({
+            suggestedName: safeFileName,
+            content: htmlContent,
+            defaultPath: getLastDirectory(),
+            extension: 'html',
+            name: 'HTML',
+            mimeType: 'text/html;charset=utf-8'
+          })
+          if (!fileRef) {
+            return
+          }
+        } else if (['smm', 'json'].includes(this.exportState.exportType)) {
           await this.mindMap.export(
             resolvedType,
             true,

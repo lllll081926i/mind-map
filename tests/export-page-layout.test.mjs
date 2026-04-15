@@ -97,6 +97,32 @@ test('导出页会记住上次导出选项并预热当前格式的导出插件',
   assert.match(source, /scheduleExportWarmup\(\)/)
 })
 
+test('HTML 导出格式已启用并走独立 HTML 生成链路', () => {
+  const exportPageSource = fs.readFileSync(exportPagePath, 'utf8')
+  const exportStateSource = fs.readFileSync(
+    path.resolve('src/services/exportState.js'),
+    'utf8'
+  )
+  const htmlFormatBlock =
+    exportStateSource.match(
+      /\{\s*name:\s*'HTML'[\s\S]*?type:\s*'html'[\s\S]*?\}/
+    )?.[0] || ''
+
+  assert.match(exportStateSource, /type:\s*'html'/)
+  assert.equal(htmlFormatBlock.includes('disabled: true'), false)
+  assert.match(exportPageSource, /from '@\/services\/htmlExport'/)
+  assert.match(
+    exportPageSource,
+    /if \(this\.exportState\.exportType === 'html'\)/
+  )
+  assert.match(
+    exportPageSource,
+    /await this\.mindMap\.export\(\s*'svg'\s*,\s*false\s*,\s*safeFileName/
+  )
+  assert.match(exportPageSource, /buildMindMapHtmlDocument\(/)
+  assert.match(exportPageSource, /saveTextFileAs\(/)
+})
+
 test('导出完成反馈会包含文件名和扩展名', () => {
   const source = fs.readFileSync(exportPagePath, 'utf8')
 

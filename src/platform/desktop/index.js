@@ -87,9 +87,25 @@ const createBrowserFilePath = name => {
   return `memory://${Date.now()}-${Math.random().toString(36).slice(2)}/${safeName}`
 }
 
+const normalizeFileExtension = extension => {
+  const normalized = String(extension || '')
+    .trim()
+    .replace(/^\.+/, '')
+    .toLowerCase()
+  return normalized || 'txt'
+}
+
 export const normalizeSaveName = suggestedName => {
   const baseName = String(suggestedName || '思维导图').trim() || '思维导图'
   return /\.smm$/i.test(baseName) ? baseName : `${baseName}.smm`
+}
+
+export const saveTextFileName = (suggestedName, extension = 'txt') => {
+  const normalizedExtension = normalizeFileExtension(extension)
+  const baseName = String(suggestedName || '思维导图').trim() || '思维导图'
+  return new RegExp(`\\.${normalizedExtension}$`, 'i').test(baseName)
+    ? baseName
+    : `${baseName}.${normalizedExtension}`
 }
 
 export const ensureSmmFilePath = filePath => {
@@ -102,17 +118,15 @@ export const ensureSmmFilePath = filePath => {
     : `${normalizedPath}.smm`
 }
 
-export const buildDesktopSaveDefaultPath = ({
+export const buildGenericSaveDefaultPath = ({
   defaultPath,
-  suggestedName
+  suggestedName,
+  extension = 'txt'
 } = {}) => {
-  const normalizedName = normalizeSaveName(suggestedName)
+  const normalizedName = saveTextFileName(suggestedName, extension)
   const normalizedDefaultPath = String(defaultPath || '').trim()
   if (!normalizedDefaultPath) {
     return normalizedName
-  }
-  if (/\.smm$/i.test(normalizedDefaultPath)) {
-    return ensureSmmFilePath(normalizedDefaultPath)
   }
   const sanitizedBasePath = normalizedDefaultPath.replace(/[\\/]+$/, '')
   if (!sanitizedBasePath) {
@@ -120,9 +134,41 @@ export const buildDesktopSaveDefaultPath = ({
   }
   const lastBackwardSlashIndex = sanitizedBasePath.lastIndexOf('\\')
   const lastForwardSlashIndex = sanitizedBasePath.lastIndexOf('/')
+  const lastSeparatorIndex = Math.max(
+    lastBackwardSlashIndex,
+    lastForwardSlashIndex
+  )
+  const trailingSegment =
+    lastSeparatorIndex >= 0
+      ? sanitizedBasePath.slice(lastSeparatorIndex + 1)
+      : sanitizedBasePath
+  const hasFileExtension = /\.[^./\\]+$/.test(trailingSegment)
+  if (hasFileExtension) {
+    if (lastSeparatorIndex < 0) {
+      return normalizedName
+    }
+    const parentPath = sanitizedBasePath.slice(0, lastSeparatorIndex)
+    if (!parentPath) {
+      return normalizedName
+    }
+    const separator =
+      lastBackwardSlashIndex > lastForwardSlashIndex ? '\\' : '/'
+    return `${parentPath}${separator}${normalizedName}`
+  }
   const separator =
     lastBackwardSlashIndex > lastForwardSlashIndex ? '\\' : '/'
   return `${sanitizedBasePath}${separator}${normalizedName}`
+}
+
+export const buildDesktopSaveDefaultPath = ({
+  defaultPath,
+  suggestedName
+} = {}) => {
+  return buildGenericSaveDefaultPath({
+    defaultPath,
+    suggestedName: normalizeSaveName(suggestedName),
+    extension: 'smm'
+  })
 }
 
 const normalizeInvokeErrorMessage = (error, fallbackMessage) => {
@@ -158,10 +204,10 @@ const pickBrowserFile = ({ accept = '' } = {}) => {
   })
 }
 
-const downloadBrowserFile = ({ name, content }) => {
+const downloadBrowserFile = ({ name, content, mimeType }) => {
   if (typeof document === 'undefined') return
   const blob = new Blob([content], {
-    type: 'application/json;charset=utf-8'
+    type: mimeType || 'text/plain;charset=utf-8'
   })
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
@@ -195,12 +241,16 @@ const createBrowserTauriModules = () => {
           const path = payload.path
           const currentEntry = getBrowserFileEntry(path) || {
             name: getFileName(path),
-            content: ''
+            content: '',
+            mimeType: 'text/plain;charset=utf-8'
           }
           const nextEntry = {
             ...currentEntry,
             content: String(payload.content || ''),
-            pendingDownload: !!currentEntry.pendingDownload
+            pendingDownload: !!currentEntry.pendingDownload,
+            mimeType:
+              String(payload.mimeType || currentEntry.mimeType || '').trim() ||
+              'text/plain;charset=utf-8'
           }
           const shouldDownload =
             currentEntry.pendingDownload || nextEntry.pendingDownload
@@ -208,7 +258,8 @@ const createBrowserTauriModules = () => {
           if (shouldDownload) {
             downloadBrowserFile({
               name: nextEntry.name,
-              content: nextEntry.content
+              content: nextEntry.content,
+              mimeType: nextEntry.mimeType
             })
           }
           return null
@@ -289,17 +340,22 @@ const createBrowserTauriModules = () => {
       return path
     },
     save: async options => {
-      const name = getFileName(
-        buildDesktopSaveDefaultPath({
-          defaultPath: options?.defaultPath,
-          suggestedName: options?.suggestedName
-        })
+      const extension =
+        options?.filters && Array.isArray(options.filters)
+          ? options.filters[0]?.extensions?.[0]
+          : ''
+      const fallbackName = saveTextFileName(
+        options?.suggestedName || 'mind-map',
+        extension || 'txt'
       )
+      const targetPath = String(options?.defaultPath || '').trim() || fallbackName
+      const name = getFileName(targetPath) || fallbackName
       const path = createBrowserFilePath(name)
       setBrowserFileEntry(path, {
         name,
         content: '',
-        pendingDownload: true
+        pendingDownload: true,
+        mimeType: 'text/plain;charset=utf-8'
       })
       return path
     }
@@ -517,6 +573,53 @@ export const desktopPlatform = {
         content
       },
       '保存思维导图文件失败'
+    )
+    return {
+      mode: 'desktop',
+      path: normalizedSelectedPath,
+      name: getFileName(normalizedSelectedPath)
+    }
+  },
+
+  async saveTextFileAs({
+    suggestedName,
+    content,
+    defaultPath,
+    extension = 'txt',
+    name = '文本文件',
+    mimeType = 'text/plain;charset=utf-8'
+  }) {
+    const normalizedExtension = normalizeFileExtension(extension)
+    const normalizedName = saveTextFileName(suggestedName, normalizedExtension)
+    const { save } = await loadTauriModules()
+    const selectedPath = await save({
+      defaultPath: buildGenericSaveDefaultPath({
+        defaultPath,
+        suggestedName: normalizedName,
+        extension: normalizedExtension
+      }),
+      suggestedName: normalizedName,
+      filters: [
+        {
+          name,
+          extensions: [normalizedExtension]
+        }
+      ]
+    })
+    if (!selectedPath) return null
+    const normalizedSelectedPath = saveTextFileName(
+      selectedPath,
+      normalizedExtension
+    )
+    await rememberPickedPath(normalizedSelectedPath)
+    await invokeCommand(
+      'write_text_file',
+      {
+        path: normalizedSelectedPath,
+        content,
+        mimeType
+      },
+      '保存文本文件失败'
     )
     return {
       mode: 'desktop',

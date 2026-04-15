@@ -1,5 +1,6 @@
 import { downTypeList } from '@/config'
 import { createExportContext } from '@/services/workspaceProjectModel'
+import { parseExternalJsonSafely } from '@/utils/json'
 
 const EXPORT_STATE_STORAGE_KEY = 'mind-map.desktop.export-state.v1'
 const PERSISTED_EXPORT_FIELDS = [
@@ -24,8 +25,7 @@ const baseFormats = [
   {
     name: 'HTML',
     type: 'html',
-    desc: '桌面版 HTML 导出即将支持',
-    disabled: true
+    desc: '单文件 HTML，只读浏览，可拖拽缩放查看导图'
   },
   {
     name: 'Word',
@@ -70,7 +70,7 @@ const getPersistedExportMap = () => {
   try {
     const raw = window.localStorage.getItem(EXPORT_STATE_STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw)
+    const parsed = parseExternalJsonSafely(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch (error) {
     console.error('getPersistedExportMap failed', error)
