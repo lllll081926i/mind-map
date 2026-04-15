@@ -7,6 +7,12 @@ const {
   ElementPlusResolver
 } = require('unplugin-vue-components/resolvers')
 const utilShimPath = path.resolve(__dirname, 'src/shims/browserUtil.js')
+const deferredMindMapPluginNames = [
+  'MiniMap.js',
+  'Search.js',
+  'Painter.js',
+  'Demonstrate.js'
+]
 
 const elementPlusOptimizedDeps = [
   'element-plus/es',
@@ -96,6 +102,13 @@ const createManualChunks = id => {
       return 'mind-map-themes'
     }
     if (id.includes('/src/plugins/') || id.includes('\\src\\plugins\\')) {
+      if (
+        deferredMindMapPluginNames.some(name => {
+          return id.endsWith(`/${name}`) || id.endsWith(`\\${name}`)
+        })
+      ) {
+        return 'mind-map-plugins-deferred'
+      }
       if (/(^|[\\/])Export\.js$/.test(id)) {
         return 'mind-map-export-base'
       }

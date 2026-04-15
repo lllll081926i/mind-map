@@ -195,6 +195,7 @@ jobs:
             portable_source_path: ''
             artifact_name: windows-installer
             artifact_path: src-tauri/target/release/bundle/nsis/*.exe
+            artifact_name_regex: ^MindMap_.*_windows_x64-setup\.exe$
             release_asset_regex: ^MindMap_.*_windows_x64-setup\.exe$
           - label: Windows Portable
             os: windows-latest
@@ -206,6 +207,7 @@ jobs:
             portable_source_path: src-tauri/target/release/mind-map-desktop.exe
             artifact_name: windows-portable
             artifact_path: src-tauri/target/release/MindMap_*.exe
+            artifact_name_regex: ^MindMap_.*_windows_x64\.exe$
             release_asset_regex: ^MindMap_.*_windows_x64\.exe$
           - label: Windows ARM64 Installer
             os: windows-latest
@@ -217,6 +219,7 @@ jobs:
             portable_source_path: ''
             artifact_name: windows-arm64-installer
             artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+            artifact_name_regex: ^MindMap_.*_windows_arm64-setup\.exe$
             release_asset_regex: ^MindMap_.*_windows_arm64-setup\.exe$
           - label: Windows ARM64 Portable
             os: windows-latest
@@ -228,6 +231,7 @@ jobs:
             portable_source_path: src-tauri/target/aarch64-pc-windows-msvc/release/mind-map-desktop.exe
             artifact_name: windows-arm64-portable
             artifact_path: src-tauri/target/aarch64-pc-windows-msvc/release/MindMap_*.exe
+            artifact_name_regex: ^MindMap_.*_windows_arm64\.exe$
             release_asset_regex: ^MindMap_.*_windows_arm64\.exe$
           - label: macOS Bundle
             os: macos-latest
@@ -242,6 +246,7 @@ jobs:
             artifact_path: |
               src-tauri/target/release/bundle/macos/*.app
               src-tauri/target/release/bundle/dmg/*.dmg
+            artifact_name_regex: ^MindMap_.*_darwin_aarch64\.(app|dmg)$
             release_asset_regex: ^MindMap_.*_darwin_aarch64\.(app\.tar\.gz|dmg)$
           - label: Linux Bundle
             os: ubuntu-22.04
@@ -255,6 +260,7 @@ jobs:
             artifact_path: |
               src-tauri/target/release/bundle/deb/*.deb
               src-tauri/target/release/bundle/appimage/*.AppImage
+            artifact_name_regex: ^MindMap_.*_linux_amd64\.(AppImage|deb)$
             release_asset_regex: ^MindMap_.*_linux_amd64\.(AppImage|deb)$
 
     steps:
@@ -605,6 +611,73 @@ jobs:
             throw "Portable artifact not found: $normalizedPath"
           }
           Write-Host "Portable artifact: $normalizedPath"
+
+      - name: Verify packaged desktop artifacts
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ matrix.portable_asset_suffix != '' && steps.portable_asset.outputs.path || matrix.artifact_path }}
+          ARTIFACT_NAME_REGEX: ${{ matrix.artifact_name_regex }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+
+          const rawPatterns = String(process.env.ARTIFACT_PATHS || '')
+            .split(/\r?\n/)
+            .map(item => item.trim())
+            .filter(Boolean)
+          const artifactNameRegex = String(process.env.ARTIFACT_NAME_REGEX || '').trim()
+
+          if (!rawPatterns.length) {
+            throw new Error('No artifact paths configured for this matrix entry')
+          }
+          if (!artifactNameRegex) {
+            throw new Error('ARTIFACT_NAME_REGEX is required')
+          }
+
+          const nameMatcher = new RegExp(artifactNameRegex)
+          const escapeRegex = value =>
+            value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&')
+
+          const expandPattern = pattern => {
+            const normalizedPattern = pattern.replace(/\\/g, '/')
+            const dirPath = path.resolve(path.dirname(normalizedPattern))
+            const basePattern = path.basename(normalizedPattern)
+
+            if (!fs.existsSync(dirPath)) {
+              return []
+            }
+
+            const fileNameMatcher = new RegExp(
+              '^' + escapeRegex(basePattern).replace(/\\\*/g, '.*') + '$'
+            )
+
+            return fs.readdirSync(dirPath).filter(name => {
+              return fileNameMatcher.test(name)
+            }).map(name => path.join(dirPath, name))
+          }
+
+          const matchedFiles = rawPatterns.flatMap(expandPattern)
+          if (!matchedFiles.length) {
+            throw new Error(
+              `No packaged desktop artifacts found for patterns: ${rawPatterns.join(', ')}`
+            )
+          }
+
+          const invalidFiles = matchedFiles.filter(filePath => {
+            return !nameMatcher.test(path.basename(filePath))
+          })
+
+          if (invalidFiles.length) {
+            throw new Error(
+              `Packaged desktop artifact does not match expected naming convention: ${invalidFiles.join(', ')}`
+            )
+          }
+
+          console.log(
+            `Packaged desktop artifact matches expected naming convention: ${matchedFiles.join(', ')}`
+          )
+          NODE
 
       - name: Upload Windows portable release asset
         if: success() && matrix.portable_asset_suffix != '' && needs.create_release.outputs.release_id != ''

@@ -152,5 +152,8 @@ export const emitShowNodeTag = payload =>
 export default {
   on: onAppEvent,
   off: offAppEvent,
-  emit: emitAppEvent
+  emit: emitAppEvent,
+  $on: onAppEvent,
+  $off: offAppEvent,
+  $emit: emitAppEvent
 }

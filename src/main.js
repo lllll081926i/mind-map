@@ -25,7 +25,6 @@ import pinia from '@/stores'
 import { syncRuntimeFromBootstrapState } from '@/stores/runtime'
 import appEvents from '@/services/appEvents'
 import { emitBootstrapStateReady } from '@/services/appEvents'
-import legacyBus from '@/services/legacyBus'
 import { hydrateBootstrapStateFromRecovery } from '@/services/recoveryStorage'
 
 let workspaceActionsPromise = null
@@ -135,8 +134,8 @@ const initApp = () => {
         component: instance?.type?.name || 'anonymous'
       })
     }
-    app.config.globalProperties.$bus = legacyBus
     app.config.globalProperties.$appEvents = appEvents
+    app.config.globalProperties.$bus = appEvents
     app.config.globalProperties.$message = ElMessage
     app.config.globalProperties.$notify = ElNotification
     app.config.globalProperties.$loading = ElLoadingService
@@ -152,11 +151,14 @@ const initApp = () => {
     const root = document.querySelector('#app')
     if (root) {
       const bootFailedMessage = i18n.global.t('app.initFailed')
-      root.innerHTML = `
-        <div style="padding:24px;font-size:14px;line-height:1.6;color:#c0392b;background:#fff4f2;">
-          ${bootFailedMessage}
-        </div>
-      `
+      const messageNode = document.createElement('div')
+      messageNode.style.padding = '24px'
+      messageNode.style.fontSize = '14px'
+      messageNode.style.lineHeight = '1.6'
+      messageNode.style.color = '#c0392b'
+      messageNode.style.background = '#fff4f2'
+      messageNode.textContent = bootFailedMessage
+      root.replaceChildren(messageNode)
     }
   }
 }

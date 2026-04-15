@@ -39,6 +39,11 @@ test('AI 配置写入会走密钥安全存储而不是直接明文落盘', () =>
 
 test('工程脚本接入行为测试与 E2E 测试', () => {
   assert.match(packageJson.scripts['test:all'], /test:behavior/)
+  assert.match(packageJson.scripts['test:behavior'], /tests\/review-remediation\.test\.mjs/)
+  assert.match(
+    packageJson.scripts['test:behavior'],
+    /tests\/desktop-startup-performance\.test\.mjs/
+  )
   assert.equal(packageJson.scripts['test:e2e'], 'playwright test')
   assert.equal(
     packageJson.devDependencies['@playwright/test'].startsWith('^'),
@@ -117,4 +122,8 @@ test('发布流程已接入代码签名配置入口', () => {
   assert.match(releaseWorkflowSource, /security create-keychain/)
   assert.match(releaseWorkflowSource, /security import/)
   assert.match(releaseWorkflowSource, /security find-identity/)
+  assert.match(releaseWorkflowSource, /artifact_name_regex:/)
+  assert.match(releaseWorkflowSource, /Verify packaged desktop artifacts/)
+  assert.match(releaseWorkflowSource, /ARTIFACT_NAME_REGEX:/)
+  assert.match(releaseWorkflowSource, /matches expected naming convention/)
 })

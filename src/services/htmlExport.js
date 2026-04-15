@@ -4,6 +4,68 @@ const normalizeSvgMarkup = svgMarkup => {
     .replace(/<\?xml[\s\S]*?\?>/gi, '')
 }
 
+const stripUnsafeSvgMarkupFallback = svgMarkup => {
+  return String(svgMarkup || '')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\s+on[a-z-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '')
+    .replace(
+      /\s+(href|xlink:href)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi,
+      ''
+    )
+}
+
+const sanitizeSvgMarkup = svgMarkup => {
+  const normalizedSvgMarkup = normalizeSvgMarkup(svgMarkup)
+  if (!normalizedSvgMarkup) {
+    return ''
+  }
+  if (
+    typeof DOMParser === 'undefined' ||
+    typeof XMLSerializer === 'undefined'
+  ) {
+    return stripUnsafeSvgMarkupFallback(normalizedSvgMarkup)
+  }
+  try {
+    const svgDocument = new DOMParser().parseFromString(
+      normalizedSvgMarkup,
+      'image/svg+xml'
+    )
+    if (
+      svgDocument.querySelector('parsererror') ||
+      svgDocument.documentElement?.nodeName?.toLowerCase() !== 'svg'
+    ) {
+      return stripUnsafeSvgMarkupFallback(normalizedSvgMarkup)
+    }
+    svgDocument.querySelectorAll('script').forEach(node => {
+      node.remove()
+    })
+    svgDocument.querySelectorAll('*').forEach(element => {
+      Array.from(element.attributes).forEach(attribute => {
+        const name = attribute.name.toLowerCase()
+        const value = String(attribute.value || '')
+        if (name.startsWith('on')) {
+          element.removeAttribute(attribute.name)
+          return
+        }
+        if (
+          (name === 'href' || name === 'xlink:href') &&
+          /^\s*javascript:/i.test(value)
+        ) {
+          element.removeAttribute(attribute.name)
+        }
+      })
+    })
+    return new XMLSerializer().serializeToString(svgDocument.documentElement)
+  } catch (error) {
+    console.error('sanitizeSvgMarkup failed', error)
+    return stripUnsafeSvgMarkupFallback(normalizedSvgMarkup)
+  }
+}
+
+const serializeForInlineScript = value => {
+  return JSON.stringify(String(value || '')).replace(/</g, '\\u003c')
+}
+
 const normalizeDocumentTitle = fileName => {
   return String(fileName || '思维导图')
     .trim()
@@ -12,7 +74,8 @@ const normalizeDocumentTitle = fileName => {
 
 export const buildMindMapHtmlDocument = ({ fileName, svgMarkup } = {}) => {
   const normalizedTitle = normalizeDocumentTitle(fileName)
-  const normalizedSvgMarkup = normalizeSvgMarkup(svgMarkup)
+  const normalizedSvgMarkup = sanitizeSvgMarkup(svgMarkup)
+  const serializedSvgMarkup = serializeForInlineScript(normalizedSvgMarkup)
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -97,7 +160,7 @@ export const buildMindMapHtmlDocument = ({ fileName, svgMarkup } = {}) => {
     </div>
     <script>
       (function () {
-        const svgMarkup = ${JSON.stringify(normalizedSvgMarkup)}
+        const svgMarkup = ${serializedSvgMarkup}
         const viewport = document.getElementById('html-export-viewport')
         const canvas = document.getElementById('html-export-canvas')
         const state = {
@@ -119,11 +182,20 @@ export const buildMindMapHtmlDocument = ({ fileName, svgMarkup } = {}) => {
           return
         }
 
-        canvas.innerHTML = svgMarkup
-        const svgEl = canvas.querySelector('svg')
-        if (!svgEl) {
+        const svgDocument = new DOMParser().parseFromString(
+          svgMarkup,
+          'image/svg+xml'
+        )
+        const nextSvgEl = svgDocument.documentElement
+        if (
+          svgDocument.querySelector('parsererror') ||
+          !nextSvgEl ||
+          nextSvgEl.nodeName.toLowerCase() !== 'svg'
+        ) {
           return
         }
+        canvas.replaceChildren(document.importNode(nextSvgEl, true))
+        const svgEl = canvas.querySelector('svg')
 
         function getSvgSize() {
           const viewBox = String(svgEl.getAttribute('viewBox') || '').trim()

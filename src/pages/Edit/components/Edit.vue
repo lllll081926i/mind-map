@@ -164,6 +164,7 @@ let exportXMindPluginPromise = null
 let scrollbarPluginPromise = null
 let handleClipboardTextPromise = null
 let mindMapRuntimePromise = null
+let deferredMindMapPluginsPromise = null
 let extendedIconListPromise = null
 const VIEW_DATA_DEBOUNCE_MS = 300
 const BUILTIN_NODE_ICON_TYPES = ['expression', 'priority', 'progress', 'sign']
@@ -211,7 +212,6 @@ const loadMindMapRuntime = async () => {
     mindMapRuntimePromise = Promise.all([
       import('simple-mind-map'),
       import('simple-mind-map-plugin-themes'),
-      import('simple-mind-map/src/plugins/MiniMap.js'),
       import('simple-mind-map/src/plugins/Watermark.js'),
       import('simple-mind-map/src/plugins/KeyboardNavigation.js'),
       import('simple-mind-map/src/plugins/Drag.js'),
@@ -219,10 +219,7 @@ const loadMindMapRuntime = async () => {
       import('simple-mind-map/src/plugins/AssociativeLine.js'),
       import('simple-mind-map/src/plugins/TouchEvent.js'),
       import('simple-mind-map/src/plugins/NodeImgAdjust.js'),
-      import('simple-mind-map/src/plugins/Search.js'),
-      import('simple-mind-map/src/plugins/Painter.js'),
       import('simple-mind-map/src/plugins/RainbowLines.js'),
-      import('simple-mind-map/src/plugins/Demonstrate.js'),
       import('simple-mind-map/src/plugins/OuterFrame.js'),
       import('simple-mind-map/src/plugins/MindMapLayoutPro.js'),
       import('simple-mind-map/src/plugins/NodeBase64ImageStorage.js')
@@ -230,7 +227,6 @@ const loadMindMapRuntime = async () => {
       ([
         mindMapModule,
         themesModule,
-        miniMapModule,
         watermarkModule,
         keyboardNavigationModule,
         dragModule,
@@ -238,27 +234,20 @@ const loadMindMapRuntime = async () => {
         associativeLineModule,
         touchEventModule,
         nodeImgAdjustModule,
-        searchPluginModule,
-        painterModule,
         rainbowLinesModule,
-        demonstrateModule,
         outerFrameModule,
         mindMapLayoutProModule,
         nodeBase64ImageStorageModule
       ]) => {
         const MindMap = mindMapModule.default
-        MindMap.usePlugin(miniMapModule.default)
-          .usePlugin(watermarkModule.default)
+        MindMap.usePlugin(watermarkModule.default)
           .usePlugin(dragModule.default)
           .usePlugin(keyboardNavigationModule.default)
           .usePlugin(selectModule.default)
           .usePlugin(associativeLineModule.default)
           .usePlugin(nodeImgAdjustModule.default)
           .usePlugin(touchEventModule.default)
-          .usePlugin(searchPluginModule.default)
-          .usePlugin(painterModule.default)
           .usePlugin(rainbowLinesModule.default)
-          .usePlugin(demonstrateModule.default)
           .usePlugin(outerFrameModule.default)
           .usePlugin(mindMapLayoutProModule.default)
           .usePlugin(nodeBase64ImageStorageModule.default)
@@ -276,6 +265,35 @@ const loadMindMapRuntime = async () => {
     })
   }
   return mindMapRuntimePromise
+}
+
+const loadDeferredMindMapPlugins = async () => {
+  if (!deferredMindMapPluginsPromise) {
+    deferredMindMapPluginsPromise = Promise.all([
+      import('simple-mind-map/src/plugins/MiniMap.js'),
+      import('simple-mind-map/src/plugins/Search.js'),
+      import('simple-mind-map/src/plugins/Painter.js'),
+      import('simple-mind-map/src/plugins/Demonstrate.js')
+    ])
+      .then(
+        ([
+          miniMapModule,
+          searchPluginModule,
+          painterModule,
+          demonstrateModule
+        ]) => [
+          miniMapModule.default,
+          searchPluginModule.default,
+          painterModule.default,
+          demonstrateModule.default
+        ]
+      )
+      .catch(error => {
+        deferredMindMapPluginsPromise = null
+        throw error
+      })
+  }
+  return deferredMindMapPluginsPromise
 }
 
 const loadScrollbarPlugin = async () => {
@@ -447,6 +465,8 @@ export default {
       onViewDataChange: null,
       richTextPluginReady: false,
       richTextPluginLoadingPromise: null,
+      deferredMindMapPluginsReady: false,
+      deferredMindMapPluginsLoadingPromise: null,
       exportPluginState: {
         base: false,
         pdf: false,
@@ -682,7 +702,11 @@ export default {
       this.mindMap?.associativeLine?.createLineFromActiveNode()
     },
 
-    handleStartPainter() {
+    async handleStartPainter() {
+      const deferredPluginsReady = await this.ensureDeferredMindMapPluginsReady()
+      if (!deferredPluginsReady) {
+        return
+      }
       this.mindMap?.painter?.startPainter()
     },
 
@@ -730,9 +754,17 @@ export default {
         this.secondaryUiFrame = 0
         this.secondaryUiTimer = window.setTimeout(() => {
           this.secondaryUiTimer = 0
-          this.secondaryUiReady = true
+          void this.finalizeSecondaryUiMount()
         }, 80)
       })
+    },
+
+    async finalizeSecondaryUiMount() {
+      const deferredPluginsReady = await this.ensureDeferredMindMapPluginsReady()
+      if (!deferredPluginsReady || !this.mindMap) {
+        return
+      }
+      this.secondaryUiReady = true
     },
 
     // 显示loading
@@ -1039,6 +1071,8 @@ export default {
     // 初始化
     async init() {
       await this.$nextTick()
+      this.deferredMindMapPluginsReady = false
+      this.deferredMindMapPluginsLoadingPromise = null
       const hasFileURL = this.hasFileURL()
       const initialData = this.normalizeMindMapData(this.mindMapData)
       const fallbackData = createDefaultMindMapData(this.$t('edit.root'))
@@ -1065,6 +1099,7 @@ export default {
           hasFileURL
         })
       )
+      void this.ensureDeferredMindMapPluginsReady()
       this.patchMindMapExport()
       await this.loadPlugins(initialData)
       this.mindMap.keyCommand.addShortcut('Control+s', () => {
@@ -1077,6 +1112,39 @@ export default {
       }
       this.registerCurrentDataGetter()
       this.scheduleSecondaryUiMount()
+    },
+
+    async ensureDeferredMindMapPluginsReady() {
+      if (!this.mindMap) {
+        return false
+      }
+      if (this.deferredMindMapPluginsReady) {
+        return true
+      }
+      if (this.deferredMindMapPluginsLoadingPromise) {
+        return this.deferredMindMapPluginsLoadingPromise
+      }
+      this.deferredMindMapPluginsLoadingPromise = (async () => {
+        const plugins = await loadDeferredMindMapPlugins()
+        if (!this.mindMap) {
+          return false
+        }
+        plugins.forEach(plugin => {
+          this.mindMap.addPlugin(plugin)
+        })
+        this.deferredMindMapPluginsReady = plugins.every(plugin => {
+          return Boolean(this.mindMap?.[plugin.instanceName])
+        })
+        return this.deferredMindMapPluginsReady
+      })()
+      try {
+        return await this.deferredMindMapPluginsLoadingPromise
+      } catch (error) {
+        console.error('load deferred mind map plugins failed', error)
+        return false
+      } finally {
+        this.deferredMindMapPluginsLoadingPromise = null
+      }
     },
 
     async ensureExportPluginsLoaded(exportType = 'smm') {
