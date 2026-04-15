@@ -27,7 +27,11 @@ test('Tauri 元状态写入直接落盘 DesktopMetaState，不再要求文档字
   assert.match(writeMetaStateSource, /state: &DesktopMetaState/)
   assert.match(
     writeMetaStateSource,
-    /write_json_file\(meta_state_file_path\(app\)\?, state\)\.await/
+    /sanitize_meta_state_for_write\(app, state\)\?/
+  )
+  assert.match(
+    writeMetaStateSource,
+    /write_json_file\(meta_state_file_path\(app\)\.await\?, &sanitized\)\.await/
   )
   assert.doesNotMatch(writeMetaStateSource, /split_state\(state\)/)
 })

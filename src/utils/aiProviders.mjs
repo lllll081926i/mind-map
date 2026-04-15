@@ -24,6 +24,8 @@
  * }} AiConfig
  */
 
+import { parseExternalJsonSafely } from './json.js'
+
 const DEFAULT_PORT = 3456
 const DEFAULT_METHOD = 'POST'
 const DEFAULT_PROTOCOL = 'openai-compatible'
@@ -371,7 +373,7 @@ export const consumeOpenAICompatibleStreamText = (pending, chunk) => {
       break
     }
     try {
-      items.push(JSON.parse(data))
+      items.push(parseExternalJsonSafely(data))
     } catch (error) {
       console.error('consumeOpenAICompatibleStreamText parse failed', error)
     }

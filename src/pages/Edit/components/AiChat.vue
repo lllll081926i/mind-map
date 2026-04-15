@@ -232,12 +232,21 @@ export default {
       return !this.isCreating && !!this.chatDraftProxy.trim()
     }
   },
+  watch: {
+    activeSidebar(value) {
+      if (value === 'ai') {
+        void this.prepareRenderer()
+      }
+    }
+  },
   created() {
     useAiStore().hydrateChatSession()
-    void this.prepareRenderer()
   },
   mounted() {
     this.queueScrollToBottom()
+    if (this.activeSidebar === 'ai') {
+      void this.prepareRenderer()
+    }
   },
   methods: {
     getAiStore() {

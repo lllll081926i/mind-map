@@ -37,6 +37,9 @@ test('独立导出页包含文件名、说明、选项与导出操作区', () =>
   assert.match(source, /class="previewSurface"/)
   assert.match(source, /\$t\('exportPage\.preview'\)/)
   assert.match(source, /\$t\('exportPage\.previewDesc'\)/)
+  assert.match(source, /class="statusMetaList"/)
+  assert.match(source, /\$t\('exportPage\.currentDocumentLabel'\)/)
+  assert.match(source, /\$t\('exportPage\.rememberedLabel'\)/)
 })
 
 test('导出弹窗仅通过遮罩关闭，不再保留右上角按钮或 Esc 关闭', () => {
@@ -82,4 +85,47 @@ test('导出预览区扩大可视面积并允许拖动缩放预览', () => {
   assert.doesNotMatch(source, /pointer-events:\s*none/)
   assert.match(source, /cursor:\s*grab/)
   assert.doesNotMatch(source, /class="previewHint"/)
+})
+
+test('导出页会记住上次导出选项并预热当前格式的导出插件', () => {
+  const source = fs.readFileSync(exportPagePath, 'utf8')
+
+  assert.match(source, /restorePersistedExportState/)
+  assert.match(source, /persistExportStateSnapshot/)
+  assert.match(source, /rememberedSummary/)
+  assert.match(source, /\$t\('exportPage\.rememberedTip'\)/)
+  assert.match(source, /scheduleExportWarmup\(\)/)
+})
+
+test('HTML 导出格式已启用并走独立 HTML 生成链路', () => {
+  const exportPageSource = fs.readFileSync(exportPagePath, 'utf8')
+  const exportStateSource = fs.readFileSync(
+    path.resolve('src/services/exportState.js'),
+    'utf8'
+  )
+  const htmlFormatBlock =
+    exportStateSource.match(
+      /\{\s*name:\s*'HTML'[\s\S]*?type:\s*'html'[\s\S]*?\}/
+    )?.[0] || ''
+
+  assert.match(exportStateSource, /type:\s*'html'/)
+  assert.equal(htmlFormatBlock.includes('disabled: true'), false)
+  assert.match(exportPageSource, /from '@\/services\/htmlExport'/)
+  assert.match(
+    exportPageSource,
+    /if \(this\.exportState\.exportType === 'html'\)/
+  )
+  assert.match(
+    exportPageSource,
+    /await this\.mindMap\.export\(\s*'svg'\s*,\s*false\s*,\s*safeFileName/
+  )
+  assert.match(exportPageSource, /buildMindMapHtmlDocument\(/)
+  assert.match(exportPageSource, /saveTextFileAs\(/)
+})
+
+test('导出完成反馈会包含文件名和扩展名', () => {
+  const source = fs.readFileSync(exportPagePath, 'utf8')
+
+  assert.match(source, /\$t\('exportPage\.exportDoneMessage',\s*\{\s*fileName:/)
+  assert.match(source, /extension:\s*this\.currentFileExtension/)
 })

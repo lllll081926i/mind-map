@@ -43,6 +43,10 @@ const runtimeSource = fs.readFileSync(
   'utf8'
 )
 const aiStoreSource = fs.readFileSync(path.resolve('src/stores/ai.js'), 'utf8')
+const exportStateSource = fs.readFileSync(
+  path.resolve('src/services/exportState.js'),
+  'utf8'
+)
 const nodeNoteSidebarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/NodeNoteSidebar.vue'),
   'utf8'
@@ -211,6 +215,10 @@ const desktopPlatformSource = fs.readFileSync(
   path.resolve('src/platform/desktop/index.js'),
   'utf8'
 )
+const htmlExportSourcePath = path.resolve('src/services/htmlExport.js')
+const htmlExportSource = fs.existsSync(htmlExportSourcePath)
+  ? fs.readFileSync(htmlExportSourcePath, 'utf8')
+  : ''
 const zhCnSource = fs.readFileSync(path.resolve('src/config/zh.js'), 'utf8')
 const tauriRecoverySource = fs.existsSync(tauriRecoverySourcePath)
   ? fs.readFileSync(tauriRecoverySourcePath, 'utf8')
@@ -257,8 +265,18 @@ test('主路径 UI 事件通过 appEvents 统一抽象', () => {
   assert.match(appEventsSource, /emitShowLoading/)
   assert.match(appEventsSource, /emitShowSearch/)
   assert.match(appEventsSource, /emitToggleMiniMap/)
+  assert.match(appEventsSource, /\$on: onAppEvent/)
+  assert.match(appEventsSource, /\$off: offAppEvent/)
+  assert.match(appEventsSource, /\$emit: emitAppEvent/)
   assert.match(legacyBusSource, /appEvents\.on/)
   assert.match(legacyBusSource, /appEvents\.emit/)
+})
+
+test('应用入口从主路径移除 legacyBus 模块依赖，但继续复用同一套 appEvents 兼容对象', () => {
+  assert.doesNotMatch(mainSource, /from '@\/services\/legacyBus'/)
+  assert.doesNotMatch(mainSource, /app\.config\.globalProperties\.\$bus = legacyBus/)
+  assert.match(mainSource, /app\.config\.globalProperties\.\$bus = appEvents/)
+  assert.match(mainSource, /app\.config\.globalProperties\.\$appEvents = appEvents/)
 })
 
 test('AI 请求逻辑拆分为浏览器与桌面 transport', () => {
@@ -359,6 +377,18 @@ test('外部 JSON 在导入、打开文件与剪贴板路径上统一走本地�
   assert.match(searchSource, /this\.\$nextTick\(\(\) => \{/)
 })
 
+test('本地持久化与 AI 流式响应也统一走安全 JSON 解析入口', () => {
+  assert.match(exportStateSource, /from '@\/utils\/json'/)
+  assert.match(exportStateSource, /parseExternalJsonSafely\(raw\)/)
+  assert.doesNotMatch(exportStateSource, /const parsed = JSON\.parse\(raw\)/)
+  assert.match(aiStoreSource, /from '@\/utils\/json'/)
+  assert.match(aiStoreSource, /parseExternalJsonSafely\(raw\)/)
+  assert.doesNotMatch(aiStoreSource, /const parsed = JSON\.parse\(raw\)/)
+  assert.match(aiProvidersSource, /from '\.\/json\.js'/)
+  assert.match(aiProvidersSource, /parseExternalJsonSafely\(data\)/)
+  assert.doesNotMatch(aiProvidersSource, /items\.push\(JSON\.parse\(data\)\)/)
+})
+
 test('打印大纲不再直接把原始 outerHTML 写入 iframe，而是先做 sanitize 后再挂载 DOM', () => {
   assert.match(utilsSource, /DOMPurify\.sanitize\(el\.outerHTML/)
   assert.match(utilsSource, /iframeDoc\.open\(\)/)
@@ -371,6 +401,7 @@ test('应用入口补充全局错误处理，根样式不再禁止所有文本�
   assert.match(mainSource, /app\.config\.errorHandler =/)
   assert.match(appSource, /errorCaptured\(error\)/)
   assert.match(appSource, /renderErrorMessage/)
+  assert.doesNotMatch(mainSource, /root\.innerHTML =/)
   assert.doesNotMatch(appSource, /body \*/)
   assert.doesNotMatch(appSource, /user-select: none;/)
 })
@@ -694,4 +725,27 @@ test('主题扩展运行时会先校验 MoreThemes\\.init 是否可调用', () =
     exportPageSource,
     /typeof globalThis\.MoreThemes\?\.init === 'function'/
   )
+})
+
+test('HTML 导出服务生成无首屏的只读浏览模板', () => {
+  assert.equal(fs.existsSync(htmlExportSourcePath), true)
+  assert.match(htmlExportSource, /buildMindMapHtmlDocument/)
+  assert.match(htmlExportSource, /class="html-export-stage"/)
+  assert.match(htmlExportSource, /class="html-export-viewport"/)
+  assert.match(htmlExportSource, /class="html-export-canvas"/)
+  assert.match(htmlExportSource, /function fitToViewport\(/)
+  assert.match(htmlExportSource, /function applyTransform\(/)
+  assert.match(htmlExportSource, /wheel', onWheel/)
+  assert.match(htmlExportSource, /mousedown', onPointerDown/)
+  assert.doesNotMatch(htmlExportSource, /html-export-header/)
+  assert.doesNotMatch(htmlExportSource, /toolbar/i)
+  assert.doesNotMatch(htmlExportSource, /contenteditable/i)
+})
+
+test('HTML 导出服务会转义内联脚本中的 SVG 字符串并避免直接 innerHTML 注入', () => {
+  assert.equal(htmlExportSource.includes(".replace(/</g, '\\\\u003c')"), true)
+  assert.match(htmlExportSource, /DOMParser\(\)/)
+  assert.equal(htmlExportSource.includes("parseFromString(\n          svgMarkup,\n          'image/svg+xml'"), true)
+  assert.equal(htmlExportSource.includes('canvas.replaceChildren('), true)
+  assert.doesNotMatch(htmlExportSource, /canvas\.innerHTML\s*=/)
 })

@@ -32,3 +32,13 @@ test('首页设置页提供恢复文件状态与清理入口', () => {
   assert.match(source, /recoverySummary/)
   assert.match(source, /clearRecoveryFiles/)
 })
+
+test('首页设置页补充工作流与效率提示卡片', () => {
+  const source = fs.readFileSync(settingsPagePath, 'utf8')
+
+  assert.match(source, /workflowGuideCard/)
+  assert.match(source, /efficiencyGuideCard/)
+  assert.match(source, /恢复文件会在正式保存后自动清理/)
+  assert.match(source, /Ctrl \+ F 可快速搜索节点/)
+  assert.match(source, /导出中心会记住你最近一次的导出参数/)
+})

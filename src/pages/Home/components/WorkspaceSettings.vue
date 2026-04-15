@@ -152,6 +152,16 @@
             <el-option label="只激活新节点，不进入编辑" value="activeOnly" />
           </el-select>
         </div>
+        <div class="guideCard workflowGuideCard">
+          <h4>工作流建议</h4>
+          <p>恢复文件会在正式保存后自动清理，异常退出后也能尽量帮你接回未保存内容。</p>
+          <p>导出中心会记住你最近一次的导出参数，适合连续导出时减少重复设置。</p>
+        </div>
+        <div class="guideCard efficiencyGuideCard">
+          <h4>效率提示</h4>
+          <p>Ctrl + F 可快速搜索节点，适合在长图里直接定位关键内容。</p>
+          <p>快捷键面板和首页工作台会保留高频入口，尽量减少来回切换页面。</p>
+        </div>
         <div class="appInfoCard">
           <div class="appInfoRow">
             <span>运行时</span>
@@ -189,7 +199,7 @@
             <strong>{{ recoverySummary.origin || '未初始化' }}</strong>
           </div>
           <p class="recoveryHint">
-            删除异常退出后用于恢复未保存内容的恢复文件，不影响正式文档和最近文件。
+            删除异常退出后用于恢复未保存内容的恢复文件，不影响正式文档和最近文件。恢复文件会在正式保存后自动清理。
           </p>
           <div class="appInfoActions">
             <el-button
@@ -540,6 +550,7 @@ export default {
 
     .settingRow,
     .appInfoCard,
+    .guideCard,
     .shortcutGroup,
     .chip {
       background: rgba(255, 255, 255, 0.04);
@@ -547,7 +558,9 @@ export default {
     }
 
     .sectionDesc,
-    .shortcutRow span {
+    .shortcutRow span,
+    .guideCard p,
+    .recoveryHint {
       color: rgba(255, 255, 255, 0.68);
     }
   }
@@ -641,12 +654,30 @@ export default {
 }
 
 .appInfoCard,
+.guideCard,
 .shortcutGroup {
   margin-top: 20px;
   border-radius: 18px;
   border: 1px solid rgba(31, 41, 55, 0.08);
   background: #f8fafc;
   padding: 18px;
+}
+
+.guideCard {
+  h4 {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+
+  p {
+    font-size: 13px;
+    line-height: 1.8;
+    color: rgba(15, 23, 42, 0.62);
+  }
+
+  p + p {
+    margin-top: 8px;
+  }
 }
 
 .recoveryInfoCard {

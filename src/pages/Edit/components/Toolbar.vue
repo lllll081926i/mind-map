@@ -261,6 +261,43 @@
           </div>
         </div>
       </div>
+      <div class="toolbarBlock toolbarMetaBlock" v-if="!isMobile">
+        <div class="toolbarStatus" :class="toolbarStatusType">
+          <span class="statusDot"></span>
+          <div class="statusText">
+            <strong>{{ toolbarStatusText }}</strong>
+            <span>
+              {{ $t('toolbar.statusDocumentPrefix') }}{{ toolbarDocumentLabel }}
+            </span>
+          </div>
+        </div>
+        <div class="toolbarQuickActions">
+          <div
+            class="toolbarBtn quickActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.searchAction')"
+            @click="showSearch"
+            @keydown.enter.prevent="showSearch"
+            @keydown.space.prevent="showSearch"
+          >
+            <span class="icon iconfont iconsousuo"></span>
+            <span class="text">{{ $t('toolbar.searchAction') }}</span>
+          </div>
+          <div
+            class="toolbarBtn quickActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.shortcutAction')"
+            @click="openShortcutKey"
+            @keydown.enter.prevent="openShortcutKey"
+            @keydown.space.prevent="openShortcutKey"
+          >
+            <span class="icon shortcutBadge">⌘</span>
+            <span class="text">{{ $t('toolbar.shortcutAction') }}</span>
+          </div>
+        </div>
+      </div>
       <div class="toolbarMeasure">
         <div class="toolbarBlock isMeasure" ref="toolbarMeasureBlockRef">
           <div ref="toolbarMeasureListRef">
@@ -311,6 +348,7 @@ import {
 } from '@/services/documentSession'
 import {
   onBootstrapStateReady,
+  emitShowSearch,
   emitShowImport,
   emitShowNodeImage,
   emitShowNodeLink,
@@ -318,9 +356,14 @@ import {
   emitShowNodeTag,
   onWriteLocalFile
 } from '@/services/appEvents'
-import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
+import {
+  setActiveSidebar,
+  setIsHandleLocalFile,
+  syncRuntimeFromWorkspaceMeta
+} from '@/stores/runtime'
 import { getWorkspaceMetaState } from '@/services/workspaceState'
 import { useAppStore } from '@/stores/app'
+import { useEditorStore } from '@/stores/editor'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import {
@@ -424,6 +467,7 @@ export default {
       fileTreeExpand: true,
       isFullDataFile: true,
       waitingWriteToLocalFile: false,
+      recoveredDraftLoaded: false,
       pendingLocalFileRef: null,
       localFileReadRequestId: 0,
       localFileWriteRequestId: 0,
@@ -446,6 +490,10 @@ export default {
     ...mapState(useAppStore, {
       isHandleLocalFile: 'isHandleLocalFile'
     }),
+    ...mapState(useEditorStore, {
+      currentDocument: 'currentDocument',
+      currentFileName: 'currentFileName'
+    }),
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
     }),
@@ -464,6 +512,41 @@ export default {
 
     showToolbarLabels() {
       return this.localConfig.showToolbarLabels !== false
+    },
+
+    hasPotentialDataLoss() {
+      return !!this.currentDocument?.dirty || this.waitingWriteToLocalFile
+    },
+
+    toolbarDocumentLabel() {
+      return (
+        this.currentFileName ||
+        this.currentDocument?.name ||
+        this.$t('toolbar.statusNoFile')
+      )
+    },
+
+    toolbarStatusText() {
+      if (this.waitingWriteToLocalFile) {
+        return this.$t('toolbar.statusAutosaving')
+      }
+      if (this.recoveredDraftLoaded) {
+        return this.$t('toolbar.statusRecovered')
+      }
+      if (this.currentDocument?.dirty) {
+        return this.$t('toolbar.statusUnsynced')
+      }
+      if (this.currentDocument?.path || this.currentFileName) {
+        return this.$t('toolbar.statusSaved')
+      }
+      return this.$t('toolbar.statusNoFile')
+    },
+
+    toolbarStatusType() {
+      if (this.waitingWriteToLocalFile) return 'autosaving'
+      if (this.recoveredDraftLoaded) return 'recovered'
+      if (this.currentDocument?.dirty) return 'dirty'
+      return 'saved'
     },
 
     btnLit() {
@@ -565,8 +648,41 @@ export default {
       await this.$router.push('/export')
     },
 
+    showSearch() {
+      emitShowSearch()
+    },
+
+    openShortcutKey() {
+      setActiveSidebar('shortcutKey')
+    },
+
+    async confirmPotentialDataLoss(actionKey = '') {
+      const nextAction = String(actionKey || '').trim()
+      if (!this.hasPotentialDataLoss) {
+        return true
+      }
+      try {
+        await this.$confirm(
+          this.$t('toolbar.leaveConfirmMessage'),
+          this.$t('toolbar.leaveConfirmTitle'),
+          {
+            type: 'warning'
+          }
+        )
+        if (!nextAction) {
+          return true
+        }
+        return true
+      } catch (_error) {
+        return false
+      }
+    },
+
     async goHome() {
       if (this.$route.path === '/home') {
+        return
+      }
+      if (!(await this.confirmPotentialDataLoss('returnHome'))) {
         return
       }
       await this.$router.push('/home')
@@ -780,7 +896,7 @@ export default {
     },
 
     onUnload(e) {
-      if (this.waitingWriteToLocalFile) {
+      if (this.hasPotentialDataLoss) {
         const msg = this.$t('toolbar.unsavedData')
         e.returnValue = msg
         return msg
@@ -818,7 +934,10 @@ export default {
     },
 
     // 扫描本地文件夹
-    openDirectory() {
+    async openDirectory() {
+      if (!(await this.confirmPotentialDataLoss('openDirectory'))) {
+        return
+      }
       this.fileTreeVisible = false
       this.fileTreeExpand = true
       this.rootDirName = ''
@@ -828,8 +947,11 @@ export default {
     },
 
     // 编辑指定文件
-    editLocalFile(data) {
+    async editLocalFile(data) {
       if (!data || data.mode !== 'desktop') return
+      if (!(await this.confirmPotentialDataLoss('editLocalFile'))) {
+        return
+      }
       void this.readFile(data)
     },
 
@@ -853,8 +975,11 @@ export default {
       }
     },
 
-    openRecentFile(item) {
+    async openRecentFile(item) {
       if (!item || !item.path) return
+      if (!(await this.confirmPotentialDataLoss('openRecentFile'))) {
+        return
+      }
       void this.readFile({
         ...item,
         mode: item.mode || 'desktop'
@@ -863,6 +988,9 @@ export default {
 
     // 打开本地文件
     async openLocalFile() {
+      if (!(await this.confirmPotentialDataLoss('openFile'))) {
+        return
+      }
       try {
         const nextFileHandle = await platform.openMindMapFile({
           defaultPath: getLastDirectory()
@@ -986,6 +1114,7 @@ export default {
         }
         this.pendingLocalFileRef = null
         markDocumentDirty(!!fileResult.recoveredFromDraft)
+        this.recoveredDraftLoaded = !!fileResult.recoveredFromDraft
         this.refreshRecentFiles()
         syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
         Notification.closeAll()
@@ -997,6 +1126,9 @@ export default {
           duration: 0,
           showClose: true
         })
+        if (fileResult.recoveredFromDraft) {
+          this.$message.success(this.$t('toolbar.recoveredDraftLoaded'))
+        }
         return true
       } catch (error) {
         if (
@@ -1082,6 +1214,7 @@ export default {
           } catch (error) {
             console.error('clearRecoveryDraftForFile failed', error)
           }
+          this.recoveredDraftLoaded = false
           markDocumentDirty(false)
         }
       }
@@ -1089,6 +1222,9 @@ export default {
 
     // 创建本地文件
     async createNewLocalFile() {
+      if (!(await this.confirmPotentialDataLoss('newFile'))) {
+        return
+      }
       await this.createLocalFile(createDefaultMindMapData())
     },
 
@@ -1138,6 +1274,8 @@ export default {
                 })
               )
           )
+          this.recoveredDraftLoaded = false
+          this.$message.success(this.$t('toolbar.fileCreated'))
         } finally {
           loading.close()
         }
@@ -1440,6 +1578,81 @@ export default {
       }
     }
 
+    .toolbarMetaBlock {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: 12px;
+
+      .toolbarStatus {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 220px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--toolbar-border);
+        background: rgba(15, 23, 42, 0.03);
+
+        .statusDot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: #16a34a;
+          flex-shrink: 0;
+        }
+
+        .statusText {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+
+          strong {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--toolbar-text-hover-color);
+          }
+
+          span {
+            font-size: 11px;
+            color: var(--toolbar-subtle-text-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 260px;
+          }
+        }
+
+        &.autosaving .statusDot {
+          background: #f59e0b;
+        }
+
+        &.recovered .statusDot {
+          background: #2563eb;
+        }
+
+        &.dirty .statusDot {
+          background: #dc2626;
+        }
+      }
+
+      .toolbarQuickActions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .quickActionBtn {
+        min-width: 38px;
+      }
+
+      .shortcutBadge {
+        font-size: 14px;
+        font-weight: 700;
+      }
+    }
+
     .toolbarBtn {
       display: inline-flex;
       justify-content: center;
@@ -1535,6 +1748,12 @@ export default {
           min-width: 32px;
         }
       }
+
+      .toolbarMetaBlock {
+        .toolbarStatus {
+          min-width: 190px;
+        }
+      }
     }
 
     .toolbarMeasure {
@@ -1543,6 +1762,24 @@ export default {
       top: -99999px;
       visibility: hidden;
       pointer-events: none;
+    }
+  }
+}
+
+@media (max-width: 980px) {
+  .toolbarContainer {
+    .toolbar {
+      .toolbarMetaBlock {
+        display: none;
+      }
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .toolbarContainer {
+    .toolbar {
+      padding: 0 10px;
     }
   }
 }

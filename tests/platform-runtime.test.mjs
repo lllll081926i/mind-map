@@ -9,9 +9,11 @@ import {
   isDesktopRuntime
 } from '../src/platform/runtime.mjs'
 import {
+  buildGenericSaveDefaultPath,
   buildDesktopSaveDefaultPath,
   ensureSmmFilePath,
-  normalizeSaveName
+  normalizeSaveName,
+  saveTextFileName
 } from '../src/platform/desktop/index.js'
 
 const require = createRequire(import.meta.url)
@@ -134,6 +136,30 @@ test('桌面保存默认路径会拼接目录和 .smm 文件名', () => {
   )
 })
 
+test('通用文本保存文件名会按目标扩展名补齐后缀', () => {
+  assert.equal(saveTextFileName('导图预览', 'html'), '导图预览.html')
+  assert.equal(saveTextFileName('demo.html', 'html'), 'demo.html')
+})
+
+test('通用文本保存默认路径会按扩展名拼接目录', () => {
+  assert.equal(
+    buildGenericSaveDefaultPath({
+      defaultPath: '/tmp/export',
+      suggestedName: '导图预览',
+      extension: 'html'
+    }),
+    '/tmp/export/导图预览.html'
+  )
+  assert.equal(
+    buildGenericSaveDefaultPath({
+      defaultPath: 'C:\\Users\\demo\\Documents',
+      suggestedName: '导图预览',
+      extension: 'html'
+    }),
+    'C:\\Users\\demo\\Documents\\导图预览.html'
+  )
+})
+
 test('Vite 配置固定注入桌面运行时标识', () => {
   const config = createViteConfig({
     command: 'serve',
@@ -215,6 +241,19 @@ test('平台层提供文档状态延迟加载入口', () => {
   assert.equal(platformIndexSource.includes('ensureBootstrapDocumentState'), true)
   assert.equal(platformIndexSource.includes('readBootstrapMetaState'), true)
   assert.equal(platformIndexSource.includes('readBootstrapDocumentState'), true)
+})
+
+test('桌面平台提供通用文本文件另存接口', () => {
+  assert.equal(desktopPlatformSource.includes('async saveTextFileAs('), true)
+  assert.equal(desktopPlatformSource.includes("name = '文本文件'"), true)
+  assert.equal(
+    desktopPlatformSource.includes('extensions: [normalizedExtension]'),
+    true
+  )
+  assert.equal(
+    desktopPlatformSource.includes("type: mimeType || 'text/plain;charset=utf-8'"),
+    true
+  )
 })
 
 test('平台层会在 bootstrap 回填前校验启动期本地写入代次', () => {

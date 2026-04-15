@@ -15,6 +15,7 @@
         size="small"
         v-model="searchText"
         @keyup.enter.stop="onSearchNext"
+        @keydown.shift.enter.stop.prevent="jumpToPrevResult()"
         @keyup.esc.stop="close"
         @keydown.stop
         @focus="onFocus"
@@ -32,6 +33,19 @@
       <div class="searchInfo" v-if="showSearchInfo && !isUndef(searchText)">
         {{ currentIndex }} / {{ total }}
       </div>
+    </div>
+    <div class="searchTips">
+      <div class="resultSummary">
+        {{
+          total > 0
+            ? $t('search.resultsSummary', {
+                count: total,
+                index: activeResultIndex + 1
+              })
+            : $t('search.idleHint')
+        }}
+      </div>
+      <p>{{ $t('search.usageHint') }}</p>
     </div>
     <el-input
       v-if="showReplaceInput"
@@ -62,6 +76,14 @@
         $t('search.replaceAll')
       }}</el-button>
     </div>
+    <div class="searchActions">
+      <el-button size="small" :disabled="total <= 0" @click="jumpToPrevResult()">
+        {{ $t('search.prevResult') }}
+      </el-button>
+      <el-button size="small" :disabled="total <= 0" @click="jumpToNextResult()">
+        {{ $t('search.nextResult') }}
+      </el-button>
+    </div>
     <div
       class="searchResultList"
       :style="{ height: searchResultListHeight + 'px' }"
@@ -69,6 +91,7 @@
     >
       <div
         class="searchResultItem"
+        :class="{ active: activeResultIndex === index }"
         v-for="(item, index) in searchResultList"
         :key="item.id"
         :title="item.name"
@@ -103,8 +126,10 @@ export default {
       searchText: '',
       replaceText: '',
       showReplaceInput: false,
+      searchedKeyword: '',
       currentIndex: 0,
       total: 0,
+      activeResultIndex: -1,
       showSearchInfo: false,
       searchResultListHeight: 0,
       searchResultList: [],
@@ -121,9 +146,11 @@ export default {
   },
   watch: {
     searchText() {
-      if (isUndef(this.searchText)) {
+      const keyword = this.searchText.trim()
+      if (isUndef(this.searchText) || !keyword || keyword !== this.searchedKeyword) {
         this.currentIndex = 0
         this.total = 0
+        this.activeResultIndex = -1
         this.showSearchInfo = false
       }
     }
@@ -194,6 +221,7 @@ export default {
     handleSearchInfoChange(data) {
       this.currentIndex = data.currentIndex + 1
       this.total = data.total
+      this.activeResultIndex = data.currentIndex
       this.showSearchInfo = true
     },
 
@@ -234,7 +262,16 @@ export default {
     },
 
     onSearchNext() {
+      const keyword = this.searchText.trim()
+      if (!keyword) {
+        return
+      }
       this.showSearchResultList = true
+      if (this.total > 0 && keyword === this.searchedKeyword) {
+        this.jumpToNextResult()
+        return
+      }
+      this.searchedKeyword = keyword
       this.mindMap.search.search(this.searchText)
     },
 
@@ -252,6 +289,8 @@ export default {
       this.showSearchInfo = false
       this.total = 0
       this.currentIndex = 0
+      this.activeResultIndex = -1
+      this.searchedKeyword = ''
       this.searchText = ''
       this.hideReplaceInput()
       this.mindMap.search.endSearch()
@@ -273,13 +312,49 @@ export default {
           name
         }
       })
+      if (this.searchResultList.length <= 0) {
+        this.activeResultIndex = -1
+        return
+      }
+      if (
+        this.activeResultIndex < 0 ||
+        this.activeResultIndex >= this.searchResultList.length
+      ) {
+        this.activeResultIndex = 0
+      }
     },
 
     setSearchResultListHeight() {
       this.searchResultListHeight = window.innerHeight - 267 - 24
     },
 
+    jumpToPrevResult() {
+      if (this.searchResultList.length <= 0) {
+        return
+      }
+      const nextIndex =
+        this.activeResultIndex <= 0
+          ? this.searchResultList.length - 1
+          : this.activeResultIndex - 1
+      this.activeResultIndex = nextIndex
+      this.mindMap.search.jump(nextIndex)
+    },
+
+    jumpToNextResult() {
+      if (this.searchResultList.length <= 0) {
+        this.mindMap.search.search(this.searchText)
+        return
+      }
+      const nextIndex =
+        this.activeResultIndex >= this.searchResultList.length - 1
+          ? 0
+          : this.activeResultIndex + 1
+      this.activeResultIndex = nextIndex
+      this.mindMap.search.jump(nextIndex)
+    },
+
     onSearchResultItemClick(index) {
+      this.activeResultIndex = index
       this.mindMap.search.jump(index)
     }
   }
@@ -319,6 +394,13 @@ export default {
 
     .searchInputBox {
       .searchInfo {
+        color: rgba(255, 255, 255, 0.92);
+      }
+    }
+
+    .searchTips {
+      .resultSummary,
+      p {
         color: rgba(255, 255, 255, 0.92);
       }
     }
@@ -369,6 +451,10 @@ export default {
           background-color: rgba(255, 255, 255, 0.88);
         }
 
+        &.active {
+          background-color: hsla(0, 0%, 100%, 0.12);
+        }
+
         &:hover {
           background-color: hsla(0, 0%, 100%, 0.08);
         }
@@ -390,6 +476,30 @@ export default {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+  }
+
+  .searchTips {
+    margin-top: 10px;
+
+    .resultSummary {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(15, 23, 42, 0.8);
+      margin-bottom: 4px;
+    }
+
+    p {
+      font-size: 12px;
+      line-height: 1.5;
+      color: rgba(15, 23, 42, 0.62);
+    }
+  }
+
+  .searchActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
   }
 
   .closeBtnBox {
@@ -488,6 +598,10 @@ export default {
         height: 5px;
         background-color: #606266;
         border-radius: 50%;
+      }
+
+      &.active {
+        background-color: rgba(64, 158, 255, 0.12);
       }
 
       &:hover {
