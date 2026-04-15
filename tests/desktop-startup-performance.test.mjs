@@ -255,8 +255,9 @@ test('桌面启动失败提示通过国际化文案提供', () => {
   assert.match(mainSource, /i18n\.global\.t\('app\.initFailed'\)/)
 })
 
-test('simple-mind-map 依赖使用非漏洞 quill 版本', () => {
-  assert.match(simpleMindMapPackageSource, /"quill": "2\.0\.3"/)
+test('simple-mind-map 不固定到已知受影响的 quill 2.0.3', () => {
+  assert.match(simpleMindMapPackageSource, /"quill": "2\.0\.2"/)
+  assert.doesNotMatch(simpleMindMapPackageSource, /"quill": "2\.0\.3"/)
 })
 
 test('应用入口改为按需解析 Element Plus 组件，不再在 main.js 手动全量注册', () => {

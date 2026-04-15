@@ -58,6 +58,14 @@ test('浏览器模式访问本地 AI 代理时会注入认证令牌', () => {
   assert.match(eslintConfigSource, /__APP_AI_PROXY_TOKEN__/)
 })
 
+test('关键网络与构建依赖保持在安全版本区间', () => {
+  assert.equal(packageJson.dependencies.axios, '^1.15.0')
+  assert.equal(packageJson.devDependencies.vite, '^8.0.8')
+  assert.equal(packageJson.overrides['follow-redirects'], '1.16.0')
+  assert.equal(packageJson.overrides.quill, '2.0.2')
+  assert.equal(simpleMindMapPackageJson.dependencies.quill, '2.0.2')
+})
+
 test('依赖清理已经移除 root 侧冗余 polyfill，并升级 simple-mind-map 的 ws', () => {
   assert.equal('core-js' in packageJson.dependencies, false)
   assert.equal('punycode' in packageJson.dependencies, false)

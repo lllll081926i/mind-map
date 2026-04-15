@@ -3,6 +3,7 @@ import {
   getDefaultAiConfig,
   normalizeAiConfig
 } from '@/utils/aiProviders.mjs'
+import { parseExternalJsonSafely } from '@/utils/json'
 
 const AI_CHAT_STORAGE_KEY = 'mindmap-ai-chat-session-v1'
 const MAX_CHAT_MESSAGES = 30
@@ -59,7 +60,7 @@ const readChatSession = () => {
   try {
     const raw = window.localStorage.getItem(AI_CHAT_STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw)
+    const parsed = parseExternalJsonSafely(raw)
     return {
       chatDraft: String(parsed.chatDraft || ''),
       chatStatus: parsed.chatStatus === 'streaming' ? 'streaming' : 'idle',
