@@ -312,7 +312,14 @@ const createBrowserTauriModules = () => {
         }
         case 'open_external_url': {
           if (typeof window !== 'undefined' && payload.url) {
-            window.open(payload.url, '_blank', 'noopener,noreferrer')
+            try {
+              const parsed = new URL(payload.url, window.location.href)
+              if (['http:', 'https:'].includes(parsed.protocol)) {
+                window.open(parsed.toString(), '_blank', 'noopener,noreferrer')
+              }
+            } catch (_error) {
+              return null
+            }
           }
           return null
         }

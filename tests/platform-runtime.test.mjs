@@ -243,6 +243,16 @@ test('平台层提供文档状态延迟加载入口', () => {
   assert.equal(platformIndexSource.includes('readBootstrapDocumentState'), true)
 })
 
+test('浏览器回退打开外链时仍限制为 http/https 协议', () => {
+  assert.equal(platformIndexSource.includes('new URL('), true)
+  assert.equal(platformIndexSource.includes('window.location.href'), true)
+  assert.equal(platformIndexSource.includes("['http:', 'https:'].includes(parsedUrl.protocol)"), true)
+  assert.equal(
+    desktopPlatformSource.includes("['http:', 'https:'].includes(parsed.protocol)"),
+    true
+  )
+})
+
 test('桌面平台提供通用文本文件另存接口', () => {
   assert.equal(desktopPlatformSource.includes('async saveTextFileAs('), true)
   assert.equal(desktopPlatformSource.includes("name = '文本文件'"), true)

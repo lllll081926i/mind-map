@@ -549,7 +549,8 @@ test('工具栏只会在成功解析本地文件后再切换当前文件状态',
   assert.match(toolbarSource, /const normalized = parseToolbarLocalFileContent\(/)
   assert.match(toolbarSource, /setCurrentFileRef\(nextFileRef, nextFileRef\.mode \|\| 'desktop'\)/)
   assert.match(toolbarSource, /setIsHandleLocalFile\(true\)/)
-  assert.match(toolbarSource, /Notification\(\{/)
+  assert.match(toolbarSource, /this\.recoveredDraftLoaded = !!fileResult\.recoveredFromDraft/)
+  assert.doesNotMatch(toolbarSource, /Notification\(\{/)
 })
 
 test('桌面文件选择器返回的新路径会先登记到运行时白名单，再执行读写或目录遍历', () => {

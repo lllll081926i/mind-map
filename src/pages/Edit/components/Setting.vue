@@ -425,7 +425,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocalConfigPatch } from '@/stores/runtime'
 import {
-  checkForUpdates as runUpdateCheck
+  checkForUpdates as runUpdateCheck,
+  createUpdateDialogMessage
 } from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
 
@@ -655,23 +656,26 @@ export default {
       try {
         const result = await runUpdateCheck(this.appVersion)
         if (result.status === 'update-available') {
-          const notes = result.notes ? `\n\n${result.notes}` : ''
           if (result.url) {
-            this.$confirm(
-              `${this.$t('setting.updateAvailableMessage', {
-                version: result.latestVersion
-              })}\n\n${this.$t('setting.updateOpenReleasePageTip')}${notes}`,
+            const action = await this.$confirm(
+              createUpdateDialogMessage(result, this.$t),
               this.$t('setting.updateAvailableTitle'),
               {
                 confirmButtonText: this.$t('setting.openReleasePage'),
                 cancelButtonText: this.$t('setting.updateLater'),
                 type: 'info'
               }
-            )
-              .then(() => {
-                return openExternalUrl(result.url)
-              })
-              .catch(() => {})
+            ).catch(action => action)
+            if (action !== 'confirm') {
+              return
+            }
+            try {
+              await openExternalUrl(result.url)
+            } catch (error) {
+              this.$message.error(
+                error?.message || this.$t('setting.updateOpenReleasePageFailed')
+              )
+            }
             return
           }
           this.$message.info(

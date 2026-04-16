@@ -129,7 +129,17 @@ const openUrlWithBrowserFallback = url => {
   ) {
     return false
   }
-  window.open(url, '_blank', 'noopener,noreferrer')
+  const urlValue = String(url || '').trim()
+  let parsedUrl
+  try {
+    parsedUrl = new URL(urlValue, window.location.href)
+  } catch (_error) {
+    return false
+  }
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return false
+  }
+  window.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
   return true
 }
 

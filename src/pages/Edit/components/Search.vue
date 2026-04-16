@@ -125,6 +125,9 @@ export default {
       show: false,
       searchText: '',
       replaceText: '',
+      searchDraftText: '',
+      replaceDraftText: '',
+      replaceDraftVisible: false,
       showReplaceInput: false,
       searchedKeyword: '',
       currentIndex: 0,
@@ -167,7 +170,7 @@ export default {
     )
     this.mindMap.keyCommand.addShortcut('Control+f', this.showSearch)
     window.addEventListener('resize', this.setSearchResultListHeight)
-    this.$bus.$on('setData', this.close)
+    this.$bus.$on('setData', this.handleDocumentChange)
   },
   mounted() {
     this.setSearchResultListHeight()
@@ -184,7 +187,7 @@ export default {
     )
     this.mindMap.keyCommand.removeShortcut('Control+f', this.showSearch)
     window.removeEventListener('resize', this.setSearchResultListHeight)
-    this.$bus.$off('setData', this.close)
+    this.$bus.$off('setData', this.handleDocumentChange)
   },
   methods: {
     isUndef,
@@ -225,10 +228,50 @@ export default {
       this.showSearchInfo = true
     },
 
+    cacheSearchDraft() {
+      this.searchDraftText = this.searchText
+      this.replaceDraftText = this.replaceText
+      this.replaceDraftVisible = this.showReplaceInput
+    },
+
+    restoreSearchDraft() {
+      this.searchText = this.searchDraftText
+      this.replaceText = this.replaceDraftText
+      this.showReplaceInput =
+        this.replaceDraftVisible && !!String(this.searchDraftText || '').trim()
+    },
+
+    resetSearchDraft() {
+      this.searchDraftText = ''
+      this.replaceDraftText = ''
+      this.replaceDraftVisible = false
+    },
+
+    resetSearchState() {
+      this.show = false
+      this.showSearchResultList = false
+      this.showSearchInfo = false
+      this.total = 0
+      this.currentIndex = 0
+      this.activeResultIndex = -1
+      this.searchedKeyword = ''
+      this.searchText = ''
+      this.replaceText = ''
+      this.showReplaceInput = false
+      this.mindMap.search.endSearch()
+    },
+
+    handleDocumentChange() {
+      this.resetSearchDraft()
+      this.resetSearchState()
+    },
+
     showSearch() {
       this.show = true
+      this.restoreSearchDraft()
       this.$nextTick(() => {
         this.$refs.searchInputRef?.focus()
+        this.$refs.searchInputRef?.select?.()
       })
     },
 
@@ -284,16 +327,8 @@ export default {
     },
 
     close() {
-      this.show = false
-      this.showSearchResultList = false
-      this.showSearchInfo = false
-      this.total = 0
-      this.currentIndex = 0
-      this.activeResultIndex = -1
-      this.searchedKeyword = ''
-      this.searchText = ''
-      this.hideReplaceInput()
-      this.mindMap.search.endSearch()
+      this.cacheSearchDraft()
+      this.resetSearchState()
     },
 
     onSearchMatchNodeListChange(list) {

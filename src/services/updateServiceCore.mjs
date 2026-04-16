@@ -4,6 +4,28 @@ export const normalizeVersion = version => {
     .replace(/^v/i, '')
 }
 
+export const formatReleasePublishedAt = publishedAt => {
+  const value = String(publishedAt || '').trim()
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export const createReleaseNotesPreview = (notes, maxLength = 280) => {
+  const normalized = String(notes || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (!normalized) return ''
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`
+}
+
 const toVersionParts = version => {
   return normalizeVersion(version)
     .split('.')
@@ -42,6 +64,7 @@ export const parseGitHubLatestRelease = (data, fallbackUrl = '') => {
 
   return {
     version: normalizeVersion(data.tag_name),
+    releaseName: String(data.name || '').trim(),
     notes: String(data.body || ''),
     url: String(data.html_url || fallbackUrl || '').trim(),
     publishedAt: String(data.published_at || data.created_at || '').trim()
@@ -54,6 +77,7 @@ export const createManualUpdateResult = (currentVersion, manifest) => {
     return {
       status: 'update-available',
       latestVersion: manifest.version,
+      releaseName: String(manifest.releaseName || '').trim(),
       notes: manifest.notes,
       url: manifest.url,
       publishedAt: manifest.publishedAt || ''
