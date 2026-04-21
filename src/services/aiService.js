@@ -75,6 +75,22 @@ export const buildAiCreatePartMessages = ({ input, t }) => {
   ]
 }
 
+export const buildAiCreateFlowchartMessages = ({ input, t }) => {
+  const content = String(input || '').trim()
+  return [
+    {
+      role: 'system',
+      content: t('ai.aiCreateFlowchartSystem')
+    },
+    {
+      role: 'user',
+      content: `${t('ai.aiCreateFlowchartPromptPrefix')}${content}${t(
+        'ai.aiCreateFlowchartPromptPostfix'
+      )}`
+    }
+  ]
+}
+
 export const createAiClient = aiConfig => {
   const config = normalizeAiConfig(aiConfig)
   const ai = new Ai({

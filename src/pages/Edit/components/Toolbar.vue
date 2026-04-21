@@ -281,16 +281,6 @@
         </div>
       </div>
       <div class="toolbarBlock toolbarMetaBlock" v-if="!isMobile">
-        <div class="toolbarStatus" :class="toolbarStatusType">
-          <span class="statusDot"></span>
-          <div class="statusText" :title="toolbarStatusTitle">
-            <strong>{{ toolbarStatusText }}</strong>
-            <span class="statusDocument">
-              {{ $t('toolbar.statusDocumentPrefix') }}{{ toolbarDocumentLabel }}
-            </span>
-            <span class="statusDetail">{{ toolbarStatusDetail }}</span>
-          </div>
-        </div>
         <div class="toolbarQuickActions">
           <div
             class="toolbarBtn quickActionBtn"
@@ -303,18 +293,6 @@
           >
             <span class="icon iconfont iconsousuo"></span>
             <span class="text">{{ $t('toolbar.searchAction') }}</span>
-          </div>
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.shortcutAction')"
-            @click="openShortcutKey"
-            @keydown.enter.prevent="openShortcutKey"
-            @keydown.space.prevent="openShortcutKey"
-          >
-            <span class="icon shortcutBadge">⌘</span>
-            <span class="text">{{ $t('toolbar.shortcutAction') }}</span>
           </div>
         </div>
       </div>
@@ -349,12 +327,16 @@ import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { getConfig, getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
-import { parseExternalJsonSafely } from '@/utils/json'
+import {
+  parseStoredDocumentContent,
+  serializeStoredDocumentContent
+} from '@/services/flowchartDocument'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
   getRecentFiles,
   isDesktopApp,
-  recordRecentFile
+  recordRecentFile,
+  saveBootstrapStatePatch
 } from '@/platform'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import {
@@ -431,22 +413,29 @@ const formatTimeLabel = timestamp => {
 }
 
 const parseToolbarLocalFileContent = (str, invalidContentMessage) => {
-  let data = parseExternalJsonSafely(str)
-  if (!data || typeof data !== 'object') {
-    throw new Error(invalidContentMessage)
+  let parsedDocument
+  try {
+    parsedDocument = parseStoredDocumentContent(str)
+  } catch (error) {
+    throw new Error(invalidContentMessage, {
+      cause: error
+    })
   }
-  if (data.root) {
+  if (parsedDocument.documentMode === 'flowchart') {
     return {
-      data,
-      isFullDataFile: true
+      documentMode: 'flowchart',
+      data: parsedDocument.flowchartData,
+      flowchartData: parsedDocument.flowchartData,
+      flowchartConfig: parsedDocument.flowchartConfig || null,
+      isFullDataFile: true,
+      configData: parsedDocument.flowchartConfig || null
     }
   }
   return {
-    data: {
-      ...createDefaultMindMapData(),
-      root: data
-    },
-    isFullDataFile: false
+    documentMode: 'mindmap',
+    data: parsedDocument.mindMapData,
+    isFullDataFile: parsedDocument.isFullDataFile,
+    configData: parsedDocument.mindMapConfig || null
   }
 }
 
@@ -1219,7 +1208,24 @@ export default {
         this.$t('toolbar.fileContentError')
       )
       this.isFullDataFile = normalized.isFullDataFile
-      this.$bus.$emit('setData', normalized.data)
+      if (normalized.documentMode === 'flowchart') {
+        void saveBootstrapStatePatch({
+          mindMapData: null,
+          mindMapConfig: null,
+          flowchartData: normalized.flowchartData,
+          flowchartConfig: normalized.flowchartConfig || null
+        })
+        return normalized
+      }
+      void saveBootstrapStatePatch({
+        mindMapData: normalized.data,
+        mindMapConfig: normalized.configData || null,
+        flowchartData: null,
+        flowchartConfig: null
+      })
+      this.$bus.$emit('setData', normalized.data, {
+        configData: normalized.configData || null
+      })
       return normalized
     },
 
@@ -1251,14 +1257,31 @@ export default {
         const nextFileRef = {
           ...fileRef,
           name: String(fileResult.name || fileRef.name || '').trim(),
-          isFullDataFile: normalized.isFullDataFile
+          isFullDataFile: normalized.isFullDataFile,
+          documentMode: normalized.documentMode
+        }
+        const setDataOptions = {
+          configData: normalized.configData || null
         }
         this.isFullDataFile = normalized.isFullDataFile
         setCurrentFileRef(nextFileRef, nextFileRef.mode || 'desktop')
         setIsHandleLocalFile(true)
-        this.$bus.$emit('setData', normalized.data, {
-          skipSave: true
-        })
+        if (normalized.documentMode === 'flowchart') {
+          await saveBootstrapStatePatch({
+            mindMapData: null,
+            mindMapConfig: null,
+            flowchartData: normalized.flowchartData,
+            flowchartConfig: normalized.flowchartConfig || null
+          })
+        } else {
+          await saveBootstrapStatePatch({
+            mindMapData: normalized.data,
+            mindMapConfig: setDataOptions.configData,
+            flowchartData: null,
+            flowchartConfig: null
+          })
+          this.$bus.$emit('setData', normalized.data, { skipSave: true })
+        }
         await recordRecentFile(nextFileRef)
         if (!this.isLatestLocalFileRead(requestId, fileRef)) {
           return false
@@ -1298,7 +1321,8 @@ export default {
         id: ++this.localFileWriteRequestId,
         fileRef,
         content,
-        isFullDataFile
+        isFullDataFile,
+        configData: getConfig()
       }
     },
 
@@ -1323,11 +1347,12 @@ export default {
       let writeSucceeded = false
       this.currentLocalFileWriteRequestId = writeTask.id
       try {
-        let content = writeTask.content
-        if (!writeTask.isFullDataFile) {
-          content = content.root
-        }
-        const string = JSON.stringify(content)
+        const string = serializeStoredDocumentContent({
+          documentMode: 'mindmap',
+          mindMapData: writeTask.content,
+          mindMapConfig: writeTask.configData,
+          isFullDataFile: writeTask.isFullDataFile
+        })
         await platform.writeMindMapFile(writeTask.fileRef, string)
         await recordRecentFile(writeTask.fileRef)
         this.refreshRecentFiles()
@@ -1387,9 +1412,16 @@ export default {
     async createLocalFile(content) {
       try {
         const previousFileRef = snapshotLocalFileRef(getCurrentFileRef())
+        const configData = getConfig()
+        const serializedContent = serializeStoredDocumentContent({
+          documentMode: 'mindmap',
+          mindMapData: content,
+          mindMapConfig: configData,
+          isFullDataFile: true
+        })
         const nextFileHandle = await platform.saveMindMapFileAs({
           suggestedName: this.$t('toolbar.defaultFileName'),
-          content: JSON.stringify(content),
+          content: serializedContent,
           defaultPath: getLastDirectory()
         })
         if (!nextFileHandle) {
@@ -1406,7 +1438,7 @@ export default {
           await this.applyLocalFileResult(
             {
               ...nextFileHandle,
-              content: JSON.stringify(content)
+              content: serializedContent
             },
             requestId
           )
@@ -1732,69 +1764,8 @@ export default {
     .toolbarMetaBlock {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: flex-end;
       margin-left: 12px;
-
-      .toolbarStatus {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 220px;
-        padding: 8px 12px;
-        border-radius: 10px;
-        border: 1px solid var(--toolbar-border);
-        background: rgba(15, 23, 42, 0.03);
-
-        .statusDot {
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: #16a34a;
-          flex-shrink: 0;
-        }
-
-        .statusText {
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-
-          strong {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--toolbar-text-hover-color);
-          }
-
-          span {
-            font-size: 11px;
-            color: var(--toolbar-subtle-text-color);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 260px;
-          }
-
-          .statusDetail {
-            font-size: 10px;
-          }
-        }
-
-        &.autosaving .statusDot {
-          background: #f59e0b;
-        }
-
-        &.recovered .statusDot {
-          background: #2563eb;
-        }
-
-        &.dirty .statusDot {
-          background: #dc2626;
-        }
-
-        &.failed .statusDot {
-          background: #b91c1c;
-        }
-      }
 
       .toolbarQuickActions {
         display: flex;
@@ -1804,11 +1775,6 @@ export default {
 
       .quickActionBtn {
         min-width: 38px;
-      }
-
-      .shortcutBadge {
-        font-size: 14px;
-        font-weight: 700;
       }
     }
 
@@ -1908,11 +1874,6 @@ export default {
         }
       }
 
-      .toolbarMetaBlock {
-        .toolbarStatus {
-          min-width: 190px;
-        }
-      }
     }
 
     .toolbarMeasure {

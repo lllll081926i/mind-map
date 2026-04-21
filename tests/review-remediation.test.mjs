@@ -14,6 +14,10 @@ const aiServiceSource = fs.readFileSync(
   path.resolve('src/services/aiService.js'),
   'utf8'
 )
+const flowchartDocumentSource = fs.readFileSync(
+  path.resolve('src/services/flowchartDocument.js'),
+  'utf8'
+)
 const aiProvidersSource = fs.readFileSync(
   path.resolve('src/utils/aiProviders.mjs'),
   'utf8'
@@ -373,7 +377,8 @@ test('外部 JSON 在导入、打开文件与剪贴板路径上统一走本地�
   assert.match(jsonUtilsSource, /JSON\.parse\(String\(input \|\| ''\)\)/)
   assert.match(jsonUtilsSource, /validateJsonValue\(parsed\)/)
   assert.match(importSource, /parseExternalJsonSafely\(evt\.target\.result\)/)
-  assert.match(toolbarSource, /parseExternalJsonSafely\(str\)/)
+  assert.match(toolbarSource, /parseStoredDocumentContent\(str\)/)
+  assert.match(flowchartDocumentSource, /parseExternalJsonSafely\(content\)/)
   assert.match(searchSource, /this\.\$nextTick\(\(\) => \{/)
 })
 

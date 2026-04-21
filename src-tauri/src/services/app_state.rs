@@ -17,6 +17,8 @@ pub struct RecentFileItem {
   pub name: String,
   #[serde(default)]
   pub updated_at: u64,
+  #[serde(default)]
+  pub document_mode: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -38,6 +40,8 @@ pub struct DesktopDocumentState {
   pub version: u32,
   pub mind_map_data: serde_json::Value,
   pub mind_map_config: Option<serde_json::Value>,
+  pub flowchart_data: serde_json::Value,
+  pub flowchart_config: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -47,6 +51,8 @@ pub struct DesktopState {
   pub version: u32,
   pub mind_map_data: serde_json::Value,
   pub mind_map_config: Option<serde_json::Value>,
+  pub flowchart_data: serde_json::Value,
+  pub flowchart_config: Option<serde_json::Value>,
   pub local_config: serde_json::Value,
   pub ai_config: serde_json::Value,
   pub recent_files: Vec<RecentFileItem>,
@@ -101,6 +107,8 @@ fn default_document_state() -> DesktopDocumentState {
     version: 1,
     mind_map_data: serde_json::Value::Null,
     mind_map_config: None,
+    flowchart_data: serde_json::Value::Null,
+    flowchart_config: None,
   }
 }
 
@@ -109,6 +117,8 @@ fn merge_state(meta: DesktopMetaState, document: DesktopDocumentState) -> Deskto
     version: meta.version.max(document.version).max(1),
     mind_map_data: document.mind_map_data,
     mind_map_config: document.mind_map_config,
+    flowchart_data: document.flowchart_data,
+    flowchart_config: document.flowchart_config,
     local_config: meta.local_config,
     ai_config: meta.ai_config,
     recent_files: meta.recent_files,
@@ -131,6 +141,8 @@ fn split_state(state: &DesktopState) -> (DesktopMetaState, DesktopDocumentState)
       version: state.version,
       mind_map_data: state.mind_map_data.clone(),
       mind_map_config: state.mind_map_config.clone(),
+      flowchart_data: state.flowchart_data.clone(),
+      flowchart_config: state.flowchart_config.clone(),
     },
   )
 }

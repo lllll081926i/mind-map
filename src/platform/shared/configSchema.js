@@ -36,6 +36,8 @@ export const DEFAULT_BOOTSTRAP_STATE = () => ({
   version: DESKTOP_STATE_VERSION,
   mindMapData: null,
   mindMapConfig: null,
+  flowchartData: null,
+  flowchartConfig: null,
   localConfig: {
     ...DEFAULT_LOCAL_CONFIG
   },

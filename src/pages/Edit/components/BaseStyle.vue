@@ -1235,8 +1235,8 @@ export default {
       PingFang SC;
     font-weight: 500;
     color: rgba(26, 26, 26, 0.9);
-    margin-bottom: 10px;
-    margin-top: 35px;
+    margin-bottom: 8px;
+    margin-top: 24px;
 
     &.noTop {
       margin-top: 0;
@@ -1246,7 +1246,7 @@ export default {
   .row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 
     &.noBottom {
       margin-bottom: 0;
@@ -1260,7 +1260,7 @@ export default {
       width: 100%;
       display: flex;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .segmentTab {
@@ -1281,11 +1281,11 @@ export default {
     }
 
     .imgUpload {
-      margin-bottom: 5px;
+      margin-bottom: 2px;
     }
 
     &.editorBackgroundStyleRow {
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .btnGroup {
@@ -1297,7 +1297,7 @@ export default {
     .rowItem {
       display: flex;
       align-items: center;
-      margin-bottom: 5px;
+      margin-bottom: 2px;
 
       &.spaceBetween {
         justify-content: space-between;

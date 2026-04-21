@@ -32,12 +32,18 @@ const getBrowserFileEntry = path => {
 
 const normalizeBrowserRecoveryDraft = draft => {
   if (!draft || !draft.sourcePath) return null
+  const documentMode =
+    String(draft.documentMode || '').trim() === 'flowchart' ||
+    (draft.flowchartData && typeof draft.flowchartData === 'object')
+      ? 'flowchart'
+      : 'mindmap'
   return {
     documentId: String(draft.documentId || '').trim(),
     title: String(draft.title || '').trim(),
     sourcePath: String(draft.sourcePath || '').trim(),
     updatedAt: Number(draft.updatedAt || Date.now()),
     dirty: !!draft.dirty,
+    documentMode,
     draftFile:
       String(draft.draftFile || '').trim() ||
       `${String(draft.documentId || '').trim() || 'draft'}.json`,
@@ -50,6 +56,14 @@ const normalizeBrowserRecoveryDraft = draft => {
     mindMapConfig:
       draft.mindMapConfig && typeof draft.mindMapConfig === 'object'
         ? draft.mindMapConfig
+        : null,
+    flowchartData:
+      draft.flowchartData && typeof draft.flowchartData === 'object'
+        ? draft.flowchartData
+        : null,
+    flowchartConfig:
+      draft.flowchartConfig && typeof draft.flowchartConfig === 'object'
+        ? draft.flowchartConfig
         : null,
     fileRef:
       draft.fileRef && typeof draft.fileRef === 'object' ? draft.fileRef : null
@@ -697,7 +711,11 @@ export const desktopPlatform = {
         item: {
           path: fileRef.path,
           name: fileRef.name || getFileName(fileRef.path),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          documentMode:
+            String(fileRef.documentMode || '').trim() === 'flowchart'
+              ? 'flowchart'
+              : 'mindmap'
         }
       },
       '记录最近文件失败'

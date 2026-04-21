@@ -15,6 +15,8 @@
 import { mapState } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 
+const COUNT_UPDATE_DEBOUNCE_MS = 120
+
 // 字数及节点数量统计
 export default {
   props: {
@@ -25,7 +27,11 @@ export default {
   data() {
     return {
       words: 0,
-      num: 0
+      num: 0,
+      countUpdateFrame: 0,
+      countUpdateTimer: 0,
+      pendingCountData: null,
+      htmlParser: null
     }
   },
   computed: {
@@ -36,11 +42,12 @@ export default {
   created() {
     this.$bus.$on('data_change', this.onDataChange)
     if (this.mindMap) {
-      this.onDataChange(this.mindMap.getData())
+      this.scheduleCountUpdate(this.mindMap.getData())
     }
   },
   beforeUnmount() {
     this.$bus.$off('data_change', this.onDataChange)
+    this.cancelScheduledCountUpdate()
   },
   methods: {
     extractText(value) {
@@ -49,30 +56,70 @@ export default {
       if (!/[<&]/.test(source)) {
         return source
       }
+      if (!this.htmlParser) {
+        this.htmlParser = new DOMParser()
+      }
       return (
-        new DOMParser().parseFromString(source, 'text/html').body.textContent ||
-        ''
+        this.htmlParser.parseFromString(source, 'text/html').body.textContent || ''
       )
+    },
+
+    cancelScheduledCountUpdate() {
+      if (this.countUpdateFrame) {
+        cancelAnimationFrame(this.countUpdateFrame)
+        this.countUpdateFrame = 0
+      }
+      if (this.countUpdateTimer) {
+        clearTimeout(this.countUpdateTimer)
+        this.countUpdateTimer = 0
+      }
+    },
+
+    scheduleCountUpdate(data) {
+      this.pendingCountData = data
+      if (this.countUpdateFrame || this.countUpdateTimer) {
+        return
+      }
+      this.countUpdateFrame = requestAnimationFrame(() => {
+        this.countUpdateFrame = 0
+        this.countUpdateTimer = window.setTimeout(() => {
+          this.countUpdateTimer = 0
+          this.flushCountUpdate()
+        }, COUNT_UPDATE_DEBOUNCE_MS)
+      })
+    },
+
+    flushCountUpdate() {
+      const stats = this.countStats(this.pendingCountData)
+      this.pendingCountData = null
+      this.words = stats.words
+      this.num = stats.num
+    },
+
+    countStats(data) {
+      const stats = {
+        words: 0,
+        num: 0
+      }
+      this.walk(data, node => {
+        stats.num += 1
+        stats.words += this.extractText(node?.data?.text).length
+      })
+      return stats
     },
 
     // 监听数据变化
     onDataChange(data) {
-      let totalText = ''
-      this.num = 0
-      this.walk(data, text => {
-        totalText += text
-      })
-      this.words = totalText.length
+      this.scheduleCountUpdate(data)
     },
 
     // 遍历
-    walk(data, collectText) {
+    walk(data, visit) {
       if (!data) return
-      this.num++
-      collectText(this.extractText(data?.data?.text))
+      visit(data)
       if (data.children && data.children.length > 0) {
         data.children.forEach(item => {
-          this.walk(item, collectText)
+          this.walk(item, visit)
         })
       }
     }

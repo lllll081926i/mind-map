@@ -24,6 +24,22 @@
 
           <button
             type="button"
+            class="secondaryAction"
+            :disabled="busy"
+            @click="createFlowchart"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="6" height="4" rx="1"></rect>
+              <rect x="14" y="15" width="6" height="4" rx="1"></rect>
+              <path d="M10 7h4"></path>
+              <path d="M14 17h-4"></path>
+              <path d="M12 9v6"></path>
+            </svg>
+            <span>{{ $t('home.createFlowchart') }}</span>
+          </button>
+
+          <button
+            type="button"
             class="actionItem"
             :disabled="busy"
             @click="openLocalFile"
@@ -120,7 +136,16 @@
             @click="openRecent(item)"
           >
             <div class="recentMain">
-              <strong>{{ resolveRecentTitle(item) }}</strong>
+              <div class="recentTitleRow">
+                <strong>{{ resolveRecentTitle(item) }}</strong>
+                <em class="recentMode">
+                  {{
+                    item.documentMode === 'flowchart'
+                      ? $t('home.documentModeFlowchart')
+                      : $t('home.documentModeMindmap')
+                  }}
+                </em>
+              </div>
               <span>{{ item.path }}</span>
               <em v-if="lastDirectory" class="recentHint">
                 {{ $t('home.currentDirectory') }}{{ lastDirectory }}
@@ -282,6 +307,19 @@ export default {
       })
     },
 
+    async createBlankFlowchartProject() {
+      await this.runWorkspaceAction(async () => {
+        const { createWorkspaceFlowchartFile } = await loadWorkspaceActions()
+        return createWorkspaceFlowchartFile({
+          router: this.$router
+        })
+      })
+    },
+
+    async createFlowchart() {
+      await this.createBlankFlowchartProject()
+    },
+
     async openLocalFile() {
       await this.runWorkspaceAction(async () => {
         const { openWorkspaceLocalFile } = await loadWorkspaceActions()
@@ -388,6 +426,15 @@ export default {
       }
     }
 
+    .secondaryAction {
+      background: rgba(255, 255, 255, 0.05);
+      color: hsla(0, 0%, 100%, 0.92);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+      }
+    }
+
     .actionItem {
       &:hover:not(:disabled) {
         background: rgba(255, 255, 255, 0.05);
@@ -395,7 +442,8 @@ export default {
     }
 
     .actionIcon,
-    .recentHint {
+    .recentHint,
+    .recentMode {
       color: hsla(0, 0%, 100%, 0.42);
     }
 
@@ -522,7 +570,7 @@ export default {
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 
   svg {
     width: 16px;
@@ -536,6 +584,43 @@ export default {
 
   &:hover:not(:disabled) {
     background: #333;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.secondaryAction {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 16px;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover:not(:disabled) {
+    background: #eef2f7;
   }
 
   &:disabled {
@@ -785,6 +870,22 @@ export default {
     color: #9ca3af;
     word-break: break-all;
   }
+}
+
+.recentTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recentMode {
+  font-style: normal;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .recentHint {

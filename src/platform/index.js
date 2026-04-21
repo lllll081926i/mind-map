@@ -39,7 +39,13 @@ const BOOTSTRAP_META_KEYS = [
   'currentDocument'
 ]
 
-const BOOTSTRAP_DOCUMENT_KEYS = ['version', 'mindMapData', 'mindMapConfig']
+const BOOTSTRAP_DOCUMENT_KEYS = [
+  'version',
+  'mindMapData',
+  'mindMapConfig',
+  'flowchartData',
+  'flowchartConfig'
+]
 
 const bumpMetaMutationVersion = () => {
   metaMutationVersion += 1

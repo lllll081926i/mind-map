@@ -31,24 +31,29 @@ pub struct RecoveryState {
   pub entries: Vec<RecoveryIndexEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct RecoveryDraft {
   pub document_id: String,
   pub title: String,
   pub source_path: String,
   pub updated_at: u64,
   pub dirty: bool,
+  pub document_mode: String,
   pub draft_file: String,
   pub origin: String,
   pub is_full_data_file: bool,
   pub mind_map_data: serde_json::Value,
   pub mind_map_config: Option<serde_json::Value>,
+  pub flowchart_data: serde_json::Value,
+  pub flowchart_config: Option<serde_json::Value>,
   pub file_ref: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct RecoveryDraftInput {
   pub source_path: String,
   pub title: String,
@@ -58,8 +63,11 @@ pub struct RecoveryDraftInput {
   pub updated_at: u64,
   #[serde(default)]
   pub is_full_data_file: bool,
+  pub document_mode: String,
   pub mind_map_data: serde_json::Value,
   pub mind_map_config: Option<serde_json::Value>,
+  pub flowchart_data: serde_json::Value,
+  pub flowchart_config: Option<serde_json::Value>,
   pub file_ref: Option<serde_json::Value>,
 }
 
@@ -306,11 +314,14 @@ pub async fn read_recovery_draft(
     source_path: entry.source_path.clone(),
     updated_at: entry.updated_at,
     dirty: entry.dirty,
+    document_mode: String::from("mindmap"),
     draft_file: entry.draft_file.clone(),
     origin: entry.origin.clone(),
     is_full_data_file: false,
     mind_map_data: serde_json::Value::Null,
     mind_map_config: None,
+    flowchart_data: serde_json::Value::Null,
+    flowchart_config: None,
     file_ref: None,
   })
   .await?;
@@ -339,11 +350,18 @@ pub async fn write_recovery_draft(
     source_path: input.source_path.trim().to_string(),
     updated_at,
     dirty: input.dirty,
+    document_mode: if input.document_mode.trim() == "flowchart" {
+      String::from("flowchart")
+    } else {
+      String::from("mindmap")
+    },
     draft_file: draft_file.clone(),
     origin: root.origin.clone(),
     is_full_data_file: input.is_full_data_file,
     mind_map_data: input.mind_map_data,
     mind_map_config: input.mind_map_config,
+    flowchart_data: input.flowchart_data,
+    flowchart_config: input.flowchart_config,
     file_ref: input.file_ref,
   };
   write_json_file(recovery_draft_path(&root.root_path, &draft_file), &draft).await?;

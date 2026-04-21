@@ -15,6 +15,10 @@ const editIndexSource = fs.readFileSync(
   path.resolve('src/pages/Edit/Index.vue'),
   'utf8'
 )
+const editSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Edit.vue'),
+  'utf8'
+)
 
 test('编辑页顶部提供返回首页入口', () => {
   assert.match(toolbarSource, /toolbar\.returnHome/)
@@ -40,23 +44,15 @@ test('编辑页页面级入口合并到主工具栏，不再使用独立悬浮�
   assert.match(toolbarSource, /toolbar\.returnHome/)
 })
 
-test('编辑页顶部工具栏新增工作流状态区、搜索入口与快捷键入口', () => {
-  assert.match(toolbarSource, /class="toolbarStatus"/)
+test('编辑页顶部工具栏保留搜索入口并移除状态卡片与快捷键按钮', () => {
+  assert.doesNotMatch(toolbarSource, /class="toolbarStatus"/)
   assert.match(toolbarSource, /class="toolbarQuickActions"/)
   assert.match(toolbarSource, /toolbar\.searchAction/)
-  assert.match(toolbarSource, /toolbar\.shortcutAction/)
   assert.match(toolbarSource, /toolbar\.save/)
   assert.match(toolbarSource, /saveCurrentLocalFile/)
   assert.match(toolbarSource, /canDirectSave/)
-  assert.match(toolbarSource, /toolbar\.statusSaved/)
-  assert.match(toolbarSource, /toolbar\.statusAutosaving/)
-  assert.match(toolbarSource, /toolbar\.statusRecovered/)
-  assert.match(toolbarSource, /toolbar\.statusSaveFailed/)
-  assert.match(toolbarSource, /toolbarStatusDetail/)
-  assert.match(toolbarSource, /lastSuccessfulSaveAt/)
-  assert.match(toolbarSource, /lastLocalSaveErrorMessage/)
   assert.match(toolbarSource, /emitShowSearch\(\)/)
-  assert.match(toolbarSource, /setActiveSidebar\('shortcutKey'\)/)
+  assert.doesNotMatch(toolbarSource, /toolbar\.shortcutAction/)
 })
 
 test('编辑页在切换上下文前会对未保存风险给出确认', () => {
@@ -75,14 +71,51 @@ test('编辑页在切换上下文前会对未保存风险给出确认', () => {
   assert.match(toolbarSource, /await this\.confirmPotentialDataLoss\('newFile'\)/)
 })
 
-test('搜索面板新增结果摘要、上下跳转与当前结果高亮', () => {
-  assert.match(searchSource, /class="searchTips"/)
+test('工具栏本地文件读写会保留思维导图 config，并在打开文件时回填到编辑态', () => {
+  assert.match(toolbarSource, /configData:\s*parsedDocument\.mindMapConfig \|\| null/)
+  assert.match(toolbarSource, /configData:\s*getConfig\(\)/)
+  assert.match(toolbarSource, /serializeStoredDocumentContent\(/)
+  assert.match(toolbarSource, /mindMapConfig:\s*writeTask\.configData/)
+  assert.match(toolbarSource, /configData:\s*normalized\.configData \|\| null/)
+  assert.match(editSource, /if \('configData' in options\)/)
+  assert.match(editSource, /this\.mindMapConfig = options\.configData \|\| \{\}/)
+})
+
+test('编辑页工具栏打开流程图文件时走统一文档解析并切换到流程图模式', () => {
+  assert.match(toolbarSource, /parseStoredDocumentContent/)
+  assert.match(toolbarSource, /normalized\.documentMode === 'flowchart'/)
+  assert.match(toolbarSource, /documentMode:\s*normalized\.documentMode/)
+  assert.match(toolbarSource, /flowchartData:\s*normalized\.flowchartData/)
+  assert.match(toolbarSource, /flowchartConfig:\s*normalized\.flowchartConfig/)
+  assert.doesNotMatch(toolbarSource, /root:\s*data[\s\S]{0,120}documentMode === 'flowchart'/)
+})
+
+test('编辑页工具栏打开思维导图文件时清空旧流程图快照', () => {
+  assert.match(toolbarSource, /normalized\.documentMode === 'flowchart'/)
+  assert.match(toolbarSource, /flowchartData:\s*null/)
+  assert.match(toolbarSource, /flowchartConfig:\s*null/)
+})
+
+test('编辑器 setData 会先回填导入配置再触发保存，避免写回旧 config', () => {
+  const setDataSection = editSource.match(/async setData\(data, options = \{\}\) \{[\s\S]*?\n\s{4}\},/)
+  assert.ok(setDataSection)
+  assert.ok(
+    setDataSection[0].indexOf("if ('configData' in options)") <
+      setDataSection[0].indexOf('this.manualSave()')
+  )
+})
+
+test('搜索面板精简说明区，并支持回车直接开始搜索', () => {
+  assert.doesNotMatch(searchSource, /class="searchTips"/)
+  assert.doesNotMatch(searchSource, /class="closeBtnBox"/)
   assert.match(searchSource, /class="searchActions"/)
-  assert.match(searchSource, /class="resultSummary"/)
   assert.match(searchSource, /class="searchResultItem"/)
   assert.match(searchSource, /active:\s*activeResultIndex === index/)
-  assert.match(searchSource, /search\.resultsSummary/)
-  assert.match(searchSource, /search\.usageHint/)
+  assert.match(searchSource, /@keyup\.enter\.stop\.prevent="onSearchEnter"/)
+  assert.match(searchSource, /executeSearch\(\{ restart = false \} = \{\}\)/)
+  assert.match(searchSource, /this\.mindMap\.search\.endSearch\(\)/)
+  assert.match(searchSource, /toggleSearch\(\)/)
+  assert.match(searchSource, /openSearch\(\)/)
   assert.match(searchSource, /jumpToPrevResult\(\)/)
   assert.match(searchSource, /jumpToNextResult\(\)/)
   assert.match(searchSource, /searchDraftText/)
@@ -90,5 +123,10 @@ test('搜索面板新增结果摘要、上下跳转与当前结果高亮', () =>
   assert.match(searchSource, /cacheSearchDraft\(\)/)
   assert.match(searchSource, /restoreSearchDraft\(\)/)
   assert.match(searchSource, /resetSearchDraft\(\)/)
+  assert.match(searchSource, /this\.mindMap\.keyCommand\.addShortcut\('Control\+f', this\.toggleSearch\)/)
+  assert.match(searchSource, /this\.mindMap\.keyCommand\.removeShortcut\('Control\+f', this\.toggleSearch\)/)
   assert.match(searchSource, /this\.\$refs\.searchInputRef\?\.select\?\.\(\)/)
+  assert.match(searchSource, /width: 248px;/)
+  assert.match(searchSource, /min-height: 34px;/)
+  assert.match(searchSource, /flex: 1;/)
 })

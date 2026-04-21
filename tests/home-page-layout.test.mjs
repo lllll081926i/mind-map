@@ -12,6 +12,7 @@ test('桌面工作台首页存在并展示核心入口', () => {
   assert.match(source, /\$t\('home\.continueTitle'\)/)
   assert.match(source, /\$t\('home\.continueAction'\)/)
   assert.match(source, /\$t\('home\.createNew'\)/)
+  assert.match(source, /\$t\('home\.createFlowchart'\)/)
   assert.match(source, /\$t\('home\.openLocalFile'\)/)
   assert.match(source, /\$t\('home\.openLocalFolder'\)/)
   assert.match(source, /\$t\('home\.recentTitle'\)/)

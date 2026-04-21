@@ -10,6 +10,7 @@ import {
   DESKTOP_STATE_VERSION
 } from './configSchema'
 import { normalizeRecentFiles } from './recentFiles'
+import { createDefaultFlowchartData } from '@/services/flowchartDocument'
 
 const pickAiConfigInput = input => {
   const localConfig = input && input.localConfig ? input.localConfig : {}
@@ -35,7 +36,8 @@ export const createDefaultBootstrapState = () => {
   const defaults = DEFAULT_BOOTSTRAP_STATE()
   return {
     ...defaults,
-    mindMapData: createDefaultMindMapData()
+    mindMapData: createDefaultMindMapData(),
+    flowchartData: createDefaultFlowchartData()
   }
 }
 
@@ -54,6 +56,21 @@ const createNormalizedConfigState = input => {
       ...separatedLocalConfig.aiConfig
     })
   }
+}
+
+const hasOwnStateField = (input, key) => {
+  return Object.prototype.hasOwnProperty.call(input || {}, key)
+}
+
+const normalizeOptionalObjectStateField = (input, key, fallbackValue = null) => {
+  if (!hasOwnStateField(input, key)) {
+    return fallbackValue
+  }
+  const value = input?.[key]
+  if (value === null) {
+    return null
+  }
+  return value && typeof value === 'object' ? value : fallbackValue
 }
 
 export const normalizeBootstrapMetaState = input => {
@@ -75,7 +92,9 @@ export const normalizeBootstrapMetaState = input => {
             name: String(input.currentDocument.name || ''),
             source: String(input.currentDocument.source || ''),
             dirty: !!input.currentDocument.dirty,
-            isFullDataFile: !!input.currentDocument.isFullDataFile
+            isFullDataFile: !!input.currentDocument.isFullDataFile,
+            documentMode:
+              String(input.currentDocument.documentMode || '').trim() || 'mindmap'
           }
         : null
   }
@@ -85,13 +104,23 @@ export const normalizeBootstrapDocumentState = input => {
   const defaults = createDefaultBootstrapState()
   return {
     version: DESKTOP_STATE_VERSION,
-    mindMapData:
-      input && input.mindMapData && typeof input.mindMapData === 'object'
-        ? input.mindMapData
-        : defaults.mindMapData,
+    mindMapData: normalizeOptionalObjectStateField(
+      input,
+      'mindMapData',
+      defaults.mindMapData
+    ),
     mindMapConfig:
       input && input.mindMapConfig && typeof input.mindMapConfig === 'object'
         ? input.mindMapConfig
+        : null,
+    flowchartData: normalizeOptionalObjectStateField(
+      input,
+      'flowchartData',
+      defaults.flowchartData
+    ),
+    flowchartConfig:
+      input && input.flowchartConfig && typeof input.flowchartConfig === 'object'
+        ? input.flowchartConfig
         : null
   }
 }
