@@ -34,12 +34,15 @@ test('流程图文档服务存在并暴露核心能力', () => {
   assert.match(source, /export\s+const\s+serializeStoredDocumentContent/)
   assert.match(source, /export\s+const\s+convertMindMapToFlowchart/)
   assert.match(source, /export\s+const\s+normalizeFlowchartAiResult/)
+  assert.match(source, /export\s+const\s+getFlowchartExportBounds/)
+  assert.match(source, /export\s+const\s+buildFlowchartSvgMarkup/)
 })
 
 test('流程图文档模型包含节点、连线、视口和模板字段', () => {
   const source = fs.readFileSync(flowchartDocumentPath, 'utf8')
 
   assert.match(source, /templateId/)
+  assert.match(source, /FLOWCHART_TEMPLATE_PRESETS/)
   assert.match(source, /viewport/)
   assert.match(source, /nodes/)
   assert.match(source, /edges/)
@@ -48,6 +51,14 @@ test('流程图文档模型包含节点、连线、视口和模板字段', () =>
   assert.match(source, /type:\s*'decision'/)
   assert.match(source, /type:\s*'input'/)
   assert.match(source, /type:\s*'end'/)
+  assert.match(source, /release:\s*title =>/)
+  assert.match(source, /ticket:\s*title =>/)
+  assert.match(source, /onboarding:\s*title =>/)
+  assert.match(source, /customerJourney:\s*title =>/)
+  assert.match(source, /incident:\s*title =>/)
+  assert.match(source, /dataPipeline:\s*title =>/)
+  assert.match(source, /projectPlan:\s*title =>/)
+  assert.match(source, /FLOWCHART_TEMPLATE_PRESETS = \[/)
 })
 
 test('思维导图文档解析与序列化会保留 config 字段', () => {
@@ -106,4 +117,91 @@ test('思维导图转流程图会修复重复 uid 并保持连线指向真实节
   assert.equal(nodeIds.includes(edge.source), true)
   assert.equal(nodeIds.includes(edge.target), true)
   assert.notEqual(edge.source, edge.target)
+})
+
+test('流程图 SVG 导出会保留节点形状并按完整边界生成 viewBox', async () => {
+  const {
+    buildFlowchartSvgMarkup,
+    createDefaultFlowchartData,
+    getFlowchartExportBounds
+  } = await loadFlowchartDocumentModule()
+  const flowchartData = createDefaultFlowchartData('导出测试', 'approval')
+  flowchartData.nodes[0].x = -240
+  const bounds = getFlowchartExportBounds(flowchartData, {
+    paddingX: 120,
+    paddingY: 120
+  })
+  const svgMarkup = buildFlowchartSvgMarkup(flowchartData, {
+    paddingX: 120,
+    paddingY: 120
+  })
+
+  assert.equal(bounds.x < 0, true)
+  assert.match(svgMarkup, /<svg[^>]+viewBox="/)
+  assert.match(svgMarkup, /<polygon/)
+  assert.match(svgMarkup, /审批通过？/)
+})
+
+test('流程图 SVG 导出会保留节点和连线样式，并输出箭头与折线路径', async () => {
+  const {
+    buildFlowchartSvgMarkup,
+    createDefaultFlowchartData
+  } = await loadFlowchartDocumentModule()
+  const flowchartData = createDefaultFlowchartData('样式导出', 'blank')
+  flowchartData.nodes = [
+    {
+      id: 'node-a',
+      type: 'process',
+      text: '开始处理',
+      x: 120,
+      y: 120,
+      width: 168,
+      height: 72,
+      style: {
+        fill: '#eff6ff',
+        stroke: '#2563eb',
+        textColor: '#1e3a8a'
+      }
+    },
+    {
+      id: 'node-b',
+      type: 'decision',
+      text: '继续？',
+      x: 420,
+      y: 320,
+      width: 176,
+      height: 92,
+      style: {
+        fill: '#fffbeb',
+        stroke: '#d97706',
+        textColor: '#92400e'
+      }
+    }
+  ]
+  flowchartData.edges = [
+    {
+      id: 'edge-a-b',
+      source: 'node-a',
+      target: 'node-b',
+      label: '条件满足',
+      style: {
+        stroke: '#e11d48',
+        dashed: true,
+        pathType: 'orthogonal'
+      }
+    }
+  ]
+
+  const svgMarkup = buildFlowchartSvgMarkup(flowchartData)
+
+  assert.match(svgMarkup, /fill="#eff6ff"/)
+  assert.match(svgMarkup, /stroke="#2563eb"/)
+  assert.match(svgMarkup, /fill="#1e3a8a"/)
+  assert.match(svgMarkup, /stroke="#e11d48"/)
+  assert.match(svgMarkup, /stroke-dasharray="8 6"/)
+  assert.match(svgMarkup, /marker-end="url\(#flowchart-arrow-edge-a-b\)"/)
+  assert.match(svgMarkup, /dominant-baseline="middle"/)
+  assert.match(svgMarkup, /rx="8"/)
+  assert.match(svgMarkup, /条件满足/)
+  assert.match(svgMarkup, /M 288 156 L 354 156 L 354 366 L 420 366/)
 })

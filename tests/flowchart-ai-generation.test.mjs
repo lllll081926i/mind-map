@@ -8,6 +8,7 @@ const aiServiceSource = fs.readFileSync(
   'utf8'
 )
 const flowchartEditorPath = path.resolve('src/pages/Edit/components/FlowchartEditor.vue')
+const flowchartAiLogicPath = path.resolve('src/pages/Edit/components/flowchartEditorAi.js')
 
 test('AI 服务提供流程图生成消息构造能力', () => {
   assert.match(aiServiceSource, /buildAiCreateFlowchartMessages/)
@@ -15,12 +16,16 @@ test('AI 服务提供流程图生成消息构造能力', () => {
 
 test('流程图编辑器提供 AI 生成入口与结果应用流程', () => {
   assert.equal(fs.existsSync(flowchartEditorPath), true)
+  assert.equal(fs.existsSync(flowchartAiLogicPath), true)
   const source = fs.readFileSync(flowchartEditorPath, 'utf8')
+  const aiLogicSource = fs.readFileSync(flowchartAiLogicPath, 'utf8')
 
-  assert.match(source, /generateWithAi/)
-  assert.match(source, /buildAiCreateFlowchartMessages/)
-  assert.match(source, /normalizeFlowchartAiResult/)
-  assert.match(source, /applyGeneratedFlowchart/)
+  assert.match(source, /flowchartAiMethods/)
+  assert.match(aiLogicSource, /generateWithAi/)
+  assert.match(aiLogicSource, /buildAiCreateFlowchartMessages/)
+  assert.match(aiLogicSource, /normalizeFlowchartAiResult/)
+  assert.match(source, /flowchartDocumentMethods/)
+  assert.match(aiLogicSource, /this\.applyGeneratedFlowchart/)
 })
 
 test('流程图国际化文案包含导入思维导图文件相关提示', () => {
