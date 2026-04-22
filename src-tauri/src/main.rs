@@ -43,6 +43,7 @@ fn main() {
       commands::fs::remember_user_selected_path,
       commands::fs::read_text_file,
       commands::fs::write_text_file,
+      commands::fs::write_binary_file,
       commands::fs::list_directory_entries,
       commands::ai::start_ai_proxy_request,
       commands::ai::stop_ai_proxy_request

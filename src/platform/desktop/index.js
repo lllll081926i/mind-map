@@ -109,6 +109,26 @@ const normalizeFileExtension = extension => {
   return normalized || 'txt'
 }
 
+const normalizeBinaryContent = content => {
+  if (content instanceof Uint8Array) {
+    return content
+  }
+  if (content instanceof ArrayBuffer) {
+    return new Uint8Array(content)
+  }
+  if (ArrayBuffer.isView(content)) {
+    return new Uint8Array(
+      content.buffer,
+      content.byteOffset,
+      content.byteLength
+    )
+  }
+  if (Array.isArray(content)) {
+    return Uint8Array.from(content)
+  }
+  return Uint8Array.from([])
+}
+
 export const normalizeSaveName = suggestedName => {
   const baseName = String(suggestedName || '思维导图').trim() || '思维导图'
   return /\.smm$/i.test(baseName) ? baseName : `${baseName}.smm`
@@ -220,7 +240,9 @@ const pickBrowserFile = ({ accept = '' } = {}) => {
 
 const downloadBrowserFile = ({ name, content, mimeType }) => {
   if (typeof document === 'undefined') return
-  const blob = new Blob([content], {
+  const normalizedContent =
+    typeof content === 'string' ? content : normalizeBinaryContent(content)
+  const blob = new Blob([normalizedContent], {
     type: mimeType || 'text/plain;charset=utf-8'
   })
   const link = document.createElement('a')
@@ -265,6 +287,33 @@ const createBrowserTauriModules = () => {
             mimeType:
               String(payload.mimeType || currentEntry.mimeType || '').trim() ||
               'text/plain;charset=utf-8'
+          }
+          const shouldDownload =
+            currentEntry.pendingDownload || nextEntry.pendingDownload
+          setBrowserFileEntry(path, nextEntry)
+          if (shouldDownload) {
+            downloadBrowserFile({
+              name: nextEntry.name,
+              content: nextEntry.content,
+              mimeType: nextEntry.mimeType
+            })
+          }
+          return null
+        }
+        case 'write_binary_file': {
+          const path = payload.path
+          const currentEntry = getBrowserFileEntry(path) || {
+            name: getFileName(path),
+            content: Uint8Array.from([]),
+            mimeType: 'application/octet-stream'
+          }
+          const nextEntry = {
+            ...currentEntry,
+            content: normalizeBinaryContent(payload.content),
+            pendingDownload: !!currentEntry.pendingDownload,
+            mimeType:
+              String(payload.mimeType || currentEntry.mimeType || '').trim() ||
+              'application/octet-stream'
           }
           const shouldDownload =
             currentEntry.pendingDownload || nextEntry.pendingDownload
@@ -641,6 +690,53 @@ export const desktopPlatform = {
         mimeType
       },
       '保存文本文件失败'
+    )
+    return {
+      mode: 'desktop',
+      path: normalizedSelectedPath,
+      name: getFileName(normalizedSelectedPath)
+    }
+  },
+
+  async saveBinaryFileAs({
+    suggestedName,
+    content,
+    defaultPath,
+    extension = 'bin',
+    name = '二进制文件',
+    mimeType = 'application/octet-stream'
+  }) {
+    const normalizedExtension = normalizeFileExtension(extension)
+    const normalizedName = saveTextFileName(suggestedName, normalizedExtension)
+    const { save } = await loadTauriModules()
+    const selectedPath = await save({
+      defaultPath: buildGenericSaveDefaultPath({
+        defaultPath,
+        suggestedName: normalizedName,
+        extension: normalizedExtension
+      }),
+      suggestedName: normalizedName,
+      filters: [
+        {
+          name,
+          extensions: [normalizedExtension]
+        }
+      ]
+    })
+    if (!selectedPath) return null
+    const normalizedSelectedPath = saveTextFileName(
+      selectedPath,
+      normalizedExtension
+    )
+    await rememberPickedPath(normalizedSelectedPath)
+    await invokeCommand(
+      'write_binary_file',
+      {
+        path: normalizedSelectedPath,
+        content: Array.from(normalizeBinaryContent(content)),
+        mimeType
+      },
+      '保存二进制文件失败'
     )
     return {
       mode: 'desktop',

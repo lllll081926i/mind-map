@@ -47,6 +47,14 @@ const appStateSource = fs.readFileSync(
   path.resolve('src-tauri/src/services/app_state.rs'),
   'utf8'
 )
+const appFsSource = fs.readFileSync(
+  path.resolve('src-tauri/src/services/app_fs.rs'),
+  'utf8'
+)
+const fsCommandSource = fs.readFileSync(
+  path.resolve('src-tauri/src/commands/fs.rs'),
+  'utf8'
+)
 const rustMainSource = fs.readFileSync(
   path.resolve('src-tauri/src/main.rs'),
   'utf8'
@@ -264,6 +272,24 @@ test('桌面平台提供通用文本文件另存接口', () => {
     desktopPlatformSource.includes("type: mimeType || 'text/plain;charset=utf-8'"),
     true
   )
+})
+
+test('桌面平台提供二进制文件另存接口，并接入 Tauri 二进制写入命令', () => {
+  assert.equal(desktopPlatformSource.includes('async saveBinaryFileAs('), true)
+  assert.equal(desktopPlatformSource.includes("name = '二进制文件'"), true)
+  assert.equal(desktopPlatformSource.includes("'write_binary_file'"), true)
+  assert.equal(fsCommandSource.includes('pub async fn write_binary_file('), true)
+  assert.equal(rustMainSource.includes('commands::fs::write_binary_file'), true)
+})
+
+test('桌面文件服务允许导出文本和图片扩展名写入，同时不把导出文件混入项目列表', () => {
+  assert.equal(appFsSource.includes('.html'), true)
+  assert.equal(appFsSource.includes('.svg'), true)
+  assert.equal(appFsSource.includes('.png'), true)
+  assert.equal(appFsSource.includes('.jpg'), true)
+  assert.equal(appFsSource.includes('.jpeg'), true)
+  assert.equal(appFsSource.includes('.pdf'), true)
+  assert.equal(appFsSource.includes('if is_file && !has_project_extension(&name)'), true)
 })
 
 test('平台层会在 bootstrap 回填前校验启动期本地写入代次', () => {

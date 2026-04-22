@@ -30,6 +30,16 @@ pub async fn write_text_file(
 }
 
 #[tauri::command]
+pub async fn write_binary_file(
+  app: tauri::AppHandle,
+  path: String,
+  content: Vec<u8>,
+) -> Result<(), String> {
+  validate_path_length(&path)?;
+  app_fs::write_binary_file(&app, &path, &content).await
+}
+
+#[tauri::command]
 pub async fn list_directory_entries(
   app: tauri::AppHandle,
   path: String,

@@ -97,6 +97,27 @@ test('导出页会记住上次导出选项并预热当前格式的导出插件',
   assert.match(source, /scheduleExportWarmup\(\)/)
 })
 
+test('导出页会根据当前文档模式切换流程图导出格式与预览链路', () => {
+  const exportPageSource = fs.readFileSync(exportPagePath, 'utf8')
+  const exportStateSource = fs.readFileSync(
+    path.resolve('src/services/exportState.js'),
+    'utf8'
+  )
+
+  assert.match(exportStateSource, /const flowchartFormats = \[/)
+  assert.match(exportStateSource, /String\(documentMode \|\| ''\)\.trim\(\) === 'flowchart'/)
+  assert.match(exportPageSource, /documentMode\(\)/)
+  assert.match(exportPageSource, /getDesktopExportFormats\(this\.documentMode\)/)
+  assert.match(exportPageSource, /if \(this\.documentMode === 'flowchart'\)/)
+  assert.match(exportPageSource, /initFlowchartPreview\(/)
+  assert.match(exportPageSource, /handleFlowchartExport\(/)
+  assert.match(exportPageSource, /buildFlowchartSvgMarkup\(/)
+  assert.match(exportPageSource, /saveBinaryFileAs\(/)
+  assert.doesNotMatch(exportPageSource, /link\.download =/)
+  assert.match(exportPageSource, /class="previewCanvas"/)
+  assert.match(exportPageSource, /previewCanvasClass/)
+})
+
 test('HTML 导出格式已启用并走独立 HTML 生成链路', () => {
   const exportPageSource = fs.readFileSync(exportPagePath, 'utf8')
   const exportStateSource = fs.readFileSync(

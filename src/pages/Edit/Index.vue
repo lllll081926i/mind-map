@@ -6,6 +6,7 @@
     <template v-if="show">
       <template v-if="isFlowchartDocument">
         <FlowchartEditor></FlowchartEditor>
+        <ExportDialog v-if="isExportRoute"></ExportDialog>
       </template>
       <template v-else>
         <Toolbar v-if="!isZenMode"></Toolbar>

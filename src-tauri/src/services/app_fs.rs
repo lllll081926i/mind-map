@@ -3,7 +3,17 @@ use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use tauri::Manager;
 
-const ALLOWED_EXTENSIONS: &[&str] = &[".smm", ".xmind", ".md", ".json"];
+const PROJECT_EXTENSIONS: &[&str] = &[".smm", ".xmind", ".md", ".json"];
+const TEXT_WRITE_EXTENSIONS: &[&str] = &[
+  ".smm",
+  ".xmind",
+  ".md",
+  ".json",
+  ".txt",
+  ".html",
+  ".svg",
+];
+const BINARY_WRITE_EXTENSIONS: &[&str] = &[".png", ".jpg", ".jpeg", ".pdf"];
 const MAX_TEXT_FILE_SIZE: u64 = 50 * 1024 * 1024;
 const RESERVED_WINDOWS_NAMES: &[&str] = &[
   "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
@@ -45,15 +55,33 @@ fn normalize_windows_path_prefix(path: &Path) -> PathBuf {
   path.to_path_buf()
 }
 
-fn has_allowed_extension(path: &str) -> bool {
+fn has_extension_from(path: &str, allowed_extensions: &[&str]) -> bool {
   let extension = Path::new(path)
     .extension()
     .and_then(|value| value.to_str())
     .map(|value| format!(".{}", value.to_lowercase()));
   match extension {
-    Some(ext) => ALLOWED_EXTENSIONS.iter().any(|allowed| *allowed == ext),
+    Some(ext) => allowed_extensions.iter().any(|allowed| *allowed == ext),
     None => false,
   }
+}
+
+fn has_project_extension(path: &str) -> bool {
+  has_extension_from(path, PROJECT_EXTENSIONS)
+}
+
+fn has_text_write_extension(path: &str) -> bool {
+  has_extension_from(path, TEXT_WRITE_EXTENSIONS)
+}
+
+fn has_binary_write_extension(path: &str) -> bool {
+  has_extension_from(path, BINARY_WRITE_EXTENSIONS)
+}
+
+fn has_supported_scope_extension(path: &str) -> bool {
+  has_project_extension(path)
+    || has_text_write_extension(path)
+    || has_binary_write_extension(path)
 }
 
 fn normalize_directory_scope(path: &str) -> Option<PathBuf> {
@@ -62,7 +90,7 @@ fn normalize_directory_scope(path: &str) -> Option<PathBuf> {
     return None;
   }
   let path_buf = PathBuf::from(value);
-  if has_allowed_extension(value) {
+  if has_supported_scope_extension(value) {
     return path_buf.parent().map(|parent| parent.to_path_buf());
   }
   Some(path_buf)
@@ -205,7 +233,7 @@ pub struct DirectoryEntry {
 }
 
 pub async fn read_text_file(app: &tauri::AppHandle, path: &str) -> Result<String, String> {
-  if !has_allowed_extension(path) {
+  if !has_project_extension(path) && !has_text_write_extension(path) {
     return Err("不支持的文件类型".into());
   }
   if !is_path_safe(path) {
@@ -228,7 +256,35 @@ pub async fn write_text_file(
   path: &str,
   content: &str,
 ) -> Result<(), String> {
-  if !has_allowed_extension(path) {
+  if !has_text_write_extension(path) {
+    return Err("不支持的文件类型".into());
+  }
+  if !is_path_safe(path) {
+    return Err("无效的路径".into());
+  }
+  ensure_directory_scope_allowed(app, path).await?;
+  if let Some(parent) = Path::new(path).parent() {
+    tokio::fs::create_dir_all(parent)
+      .await
+      .map_err(|error| format!("创建目标目录失败: {}", error))?;
+    let metadata = tokio::fs::metadata(parent)
+      .await
+      .map_err(|_| "目标目录不存在".to_string())?;
+    if !metadata.is_dir() {
+      return Err("目标目录不可用".into());
+    }
+  }
+  tokio::fs::write(path, content)
+    .await
+    .map_err(|error| error.to_string())
+}
+
+pub async fn write_binary_file(
+  app: &tauri::AppHandle,
+  path: &str,
+  content: &[u8],
+) -> Result<(), String> {
+  if !has_binary_write_extension(path) {
     return Err("不支持的文件类型".into());
   }
   if !is_path_safe(path) {
@@ -270,7 +326,7 @@ pub async fn list_directory_entries(
     let metadata = entry.metadata().await.map_err(|error| error.to_string())?;
     let name = entry.file_name().to_string_lossy().to_string();
     let is_file = metadata.is_file();
-    if is_file && !has_allowed_extension(&name) {
+    if is_file && !has_project_extension(&name) {
       continue;
     }
     let data = DirectoryEntry {
