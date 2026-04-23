@@ -18,7 +18,10 @@ export const DEFAULT_LOCAL_CONFIG = {
   enableDragImport: false
 }
 
-export const createDefaultMindMapData = (title = '思维导图') => ({
+export const createDefaultMindMapData = (
+  title = '思维导图',
+  themeTemplate = DEFAULT_MIND_MAP_THEME_TEMPLATE
+) => ({
   root: {
     data: {
       text: String(title || '思维导图')
@@ -26,7 +29,8 @@ export const createDefaultMindMapData = (title = '思维导图') => ({
     children: []
   },
   theme: {
-    template: DEFAULT_MIND_MAP_THEME_TEMPLATE,
+    template:
+      String(themeTemplate || '').trim() || DEFAULT_MIND_MAP_THEME_TEMPLATE,
     config: {}
   },
   layout: DEFAULT_MIND_MAP_LAYOUT

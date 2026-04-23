@@ -123,6 +123,11 @@ import AssociativeLineStyle from './AssociativeLineStyle.vue'
 import NodeImgPlacementToolbar from './NodeImgPlacementToolbar.vue'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import {
+  applyMindMapThemeMode,
+  getMindMapThemeMetaByValue
+} from '@/stores/runtime'
 
 const loadOutlineSidebar = () => import('./OutlineSidebar.vue')
 const loadStyle = () => import('./Style.vue')
@@ -561,6 +566,9 @@ export default {
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
     }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
+    }),
     ...mapState(useAppStore, {
       extraTextOnExport: 'extraTextOnExport',
       isDragOutlineTreeNode: 'isDragOutlineTreeNode',
@@ -599,6 +607,9 @@ export default {
     }
   },
   watch: {
+    isDark() {
+      void this.syncMindMapThemeMode()
+    },
     openNodeRichText() {
       if (this.openNodeRichText) {
         this.addRichTextPlugin()
@@ -655,6 +666,24 @@ export default {
     this.mindMap = null
   },
   methods: {
+    async syncMindMapThemeMode() {
+      if (!this.mindMap) {
+        return null
+      }
+      const currentThemeMeta = this.getCurrentMindMapThemeMeta()
+      if (currentThemeMeta && currentThemeMeta.dark === this.isDark) {
+        return null
+      }
+      return applyMindMapThemeMode(this.mindMap, this.isDark)
+    },
+
+    getCurrentMindMapThemeMeta() {
+      if (!this.mindMap || typeof this.mindMap.getTheme !== 'function') {
+        return null
+      }
+      return getMindMapThemeMetaByValue(this.mindMap.getTheme())
+    },
+
     markPrimarySidebarMounted(key) {
       if (!PRIMARY_SIDEBAR_COMPONENTS[key]) {
         return
@@ -1260,6 +1289,7 @@ export default {
           hasFileURL
         })
       )
+      await this.syncMindMapThemeMode()
       void this.ensureDeferredMindMapPluginsReady()
       this.patchMindMapExport()
       await this.loadPlugins(initialData)

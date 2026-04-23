@@ -116,14 +116,44 @@
 
         <header class="mainHeader">
           <h2>{{ $t('home.recentTitle') }}</h2>
-          <button
-            type="button"
-            class="textButton"
-            :disabled="busy || recentFiles.length <= 0"
-            @click="clearRecents"
-          >
-            {{ $t('home.clearRecents') }}
-          </button>
+          <div class="headerActions">
+            <button
+              type="button"
+              class="themeModeToggle"
+              :aria-label="themeToggleLabel"
+              :title="themeToggleLabel"
+              :disabled="busy"
+              @click="toggleAppearance"
+            >
+              <span class="themeModeToggleIcon" aria-hidden="true">
+                <svg v-if="isDark" viewBox="0 0 24 24">
+                  <path
+                    d="M18 14.5A7.5 7.5 0 0 1 9.5 6a8 8 0 1 0 8.5 8.5Z"
+                  ></path>
+                </svg>
+                <svg v-else viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="4"></circle>
+                  <path d="M12 2v2.5"></path>
+                  <path d="M12 19.5V22"></path>
+                  <path d="m4.9 4.9 1.8 1.8"></path>
+                  <path d="m17.3 17.3 1.8 1.8"></path>
+                  <path d="M2 12h2.5"></path>
+                  <path d="M19.5 12H22"></path>
+                  <path d="m4.9 19.1 1.8-1.8"></path>
+                  <path d="m17.3 6.7 1.8-1.8"></path>
+                </svg>
+              </span>
+              <span>{{ isDark ? $t('theme.dark') : $t('theme.light') }}</span>
+            </button>
+            <button
+              type="button"
+              class="textButton"
+              :disabled="busy || recentFiles.length <= 0"
+              @click="clearRecents"
+            >
+              {{ $t('home.clearRecents') }}
+            </button>
+          </div>
         </header>
 
         <div v-if="recentFiles.length > 0" class="recentList">
@@ -173,6 +203,11 @@
 import { mapState } from 'pinia'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
+import { createDefaultMindMapData } from '@/platform/shared/configSchema'
+import {
+  getPreferredMindMapThemeValue,
+  toggleThemeMode
+} from '@/stores/runtime'
 
 let workspaceActionsPromise = null
 
@@ -207,7 +242,12 @@ export default {
     }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
-    })
+    }),
+    themeToggleLabel() {
+      return this.isDark
+        ? this.$t('navigatorToolbar.lightMode')
+        : this.$t('navigatorToolbar.darkMode')
+    }
   },
   mounted() {
     this.scheduleRefreshHomeData()
@@ -302,7 +342,8 @@ export default {
       await this.runWorkspaceAction(async () => {
         const { createWorkspaceLocalFile } = await loadWorkspaceActions()
         return createWorkspaceLocalFile({
-          router: this.$router
+          router: this.$router,
+          content: this.createBlankProjectContent()
         })
       })
     },
@@ -367,6 +408,21 @@ export default {
         const { clearWorkspaceRecentFiles } = await loadWorkspaceActions()
         await clearWorkspaceRecentFiles()
       })
+    },
+
+    createBlankProjectContent() {
+      const themeTemplate = getPreferredMindMapThemeValue(!!this.isDark)
+      return createDefaultMindMapData('思维导图', themeTemplate)
+    },
+
+    async toggleAppearance() {
+      if (this.busy) return
+      try {
+        await toggleThemeMode()
+      } catch (error) {
+        console.error('toggleAppearance failed', error)
+        this.$message.error(error?.message || this.$t('home.actionFailed'))
+      }
     }
   }
 }
@@ -416,6 +472,17 @@ export default {
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
         transparent;
+    }
+
+    .themeModeToggle {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: hsla(0, 0%, 100%, 0.08);
+      color: hsla(0, 0%, 100%, 0.9);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: hsla(0, 0%, 100%, 0.12);
+      }
     }
 
     .primaryAction {
@@ -800,6 +867,59 @@ export default {
     font-size: 16px;
     font-weight: 500;
     color: #111827;
+  }
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.themeModeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #d1d5db;
+    background: #f9fafb;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.themeModeToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 
