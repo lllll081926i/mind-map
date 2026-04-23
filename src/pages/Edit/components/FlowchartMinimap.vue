@@ -8,6 +8,22 @@
   >
     <svg :viewBox="minimapViewBox">
       <rect
+        v-for="lane in lanes"
+        :key="lane.id"
+        class="flowchartMinimapLane"
+        :x="lane.x"
+        :y="lane.y"
+        :width="lane.width"
+        :height="lane.height"
+        rx="20"
+      ></rect>
+      <path
+        v-for="edge in edges"
+        :key="edge.id"
+        class="flowchartMinimapEdge"
+        :d="edge.path"
+      ></path>
+      <rect
         v-for="node in nodes"
         :key="node.id"
         class="flowchartMinimapNode"
@@ -37,6 +53,14 @@ export default {
       type: Array,
       required: true
     },
+    edges: {
+      type: Array,
+      default: () => []
+    },
+    lanes: {
+      type: Array,
+      default: () => []
+    },
     viewport: {
       type: Object,
       required: true
@@ -52,7 +76,11 @@ export default {
   },
   data() {
     return {
-      dragActive: false
+      dragActive: false,
+      dragFrameId: 0,
+      pendingClientPoint: null,
+      dragPointerOffset: null,
+      lastWorldPoint: null
     }
   },
   computed: {
@@ -68,7 +96,8 @@ export default {
           height: 480
         }
       }
-      const bounds = this.nodes.reduce(
+      const items = [...this.lanes, ...this.nodes]
+      const bounds = items.reduce(
         (result, node) => ({
           minX: Math.min(result.minX, Number(node.x || 0)),
           minY: Math.min(result.minY, Number(node.y || 0)),
@@ -110,37 +139,154 @@ export default {
     }
   },
   methods: {
-    emitJump(event) {
-      const rect = event.currentTarget.getBoundingClientRect()
+    getMinimapCenterSlowdownRadius() {
+      const bounds = this.contentBounds
+      return Math.max(96, Math.min(bounds.width, bounds.height) * 0.2)
+    },
+    applyCenterSlowdownToWorldPoint(worldPoint) {
+      if (!worldPoint) {
+        return null
+      }
+      const bounds = this.contentBounds
+      const contentCenterX = bounds.x + bounds.width / 2
+      const contentCenterY = bounds.y + bounds.height / 2
+      const deltaX = worldPoint.x - contentCenterX
+      const deltaY = worldPoint.y - contentCenterY
+      const distance = Math.hypot(deltaX, deltaY)
+      const slowdownRadius = this.getMinimapCenterSlowdownRadius()
+      if (distance < 0.001 || distance >= slowdownRadius) {
+        return worldPoint
+      }
+      const progress = distance / slowdownRadius
+      const speedFactor = 0.38 + 0.62 * progress * progress
+      return {
+        x: contentCenterX + deltaX * speedFactor,
+        y: contentCenterY + deltaY * speedFactor
+      }
+    },
+    resolveWorldPointFromClientPoint(clientPoint) {
+      const rect = this.$el?.getBoundingClientRect?.()
       const bounds = this.contentBounds
       if (!rect.width || !rect.height) {
-        return
+        return null
       }
-      const ratioX = (event.clientX - rect.left) / rect.width
-      const ratioY = (event.clientY - rect.top) / rect.height
-      this.$emit('jump-to-point', {
+      const ratioX = Math.max(
+        0,
+        Math.min(1, (clientPoint.clientX - rect.left) / rect.width)
+      )
+      const ratioY = Math.max(
+        0,
+        Math.min(1, (clientPoint.clientY - rect.top) / rect.height)
+      )
+      return {
         x: bounds.x + bounds.width * ratioX,
         y: bounds.y + bounds.height * ratioY
+      }
+    },
+    isPointInsideViewportRect(point) {
+      const viewportRect = this.viewportRect
+      return (
+        point.x >= viewportRect.x &&
+        point.x <= viewportRect.x + viewportRect.width &&
+        point.y >= viewportRect.y &&
+        point.y <= viewportRect.y + viewportRect.height
+      )
+    },
+    buildViewportCenterPoint(worldPoint) {
+      const viewportRect = this.viewportRect
+      const adjustedWorldPoint = this.applyCenterSlowdownToWorldPoint(worldPoint)
+      const offset = this.dragPointerOffset || {
+        x: viewportRect.width / 2,
+        y: viewportRect.height / 2
+      }
+      return {
+        x: adjustedWorldPoint.x - offset.x + viewportRect.width / 2,
+        y: adjustedWorldPoint.y - offset.y + viewportRect.height / 2
+      }
+    },
+    emitJump(worldPoint, { persist = false } = {}) {
+      if (!worldPoint) {
+        return
+      }
+      const centerPoint = this.buildViewportCenterPoint(worldPoint)
+      this.lastWorldPoint = worldPoint
+      this.$emit('jump-to-point', {
+        ...centerPoint,
+        persist
       })
     },
     startMinimapDrag(event) {
+      const worldPoint = this.resolveWorldPointFromClientPoint(event)
+      if (!worldPoint) {
+        return
+      }
+      const viewportRect = this.viewportRect
+      this.dragPointerOffset = this.isPointInsideViewportRect(worldPoint)
+        ? {
+            x: worldPoint.x - viewportRect.x,
+            y: worldPoint.y - viewportRect.y
+          }
+        : {
+            x: viewportRect.width / 2,
+            y: viewportRect.height / 2
+          }
       this.dragActive = true
-      this.emitJump(event)
+      this.emitJump(worldPoint, {
+        persist: false
+      })
       window.addEventListener('mousemove', this.onMinimapDrag)
       window.addEventListener('mouseup', this.stopMinimapDrag)
     },
-    onMinimapDrag(event) {
-      if (!this.dragActive || !this.$el) {
+    flushMinimapDragFrame() {
+      this.dragFrameId = 0
+      if (!this.dragActive || !this.pendingClientPoint) {
         return
       }
-      this.emitJump({
-        clientX: event.clientX,
-        clientY: event.clientY,
-        currentTarget: this.$el
+      const worldPoint = this.resolveWorldPointFromClientPoint(
+        this.pendingClientPoint
+      )
+      this.pendingClientPoint = null
+      this.emitJump(worldPoint, {
+        persist: false
       })
     },
-    stopMinimapDrag() {
+    onMinimapDrag(event) {
+      if (!this.dragActive) {
+        return
+      }
+      this.pendingClientPoint = {
+        clientX: event.clientX,
+        clientY: event.clientY
+      }
+      if (this.dragFrameId) {
+        return
+      }
+      this.dragFrameId = window.requestAnimationFrame(() => {
+        this.flushMinimapDragFrame()
+      })
+    },
+    stopMinimapDrag(event) {
+      if (this.dragFrameId) {
+        cancelAnimationFrame(this.dragFrameId)
+        this.dragFrameId = 0
+      }
+      const finalWorldPoint = event
+        ? this.resolveWorldPointFromClientPoint({
+            clientX: event.clientX,
+            clientY: event.clientY
+          })
+        : this.pendingClientPoint
+          ? this.resolveWorldPointFromClientPoint(this.pendingClientPoint)
+          : this.lastWorldPoint
+      this.pendingClientPoint = null
+      if (this.dragActive && finalWorldPoint) {
+        this.emitJump(finalWorldPoint, {
+          persist: true
+        })
+      }
       this.dragActive = false
+      this.dragPointerOffset = null
+      this.lastWorldPoint = null
       window.removeEventListener('mousemove', this.onMinimapDrag)
       window.removeEventListener('mouseup', this.stopMinimapDrag)
     }

@@ -7,7 +7,14 @@
       class="flowchartQuickAddBtn"
       :aria-label="getTypeLabel(typeItem)"
       :title="getTypeLabel(typeItem)"
-      @click="$emit('add-node', typeItem.type)"
+      @click="
+        $emit('add-node', {
+          type: typeItem.type,
+          autoConnect: true,
+          startInlineEdit: false,
+          origin: 'quick-add'
+        })
+      "
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path v-if="typeItem.type === 'start'" d="M8 6h8a6 6 0 0 1 0 12H8A6 6 0 0 1 8 6z"></path>

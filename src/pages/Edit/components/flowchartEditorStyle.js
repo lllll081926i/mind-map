@@ -1,4 +1,42 @@
 export const flowchartStyleMethods = {
+  updateFlowchartConfig(configPatch = {}) {
+    const wasStrictAlignment = !!this.flowchartConfig?.strictAlignment
+    const nextFlowchartConfig = {
+      ...this.flowchartConfig,
+      ...configPatch
+    }
+    if (nextFlowchartConfig.strictAlignment) {
+      this.flowchartData.edges.forEach(edge => {
+        edge.style = {
+          ...(edge.style || {}),
+          pathType: 'orthogonal'
+        }
+      })
+      if (this.selectedEdge?.style) {
+        this.selectedEdge.style.pathType = 'orthogonal'
+      }
+    }
+    this.flowchartConfig = nextFlowchartConfig
+    if (nextFlowchartConfig.strictAlignment && !wasStrictAlignment) {
+      if ((this.flowchartData?.nodes || []).length > 1) {
+        void this.tidyFlowchartLayout({
+          silent: true
+        })
+        return
+      }
+    }
+    void this.persistFlowchartState()
+  },
+
+  updateFlowchartTheme(themeId) {
+    const normalizedThemeId = String(themeId || '').trim() || 'blueprint'
+    this.flowchartConfig = {
+      ...this.flowchartConfig,
+      themeId: normalizedThemeId
+    }
+    void this.persistFlowchartState()
+  },
+
   updateSelectedNodeStyle(stylePatch = {}) {
     if (!this.selectedNode) {
       return
@@ -33,9 +71,13 @@ export const flowchartStyleMethods = {
     if (!this.selectedEdge) {
       return
     }
+    const nextStylePatch = { ...stylePatch }
+    if (this.flowchartConfig.strictAlignment) {
+      nextStylePatch.pathType = 'orthogonal'
+    }
     this.selectedEdge.style = {
       ...(this.selectedEdge.style || {}),
-      ...stylePatch
+      ...nextStylePatch
     }
     void this.persistFlowchartState()
   },
@@ -55,7 +97,9 @@ export const flowchartStyleMethods = {
     this.updateSelectedEdgeStyle({
       stroke: preset.stroke,
       dashed: !!preset.dashed,
-      pathType: preset.pathType || 'orthogonal'
+      pathType: this.flowchartConfig.strictAlignment
+        ? 'orthogonal'
+        : preset.pathType || 'orthogonal'
     })
   }
 }

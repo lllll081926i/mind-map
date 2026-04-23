@@ -15,6 +15,24 @@
     @click.stop="$emit('select-node', node.id, $event)"
     @dblclick.stop="$emit('edit-node-text', node.id)"
   >
+    <svg
+      v-if="usesPolygonShape(node)"
+      class="flowchartNodeShapeSvg"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polygon
+        v-if="node.type === 'decision'"
+        class="flowchartNodeShapePolygon"
+        :points="getDecisionPolygonPoints()"
+      ></polygon>
+      <polygon
+        v-else
+        class="flowchartNodeShapePolygon"
+        :points="getInputPolygonPoints()"
+      ></polygon>
+    </svg>
     <span class="nodeText">{{ node.text }}</span>
     <template v-if="showConnectorHandlesForNode(node.id)">
       <button
@@ -87,6 +105,17 @@ export default {
     return {
       connectorDirections: CONNECTOR_DIRECTIONS,
       resizeDirections: RESIZE_DIRECTIONS
+    }
+  },
+  methods: {
+    usesPolygonShape(node) {
+      return node?.type === 'decision' || node?.type === 'input'
+    },
+    getDecisionPolygonPoints() {
+      return '50,1 99,50 50,99 1,50'
+    },
+    getInputPolygonPoints() {
+      return '13,1 99,1 87,99 1,99'
     }
   }
 }

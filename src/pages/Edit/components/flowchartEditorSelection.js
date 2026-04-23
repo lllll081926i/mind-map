@@ -1,3 +1,13 @@
+const getEdgeLabelToolbarPlacement = edge => {
+  const deltaX = Math.abs(Number(edge?.targetPoint?.x || 0) - Number(edge?.sourcePoint?.x || 0))
+  const deltaY = Math.abs(Number(edge?.targetPoint?.y || 0) - Number(edge?.sourcePoint?.y || 0))
+  const isHorizontal = deltaX >= deltaY
+  if (isHorizontal) {
+    return Number(edge?.labelY || 0) < 72 ? 'bottom' : 'top'
+  }
+  return edge?.labelPlacement === 'left' ? 'left' : 'right'
+}
+
 export const flowchartSelectionMethods = {
   selectNode(nodeId, event) {
     this.cancelConnectorDrag()
@@ -19,6 +29,9 @@ export const flowchartSelectionMethods = {
     }
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
+    if (this.isInspectorOpen) {
+      this.inspectorPanelSection = 'inspector'
+    }
   },
 
   selectEdge(edgeId) {
@@ -32,6 +45,9 @@ export const flowchartSelectionMethods = {
     }
     this.selectedEdgeId = edgeId
     this.selectedNodeIds = []
+    if (this.isInspectorOpen) {
+      this.inspectorPanelSection = 'inspector'
+    }
     this.syncEdgeToolbarState(edgeId)
   },
 
@@ -55,6 +71,7 @@ export const flowchartSelectionMethods = {
     }
     this.edgeToolbarState = {
       edgeId,
+      placement: getEdgeLabelToolbarPlacement(edge),
       style: {
         left: `${edge.labelX}px`,
         top: `${edge.labelY}px`

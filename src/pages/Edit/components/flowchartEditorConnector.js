@@ -252,10 +252,6 @@ export const flowchartConnectorMethods = {
     this.selectedEdgeId = ''
     this.closeInspector()
     await this.persistFlowchartState()
-    this.openInlineTextEditor({
-      kind: 'node',
-      id: newNode.id
-    })
   },
 
   cancelConnectorDrag() {

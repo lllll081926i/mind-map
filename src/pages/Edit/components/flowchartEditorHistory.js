@@ -56,6 +56,7 @@ export const flowchartHistoryMethods = {
     const nextFlowchartConfig = {
       snapToGrid: false,
       gridSize: 24,
+      strictAlignment: false,
       ...cloneJson(snapshot.flowchartConfig || {})
     }
     nextFlowchartConfig.snapToGrid = false

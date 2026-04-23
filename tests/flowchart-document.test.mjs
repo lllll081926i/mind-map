@@ -41,9 +41,13 @@ test('流程图文档服务存在并暴露核心能力', () => {
 test('流程图文档模型包含节点、连线、视口和模板字段', () => {
   const source = fs.readFileSync(flowchartDocumentPath, 'utf8')
 
+  assert.match(source, /strictAlignment:\s*false/)
   assert.match(source, /templateId/)
   assert.match(source, /FLOWCHART_TEMPLATE_PRESETS/)
+  assert.match(source, /FLOWCHART_THEME_PRESETS/)
+  assert.match(source, /getFlowchartThemeDefinition/)
   assert.match(source, /viewport/)
+  assert.match(source, /lanes/)
   assert.match(source, /nodes/)
   assert.match(source, /edges/)
   assert.match(source, /type:\s*'start'/)
@@ -58,7 +62,37 @@ test('流程图文档模型包含节点、连线、视口和模板字段', () =>
   assert.match(source, /incident:\s*title =>/)
   assert.match(source, /dataPipeline:\s*title =>/)
   assert.match(source, /projectPlan:\s*title =>/)
+  assert.match(source, /crossFunctionalApproval:\s*title =>/)
+  assert.match(source, /supportEscalation:\s*title =>/)
+  assert.match(source, /contentReview:\s*title =>/)
+  assert.match(source, /procurement:\s*title =>/)
+  assert.match(source, /salesPipeline:\s*title =>/)
+  assert.match(source, /customerOnboardingSwimlane:\s*title =>/)
+  assert.match(source, /productLaunchSwimlane:\s*title =>/)
   assert.match(source, /FLOWCHART_TEMPLATE_PRESETS = \[/)
+  assert.match(source, /graphite:\s*\{/)
+  assert.match(source, /clayWarm:\s*\{/)
+  assert.match(source, /canvasBg:\s*'#ffffff'/)
+  assert.doesNotMatch(source, /FLOWCHART_TEMPLATE_PRESETS[\s\S]*themeId:/)
+})
+
+test('流程图严格对齐配置会在文档层默认保留，并在导出时强制正交折线', () => {
+  const source = fs.readFileSync(flowchartDocumentPath, 'utf8')
+
+  assert.match(source, /strictAlignment:\s*false/)
+  assert.match(source, /pathType:\s*strictAlignment[\s\S]*?'orthogonal'/)
+  assert.match(source, /strictAlignment:\s*!!flowchartConfig\?\.strictAlignment/)
+})
+
+test('流程图模板在生成时会统一改为纯直线连线布局', async () => {
+  const { createDefaultFlowchartData } = await loadFlowchartDocumentModule()
+  const flowchartData = createDefaultFlowchartData('模板直线', 'approval')
+
+  assert.ok(flowchartData.edges.length > 0)
+  assert.equal(
+    flowchartData.edges.every(edge => edge?.style?.pathType === 'straight'),
+    true
+  )
 })
 
 test('思维导图文档解析与序列化会保留 config 字段', () => {
@@ -201,7 +235,205 @@ test('流程图 SVG 导出会保留节点和连线样式，并输出箭头与折
   assert.match(svgMarkup, /stroke-dasharray="8 6"/)
   assert.match(svgMarkup, /marker-end="url\(#flowchart-arrow-edge-a-b\)"/)
   assert.match(svgMarkup, /dominant-baseline="middle"/)
-  assert.match(svgMarkup, /rx="8"/)
+  assert.match(svgMarkup, /paint-order="stroke"/)
+  assert.match(svgMarkup, /rx="10"/)
   assert.match(svgMarkup, /条件满足/)
   assert.match(svgMarkup, /M 288 156 L 354 156 L 354 366 L 420 366/)
+  assert.doesNotMatch(svgMarkup, /<path[^>]*\/><rect[^>]*rx="8"[^>]*\/><text[^>]*>条件满足/)
+})
+
+test('流程图曲线连线布局会生成贝塞尔路径并支持主题回退色', async () => {
+  const {
+    getFlowchartEdgeLayout,
+    getFlowchartThemeDefinition
+  } = await loadFlowchartDocumentModule()
+  const theme = getFlowchartThemeDefinition('incidentDark')
+  const layout = getFlowchartEdgeLayout(
+    {
+      id: 'edge-curved',
+      source: 'a',
+      target: 'b',
+      label: '升级',
+      style: {
+        pathType: 'curved'
+      }
+    },
+    {
+      id: 'a',
+      x: 120,
+      y: 120,
+      width: 168,
+      height: 72
+    },
+    {
+      id: 'b',
+      x: 420,
+      y: 320,
+      width: 168,
+      height: 72
+    },
+    {
+      theme
+    }
+  )
+
+  assert.match(layout.path, /^M 288 156 C /)
+  assert.equal(layout.style.pathType, 'curved')
+  assert.equal(layout.style.stroke, theme.edgeStroke)
+})
+
+test('严格对齐开启后会把连线布局强制为正交折线', async () => {
+  const { getFlowchartEdgeLayout } = await loadFlowchartDocumentModule()
+  const layout = getFlowchartEdgeLayout(
+    {
+      id: 'edge-strict-curved',
+      source: 'a',
+      target: 'b',
+      style: {
+        pathType: 'curved'
+      }
+    },
+    {
+      id: 'a',
+      x: 120,
+      y: 120,
+      width: 168,
+      height: 72
+    },
+    {
+      id: 'b',
+      x: 420,
+      y: 320,
+      width: 168,
+      height: 72
+    },
+    {
+      strictAlignment: true
+    }
+  )
+
+  assert.equal(layout.style.pathType, 'orthogonal')
+  assert.match(layout.path, /^M 288 156 L 354 156 L 354 356 L 420 356$/)
+})
+
+test('流程图连线标签会避开线段，竖线标签放到线段侧边', async () => {
+  const { getFlowchartEdgeLayout } = await loadFlowchartDocumentModule()
+  const verticalLayout = getFlowchartEdgeLayout(
+    {
+      id: 'edge-vertical',
+      source: 'a',
+      target: 'b',
+      label: '否',
+      style: {
+        pathType: 'straight'
+      }
+    },
+    {
+      id: 'a',
+      x: 120,
+      y: 120,
+      width: 168,
+      height: 72
+    },
+    {
+      id: 'b',
+      x: 120,
+      y: 320,
+      width: 168,
+      height: 72
+    }
+  )
+  const horizontalLayout = getFlowchartEdgeLayout(
+    {
+      id: 'edge-horizontal',
+      source: 'a',
+      target: 'b',
+      label: '是',
+      style: {
+        pathType: 'straight'
+      }
+    },
+    {
+      id: 'a',
+      x: 120,
+      y: 120,
+      width: 168,
+      height: 72
+    },
+    {
+      id: 'b',
+      x: 420,
+      y: 120,
+      width: 168,
+      height: 72
+    }
+  )
+
+  assert.equal(verticalLayout.labelPlacement, 'right')
+  assert.notEqual(verticalLayout.labelX, verticalLayout.sourcePoint.x)
+  assert.equal(horizontalLayout.labelPlacement, 'inline')
+  assert.equal(horizontalLayout.labelY, horizontalLayout.sourcePoint.y)
+})
+
+test('流程图 SVG 导出会带上主题配色，而不是退回默认白底', async () => {
+  const {
+    buildFlowchartSvgMarkup,
+    createDefaultFlowchartData,
+    getFlowchartThemeDefinition
+  } = await loadFlowchartDocumentModule()
+  const flowchartData = createDefaultFlowchartData('主题导出', 'supportEscalation')
+  const theme = getFlowchartThemeDefinition('incidentDark')
+  const svgMarkup = buildFlowchartSvgMarkup(flowchartData, {
+    flowchartConfig: {
+      themeId: 'incidentDark'
+    }
+  })
+
+  assert.match(svgMarkup, new RegExp(`fill="${theme.canvasBg}"`))
+  assert.match(svgMarkup, new RegExp(`stroke="${theme.edgeStroke}"`))
+})
+
+test('流程图连线标签底板尺寸同时兼容编辑态 layout.label 与导出态 layout.edge.label', async () => {
+  const { getFlowchartEdgeLabelBox } = await loadFlowchartDocumentModule()
+
+  const editorLayoutBox = getFlowchartEdgeLabelBox({
+    label: '这是一个比较长的流程图标签',
+    labelX: 240,
+    labelY: 120
+  })
+  const exportLayoutBox = getFlowchartEdgeLabelBox({
+    edge: {
+      label: '这是一个比较长的流程图标签'
+    },
+    labelX: 240,
+    labelY: 120
+  })
+
+  assert.equal(editorLayoutBox.width, exportLayoutBox.width)
+  assert.equal(editorLayoutBox.width > 56, true)
+})
+
+test('流程图泳道模板会保留责任分区，并在 SVG 导出中先于节点和连线输出', async () => {
+  const {
+    buildFlowchartSvgMarkup,
+    createDefaultFlowchartData,
+    getFlowchartExportBounds
+  } = await loadFlowchartDocumentModule()
+  const flowchartData = createDefaultFlowchartData('客户交付', 'customerOnboardingSwimlane')
+  const bounds = getFlowchartExportBounds(flowchartData, {
+    paddingX: 40,
+    paddingY: 40
+  })
+  const svgMarkup = buildFlowchartSvgMarkup(flowchartData, {
+    paddingX: 40,
+    paddingY: 40
+  })
+
+  assert.equal(flowchartData.lanes.length, 3)
+  assert.equal(flowchartData.lanes[0].label, '销售')
+  assert.equal(bounds.x <= 40, true)
+  assert.match(svgMarkup, /flowchart-swimlane/)
+  assert.match(svgMarkup, /客户成功/)
+  assert.equal(svgMarkup.indexOf('flowchart-swimlane') < svgMarkup.indexOf('<g><path'), true)
+  assert.equal(svgMarkup.indexOf('flowchart-swimlane') < svgMarkup.indexOf('合同签署'), true)
 })

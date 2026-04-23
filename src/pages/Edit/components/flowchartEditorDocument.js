@@ -5,9 +5,11 @@ import platform, {
 } from '@/platform'
 import {
   createDesktopFsError,
+  getCurrentFileRef,
   getLastDirectory,
   markDocumentDirty,
-  setCurrentFileRef
+  setCurrentFileRef,
+  updateCurrentFileRef
 } from '@/services/documentSession'
 import {
   clearRecoveryDraftForFile,
@@ -37,6 +39,7 @@ export const flowchartDocumentMethods = {
     if (recordHistory) {
       this.commitFlowchartHistorySnapshot()
     }
+    this.ensureFlowchartDocumentSession()
     await saveBootstrapStatePatch({
       flowchartData: cloneJson(this.flowchartData),
       flowchartConfig: cloneJson(this.flowchartConfig)
@@ -47,6 +50,34 @@ export const flowchartDocumentMethods = {
     }
     if (autoSave && this.currentDocument?.path) {
       this.queueAutoSave()
+    }
+  },
+
+  ensureFlowchartDocumentSession() {
+    const path = String(this.currentDocument?.path || '').trim()
+    if (!path) {
+      return
+    }
+    const nextFileRef = {
+      ...this.currentDocument,
+      path,
+      documentMode: 'flowchart',
+      isFullDataFile: true
+    }
+    const currentFileRef = getCurrentFileRef()
+    const currentPath = String(currentFileRef?.path || '').trim()
+    if (!currentPath || currentPath !== path) {
+      setCurrentFileRef(nextFileRef, this.currentDocument.source || 'desktop')
+      return
+    }
+    if (
+      currentFileRef.documentMode !== 'flowchart' ||
+      !currentFileRef.isFullDataFile
+    ) {
+      updateCurrentFileRef({
+        documentMode: 'flowchart',
+        isFullDataFile: true
+      })
     }
   },
 
@@ -195,9 +226,12 @@ export const flowchartDocumentMethods = {
     const nextFlowchartConfig = {
       snapToGrid: false,
       gridSize: 24,
+      themeId: this.flowchartConfig?.themeId || 'blueprint',
+      strictAlignment: false,
       ...cloneJson(normalized.flowchartConfig || {})
     }
     nextFlowchartConfig.snapToGrid = false
+    nextFlowchartConfig.themeId = this.flowchartConfig?.themeId || 'blueprint'
     this.flowchartConfig = nextFlowchartConfig
     this.selectedNodeIds = []
     this.selectedEdgeId = ''

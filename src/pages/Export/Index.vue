@@ -805,6 +805,16 @@ export default {
       return getBootstrapState().flowchartData || createFallbackFlowchartData()
     },
 
+    getFlowchartConfig() {
+      const bootstrapState = getBootstrapState()
+      return bootstrapState.flowchartConfig || {
+        snapToGrid: false,
+        gridSize: 24,
+        themeId: 'blueprint',
+        strictAlignment: false
+      }
+    },
+
     initFlowchartPreview(previewEl) {
       if (!previewEl) {
         throw new Error(this.$t('exportPage.previewContainerMissing'))
@@ -814,6 +824,7 @@ export default {
         this.mindMap = null
       }
       this.flowchartPreviewMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
+        flowchartConfig: this.getFlowchartConfig(),
         isDark: this.isDark,
         transparent: false,
         paddingX: this.exportState.paddingX,
@@ -891,6 +902,7 @@ export default {
     async handleFlowchartExport(safeFileName) {
       const exportType = this.exportState.exportType
       const svgMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
+        flowchartConfig: this.getFlowchartConfig(),
         isDark: this.isDark,
         transparent: exportType === 'png' ? this.exportState.isTransparent : false,
         paddingX: this.exportState.paddingX,

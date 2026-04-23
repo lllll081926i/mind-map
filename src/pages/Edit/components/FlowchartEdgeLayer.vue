@@ -32,17 +32,6 @@
           @click.stop="$emit('select-edge', edge.id)"
           @dblclick.stop="$emit('edit-edge-label', edge.id)"
         />
-        <rect
-          v-if="edge.label"
-          class="edgeLabelBackdrop"
-          :x="getEdgeLabelRectX(edge)"
-          :y="getEdgeLabelRectY(edge)"
-          :width="getEdgeLabelWidth(edge)"
-          :height="getEdgeLabelHeight()"
-          rx="8"
-          @click.stop="$emit('select-edge', edge.id)"
-          @dblclick.stop="$emit('edit-edge-label', edge.id)"
-        />
         <text
           v-if="edge.label"
           class="edgeLabel"
@@ -91,31 +80,52 @@
     <div
       v-if="edgeToolbarState"
       class="flowchartEdgeToolbar"
+      :class="edgeToolbarState.placement ? `is-${edgeToolbarState.placement}` : ''"
       :style="edgeToolbarState.style"
     >
       <button
         type="button"
         class="flowchartEdgeToolbarBtn"
-        :aria-label="labels.edgeLabel"
+        :aria-label="labels.edgeEditText"
+        :title="labels.edgeEditText"
         @click.stop="$emit('edit-edge-label', edgeToolbarState.edgeId)"
       >
-        T
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20h4l9.5-9.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path>
+          <path d="M13.5 6.5l4 4"></path>
+        </svg>
+        <span class="flowchartEdgeToolbarText">{{ labels.edgeEditText }}</span>
       </button>
       <button
         type="button"
         class="flowchartEdgeToolbarBtn"
-        :aria-label="labels.addProcess"
+        :aria-label="labels.edgeInsertNode"
+        :title="labels.edgeInsertNode"
         @click.stop="$emit('insert-node-on-edge', edgeToolbarState.edgeId)"
       >
-        +
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5v14"></path>
+          <path d="M5 12h14"></path>
+          <path d="M4 18h16"></path>
+        </svg>
+        <span class="flowchartEdgeToolbarText">{{ labels.edgeInsertNode }}</span>
       </button>
       <button
         type="button"
-        class="flowchartEdgeToolbarBtn"
-        :aria-label="labels.delete"
+        class="flowchartEdgeToolbarBtn isDanger"
+        :aria-label="labels.edgeDeleteLine"
+        :title="labels.edgeDeleteLine"
         @click.stop="$emit('remove-edge', edgeToolbarState.edgeId)"
       >
-        ×
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 7h14"></path>
+          <path d="M9 7V5h6v2"></path>
+          <path d="M8 10v8"></path>
+          <path d="M12 10v8"></path>
+          <path d="M16 10v8"></path>
+          <path d="M7 7l1 12h8l1-12"></path>
+        </svg>
+        <span class="flowchartEdgeToolbarText">{{ labels.edgeDeleteLine }}</span>
       </button>
     </div>
 </template>
@@ -166,32 +176,6 @@ export default {
     },
     getEdgeStroke(edge) {
       return this.selectedEdgeId === edge.id ? 'var(--flowchart-selection)' : edge.style.stroke
-    },
-    getEdgeLabelTextUnits(label = '') {
-      return Array.from(String(label || '')).reduce((total, char) => {
-        if (/\s/.test(char)) {
-          return total + 0.45
-        }
-        if (/[\u1100-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(char)) {
-          return total + 1.7
-        }
-        if (/[MW@#%&]/.test(char)) {
-          return total + 1
-        }
-        return total + 0.72
-      }, 0)
-    },
-    getEdgeLabelWidth(edge) {
-      return Math.max(48, Math.ceil(this.getEdgeLabelTextUnits(edge?.label) * 7.6 + 20))
-    },
-    getEdgeLabelHeight() {
-      return 24
-    },
-    getEdgeLabelRectX(edge) {
-      return Number(edge?.labelX || 0) - this.getEdgeLabelWidth(edge) / 2
-    },
-    getEdgeLabelRectY(edge) {
-      return Number(edge?.labelY || 0) - this.getEdgeLabelHeight() / 2
     }
   }
 }

@@ -62,16 +62,20 @@ export const flowchartViewportMethods = {
     }
   },
 
-  centerViewportAt(point) {
+  centerViewportAt(point, options = {}) {
     const canvasRect = this.getCanvasElement()?.getBoundingClientRect?.()
     if (!canvasRect) {
       return
     }
     const viewport = this.getViewport()
     const zoom = Number(viewport.zoom || 1) || 1
+    const persist =
+      options.persist !== undefined ? options.persist : point?.persist !== false
     this.setViewportPatch({
       x: canvasRect.width / 2 - Number(point?.x || 0) * zoom,
       y: canvasRect.height / 2 - Number(point?.y || 0) * zoom
+    }, {
+      persist
     })
   },
 
@@ -146,18 +150,21 @@ export const flowchartViewportMethods = {
 
   fitCanvasToView({ persist = true } = {}) {
     const canvasRect = this.getCanvasElement()?.getBoundingClientRect?.()
-    if (!canvasRect || !this.flowchartData.nodes.length) {
+    const nodes = Array.isArray(this.flowchartData?.nodes) ? this.flowchartData.nodes : []
+    const lanes = Array.isArray(this.flowchartData?.lanes) ? this.flowchartData.lanes : []
+    const contentItems = [...lanes, ...nodes]
+    if (!canvasRect || !contentItems.length) {
       this.resetViewport({
         persist
       })
       return
     }
-    const bounds = this.flowchartData.nodes.reduce(
-      (result, node) => ({
-        minX: Math.min(result.minX, Number(node.x || 0)),
-        minY: Math.min(result.minY, Number(node.y || 0)),
-        maxX: Math.max(result.maxX, Number(node.x || 0) + Number(node.width || 0)),
-        maxY: Math.max(result.maxY, Number(node.y || 0) + Number(node.height || 0))
+    const bounds = contentItems.reduce(
+      (result, item) => ({
+        minX: Math.min(result.minX, Number(item.x || 0)),
+        minY: Math.min(result.minY, Number(item.y || 0)),
+        maxX: Math.max(result.maxX, Number(item.x || 0) + Number(item.width || 0)),
+        maxY: Math.max(result.maxY, Number(item.y || 0) + Number(item.height || 0))
       }),
       {
         minX: Infinity,
@@ -203,7 +210,7 @@ export const flowchartViewportMethods = {
     const target = event.target
     if (
       target?.closest?.(
-        '.flowchartNode, .edgePath, .edgeLabel, .edgeLabelBackdrop, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .flowchartEdgeReconnectHandle'
+        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .flowchartEdgeReconnectHandle'
       )
     ) {
       return

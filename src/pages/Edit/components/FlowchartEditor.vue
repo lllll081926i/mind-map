@@ -1,7 +1,8 @@
 <template>
-  <div class="flowchartEditor" :class="{ isDark }">
+  <div class="flowchartEditor" :class="{ isDark }" :style="flowchartThemeStyleVars">
     <FlowchartToolbar
       :labels="flowchartToolbarText"
+      :is-dark="isDark"
       :is-generating="isGenerating"
       @go-home="goHome"
       @save="saveCurrentFile()"
@@ -9,7 +10,9 @@
       @import-mind-map-file="importMindMapFile"
       @open-export="openExportCenter"
       @convert-mind-map="convertCurrentMindMap"
+      @toggle-dark="toggleAppearance"
       @generate-ai="generateWithAi"
+      @tidy-layout="tidyFlowchartLayout"
     />
 
     <div class="flowchartStage">
@@ -32,6 +35,17 @@
         @generate-ai="generateWithAi"
       >
         <template #world>
+          <div
+            v-for="lane in flowchartLanes"
+            :key="lane.id"
+            class="flowchartSwimlane"
+            :style="getSwimlaneStyle(lane)"
+          >
+            <div class="flowchartSwimlaneLabel">
+              {{ lane.label }}
+            </div>
+          </div>
+
           <FlowchartEdgeLayer
             :edges-with-layout="edgesWithLayout"
             :selected-edge-id="selectedEdgeId"
@@ -96,6 +110,8 @@
 
       <FlowchartMinimap
         :nodes="flowchartData.nodes"
+        :edges="edgesWithLayout"
+        :lanes="flowchartLanes"
         :viewport="getViewport()"
         :canvas-viewport-size="canvasViewportSize"
         :labels="flowchartUiText"
@@ -122,8 +138,12 @@
 
       <FlowchartInspector
         :is-open="isInspectorOpen"
+        :panel-section="inspectorPanelSection"
         :labels="flowchartUiText"
         :templates="flowchartTemplates"
+        :flowchart-theme-presets="flowchartThemePresets"
+        :flowchart-theme-id="flowchartConfig.themeId"
+        :strict-alignment="flowchartConfig.strictAlignment"
         :selected-node="selectedNode"
         :selected-edge="selectedEdge"
         :flowchart-node-types="flowchartNodeTypes"
@@ -131,13 +151,16 @@
         :edge-style-presets="flowchartEdgeStylePresets"
         :edge-path-types="flowchartEdgePathTypes"
         @toggle-inspector="toggleInspector"
+        @toggle-section="toggleInspectorSection"
         @close-inspector="closeInspector"
         @apply-template="applyTemplate"
+        @update-flowchart-config="updateFlowchartConfig"
         @update-selected-node-type="updateSelectedNodeType"
         @update-selected-node-text="updateSelectedNodeText"
         @update-selected-edge-label="updateSelectedEdgeLabel"
         @apply-selected-node-preset="applySelectedNodePreset"
         @apply-selected-edge-preset="applySelectedEdgePreset"
+        @update-flowchart-theme="updateFlowchartTheme"
         @update-selected-node-style="updateSelectedNodeStyle"
         @update-selected-edge-style="updateSelectedEdgeStyle"
         @reset-selected-node-style="resetSelectedNodeStyle"
@@ -156,14 +179,17 @@ import {
 import { useAiStore } from '@/stores/ai'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
+import { toggleThemeMode } from '@/stores/runtime'
 import {
   FLOWCHART_EDGE_STYLE_PRESETS,
   FLOWCHART_NODE_STYLE_PRESETS,
   FLOWCHART_TEMPLATE_PRESETS,
+  FLOWCHART_THEME_PRESETS,
   FLOWCHART_NODE_TYPES,
   createDefaultFlowchartData,
   getFlowchartEdgeLayout,
-  getFlowchartNodeVisualStyle
+  getFlowchartNodeVisualStyle,
+  getFlowchartThemeDefinition
 } from '@/services/flowchartDocument'
 import FlowchartCanvas from './FlowchartCanvas.vue'
 import FlowchartEdgeLayer from './FlowchartEdgeLayer.vue'
@@ -207,7 +233,9 @@ export default {
       flowchartData: createDefaultFlowchartData(),
       flowchartConfig: {
         snapToGrid: false,
-        gridSize: 24
+        gridSize: 24,
+        themeId: 'blueprint',
+        strictAlignment: false
       },
       flowchartNodeTypes: FLOWCHART_NODE_TYPES,
       selectedNodeIds: [],
@@ -221,6 +249,7 @@ export default {
       connectorDragState: null,
       edgeReconnectState: null,
       edgeToolbarState: null,
+      inspectorPanelSection: 'templates',
       inlineTextEditorState: null,
       flowchartClipboard: null,
       flowchartHistory: {
@@ -281,10 +310,16 @@ export default {
           if (!sourceNode || !targetNode) return null
           return {
             ...edge,
-            ...getFlowchartEdgeLayout(edge, sourceNode, targetNode)
+            ...getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
+              theme: this.resolvedFlowchartTheme,
+              strictAlignment: !!this.flowchartConfig.strictAlignment
+            })
           }
         })
         .filter(Boolean)
+    },
+    flowchartLanes() {
+      return Array.isArray(this.flowchartData.lanes) ? this.flowchartData.lanes : []
     },
     flowchartNodeStylePresets() {
       return FLOWCHART_NODE_STYLE_PRESETS
@@ -292,8 +327,62 @@ export default {
     flowchartEdgeStylePresets() {
       return FLOWCHART_EDGE_STYLE_PRESETS
     },
+    resolvedFlowchartTheme() {
+      return getFlowchartThemeDefinition(this.flowchartConfig.themeId, {
+        isDark: this.isDark
+      })
+    },
+    flowchartThemeStyleVars() {
+      const theme = this.resolvedFlowchartTheme
+      return {
+        '--flowchart-canvas-bg': theme.canvasBg,
+        '--flowchart-grid-color': theme.gridColor,
+        '--flowchart-floating-bg': theme.floatingBg,
+        '--flowchart-floating-border': theme.floatingBorder,
+        '--flowchart-floating-shadow': theme.floatingShadow,
+        '--flowchart-dock-bg': theme.dockBg,
+        '--flowchart-dock-border': theme.dockBorder,
+        '--flowchart-dock-shadow': theme.dockShadow,
+        '--flowchart-dock-active-bg': theme.dockActiveBg,
+        '--flowchart-dock-active-text': theme.dockActiveText,
+        '--flowchart-text': theme.text,
+        '--flowchart-subtle-text': theme.subtleText,
+        '--flowchart-toolbar-bg': theme.toolbarBg,
+        '--flowchart-toolbar-border': theme.toolbarBorder,
+        '--flowchart-toolbar-btn-hover': theme.toolbarBtnHover,
+        '--flowchart-node-bg': theme.nodeBg,
+        '--flowchart-node-border': theme.nodeBorder,
+        '--flowchart-node-shadow': theme.nodeShadow,
+        '--flowchart-accent': theme.accent,
+        '--flowchart-accent-ring': theme.accentRing,
+        '--flowchart-connector': theme.connector,
+        '--flowchart-connector-preview': theme.connectorPreview,
+        '--flowchart-overlay': theme.overlay,
+        '--flowchart-template-preview-bg': theme.templatePreviewBg,
+        '--flowchart-template-edge': theme.templateEdgeStroke,
+        '--flowchart-template-node-fill': theme.templateNodeFill,
+        '--flowchart-template-node-stroke': theme.templateNodeStroke,
+        '--flowchart-icon-stroke': theme.iconStroke
+      }
+    },
+    flowchartThemePresets() {
+      return FLOWCHART_THEME_PRESETS.map(item => {
+        const preview = getFlowchartThemeDefinition(item.id, {
+          isDark: this.isDark
+        })
+        return {
+          id: item.id,
+          label: this.$t(item.labelKey),
+          ...preview
+        }
+      })
+    },
     canvasWorldBounds() {
-      const nodeBounds = this.flowchartData.nodes.reduce(
+      const boundsItems = [
+        ...this.flowchartLanes,
+        ...this.flowchartData.nodes
+      ]
+      const nodeBounds = boundsItems.reduce(
         (bounds, node) => {
           return {
             minX: Math.min(bounds.minX, Number(node.x || 0)),
@@ -327,10 +416,22 @@ export default {
       return `${Math.round(viewport.zoom * 100)}%`
     },
     flowchartEdgePathTypes() {
+      if (this.flowchartConfig.strictAlignment) {
+        return [
+          {
+            value: 'orthogonal',
+            label: this.$t('flowchart.edgeTypeOrthogonal')
+          }
+        ]
+      }
       return [
         {
           value: 'orthogonal',
           label: this.$t('flowchart.edgeTypeOrthogonal')
+        },
+        {
+          value: 'curved',
+          label: this.$t('flowchart.edgeTypeCurved')
         },
         {
           value: 'straight',
@@ -344,6 +445,7 @@ export default {
         saveAs: this.$t('flowchart.saveAs'),
         returnHome: this.$t('flowchart.returnHome'),
         template: this.$t('flowchart.template'),
+        theme: this.$t('flowchart.theme'),
         templatePanelTitle: this.$t('flowchart.templatePanelTitle'),
         templateBlank: this.$t('flowchart.templateBlank'),
         convertMindMap: this.$t('flowchart.convertMindMap'),
@@ -377,12 +479,20 @@ export default {
         edgeType: this.$t('flowchart.edgeType'),
         edgeDashed: this.$t('flowchart.edgeDashed'),
         edgeTypeStraight: this.$t('flowchart.edgeTypeStraight'),
+        edgeTypeCurved: this.$t('flowchart.edgeTypeCurved'),
         edgeTypeOrthogonal: this.$t('flowchart.edgeTypeOrthogonal'),
+        strictAlignment: this.$t('flowchart.strictAlignment'),
+        settingsPanelTitle: this.$t('flowchart.settingsPanelTitle'),
+        inspectorEmpty: this.$t('flowchart.inspectorEmpty'),
+        edgeEditText: this.$t('flowchart.edgeEditText'),
+        edgeInsertNode: this.$t('flowchart.edgeInsertNode'),
+        edgeDeleteLine: this.$t('flowchart.edgeDeleteLine'),
         resetEdgeStyle: this.$t('flowchart.resetEdgeStyle'),
         minimap: this.$t('flowchart.minimap'),
         delete: this.$t('flowchart.delete'),
         selectionEmpty: this.$t('flowchart.selectionEmpty'),
         fitView: this.$t('flowchart.fitView'),
+        tidyLayout: this.$t('flowchart.tidyLayout'),
         templateApproval: this.$t('flowchart.templateApproval'),
         templateRelease: this.$t('flowchart.templateRelease'),
         templateTicket: this.$t('flowchart.templateTicket'),
@@ -392,6 +502,13 @@ export default {
         templateIncident: this.$t('flowchart.templateIncident'),
         templateDataPipeline: this.$t('flowchart.templateDataPipeline'),
         templateProjectPlan: this.$t('flowchart.templateProjectPlan'),
+        templateCrossFunctionalApproval: this.$t('flowchart.templateCrossFunctionalApproval'),
+        templateSupportEscalation: this.$t('flowchart.templateSupportEscalation'),
+        templateContentReview: this.$t('flowchart.templateContentReview'),
+        templateProcurement: this.$t('flowchart.templateProcurement'),
+        templateSalesPipeline: this.$t('flowchart.templateSalesPipeline'),
+        templateCustomerOnboardingSwimlane: this.$t('flowchart.templateCustomerOnboardingSwimlane'),
+        templateProductLaunchSwimlane: this.$t('flowchart.templateProductLaunchSwimlane'),
         close: this.$t('ai.close')
       }
     },
@@ -403,7 +520,10 @@ export default {
         importMindMapFile: this.$t('flowchart.importMindMapFileShort'),
         aiGenerate: this.$t('flowchart.aiGenerateShort'),
         exportCenter: this.$t('toolbar.exportCenter'),
-        convertMindMap: this.$t('flowchart.convertMindMapShort')
+        convertMindMap: this.$t('flowchart.convertMindMapShort'),
+        tidyLayout: this.$t('flowchart.tidyLayout'),
+        darkMode: this.$t('navigatorToolbar.darkMode'),
+        lightMode: this.$t('navigatorToolbar.lightMode')
       }
     },
     flowchartTemplates() {
@@ -467,6 +587,31 @@ export default {
     this.pendingCanvasPanPoint = null
   },
   methods: {
+    toggleInspectorSection(section = 'templates') {
+      const nextSection = ['templates', 'settings', 'inspector'].includes(section)
+        ? section
+        : 'templates'
+      if (this.isInspectorOpen && this.inspectorPanelSection === nextSection) {
+        this.closeInspector()
+        return
+      }
+      this.inspectorPanelSection = nextSection
+      this.isInspectorOpen = true
+    },
+    showInspectorSection(section = 'templates') {
+      this.inspectorPanelSection = ['templates', 'settings', 'inspector'].includes(section)
+        ? section
+        : 'templates'
+      this.isInspectorOpen = true
+    },
+    async toggleAppearance() {
+      try {
+        await toggleThemeMode()
+      } catch (error) {
+        console.error('toggleAppearance failed', error)
+        this.$message.error(error?.message || this.$t('flowchart.saveFailed'))
+      }
+    },
     loadFlowchartState() {
       const bootstrapState = getBootstrapState()
       this.flowchartData = cloneJson(
@@ -475,6 +620,8 @@ export default {
       const nextFlowchartConfig = {
         snapToGrid: false,
         gridSize: 24,
+        themeId: 'blueprint',
+        strictAlignment: false,
         ...cloneJson(bootstrapState.flowchartConfig || {})
       }
       nextFlowchartConfig.snapToGrid = false
@@ -486,16 +633,32 @@ export default {
 
     getNodeStyle(node) {
       const visualStyle = getFlowchartNodeVisualStyle(node, {
-        isDark: this.isDark
+        isDark: this.isDark,
+        theme: this.resolvedFlowchartTheme
       })
+      const usesPolygonShape =
+        node?.type === 'decision' || node?.type === 'input'
       return {
         left: `${node.x}px`,
         top: `${node.y}px`,
         width: `${node.width}px`,
         height: `${node.height}px`,
-        backgroundColor: visualStyle.fill,
+        backgroundColor: usesPolygonShape ? 'transparent' : visualStyle.fill,
         borderColor: visualStyle.stroke,
-        color: visualStyle.textColor
+        color: visualStyle.textColor,
+        '--flowchart-node-fill-current': visualStyle.fill,
+        '--flowchart-node-stroke-current': visualStyle.stroke,
+        '--flowchart-node-text-current': visualStyle.textColor
+      }
+    },
+    getSwimlaneStyle(lane) {
+      const accent = String(lane?.accent || this.resolvedFlowchartTheme.accent)
+      return {
+        left: `${Number(lane?.x || 0)}px`,
+        top: `${Number(lane?.y || 0)}px`,
+        width: `${Number(lane?.width || 0)}px`,
+        height: `${Number(lane?.height || 0)}px`,
+        '--flowchart-lane-accent': accent
       }
     },
     ...flowchartConnectorMethods,
@@ -530,6 +693,91 @@ export default {
       }
     },
 
+    getAlignmentSnapThreshold() {
+      const viewport = this.getViewport()
+      const zoom = Math.max(0.25, Number(viewport.zoom || 1) || 1)
+      const baseThreshold = FLOWCHART_ALIGNMENT_THRESHOLD / zoom
+      if (this.flowchartConfig.strictAlignment) {
+        return Math.max(8, Math.min(20, baseThreshold * 1.45))
+      }
+      return Math.max(4, Math.min(14, baseThreshold))
+    },
+
+    resolveAlignmentCandidate(candidates, axis, threshold, releaseThreshold) {
+      const lock = this.dragState?.snapLock?.[axis] || null
+      if (!candidates.length) {
+        return null
+      }
+      if (lock) {
+        const lockedCandidate = candidates.find(candidate => {
+          return candidate.lockKey === lock.lockKey
+        })
+        if (
+          lockedCandidate &&
+          Math.abs(lockedCandidate.diff) <= releaseThreshold
+        ) {
+          return lockedCandidate
+        }
+      }
+      const activeCandidates = candidates.filter(candidate => {
+        return Math.abs(candidate.diff) <= threshold
+      })
+      if (!activeCandidates.length) {
+        return null
+      }
+      return activeCandidates.sort((a, b) => {
+        if ((b.priority || 0) !== (a.priority || 0)) {
+          return (b.priority || 0) - (a.priority || 0)
+        }
+        return Math.abs(a.diff) - Math.abs(b.diff)
+      })[0]
+    },
+
+    getConnectedNodeIds(nodeId) {
+      if (!nodeId) {
+        return new Set()
+      }
+      return this.flowchartData.edges.reduce((result, edge) => {
+        if (edge.source === nodeId && edge.target) {
+          result.add(edge.target)
+        }
+        if (edge.target === nodeId && edge.source) {
+          result.add(edge.source)
+        }
+        return result
+      }, new Set())
+    },
+
+    createAlignmentGuideSpan(axis, guideValue, movingMetrics, candidateMetrics) {
+      const padding = 40
+      if (axis === 'x') {
+        return {
+          x1: guideValue,
+          y1: Math.max(
+            0,
+            Math.min(movingMetrics.top, candidateMetrics.top) - padding
+          ),
+          x2: guideValue,
+          y2: Math.min(
+            this.canvasWorldBounds.height,
+            Math.max(movingMetrics.bottom, candidateMetrics.bottom) + padding
+          )
+        }
+      }
+      return {
+        x1: Math.max(
+          0,
+          Math.min(movingMetrics.left, candidateMetrics.left) - padding
+        ),
+        y1: guideValue,
+        x2: Math.min(
+          this.canvasWorldBounds.width,
+          Math.max(movingMetrics.right, candidateMetrics.right) + padding
+        ),
+        y2: guideValue
+      }
+    },
+
     computeAlignmentSnap({ node, x, y, selectedIds = [] } = {}) {
       if (!node) {
         return {
@@ -540,8 +788,14 @@ export default {
       }
       const selectedSet = new Set(selectedIds)
       const movingMetrics = this.createNodeAlignmentMetrics(node, x, y)
-      let bestX = null
-      let bestY = null
+      const threshold = this.getAlignmentSnapThreshold()
+      const releaseThreshold = threshold * 1.75
+      const strictAlignment = !!this.flowchartConfig.strictAlignment
+      const connectedNodeIds = strictAlignment
+        ? this.getConnectedNodeIds(node.id)
+        : new Set()
+      const xCandidates = []
+      const yCandidates = []
       this.flowchartData.nodes.forEach(candidate => {
         if (selectedSet.has(candidate.id)) return
         const candidateMetrics = this.createNodeAlignmentMetrics(candidate)
@@ -551,14 +805,23 @@ export default {
           ['right', 'right']
         ].forEach(([movingKey, candidateKey]) => {
           const diff = candidateMetrics[candidateKey] - movingMetrics[movingKey]
-          if (
-            Math.abs(diff) <= FLOWCHART_ALIGNMENT_THRESHOLD &&
-            (!bestX || Math.abs(diff) < Math.abs(bestX.diff))
-          ) {
-            bestX = {
+          if (Math.abs(diff) <= releaseThreshold) {
+            const isConnected = connectedNodeIds.has(candidate.id)
+            const isCenterAlignment = movingKey === 'centerX'
+            xCandidates.push({
               diff,
-              guideX: candidateMetrics[candidateKey]
-            }
+              guideX: candidateMetrics[candidateKey],
+              candidateMetrics,
+              priority:
+                strictAlignment && isConnected && isCenterAlignment
+                  ? 4
+                  : strictAlignment && isCenterAlignment
+                    ? 2
+                    : isConnected
+                      ? 1
+                      : 0,
+              lockKey: `${candidate.id}:${candidateKey}:${movingKey}`
+            })
           }
         })
         ;[
@@ -567,36 +830,66 @@ export default {
           ['bottom', 'bottom']
         ].forEach(([movingKey, candidateKey]) => {
           const diff = candidateMetrics[candidateKey] - movingMetrics[movingKey]
-          if (
-            Math.abs(diff) <= FLOWCHART_ALIGNMENT_THRESHOLD &&
-            (!bestY || Math.abs(diff) < Math.abs(bestY.diff))
-          ) {
-            bestY = {
+          if (Math.abs(diff) <= releaseThreshold) {
+            const isConnected = connectedNodeIds.has(candidate.id)
+            const isCenterAlignment = movingKey === 'centerY'
+            yCandidates.push({
               diff,
-              guideY: candidateMetrics[candidateKey]
-            }
+              guideY: candidateMetrics[candidateKey],
+              candidateMetrics,
+              priority:
+                strictAlignment && isConnected && isCenterAlignment
+                  ? 4
+                  : strictAlignment && isCenterAlignment
+                    ? 2
+                    : isConnected
+                      ? 1
+                      : 0,
+              lockKey: `${candidate.id}:${candidateKey}:${movingKey}`
+            })
           }
         })
       })
-      const bounds = this.canvasWorldBounds
+      const bestX = this.resolveAlignmentCandidate(
+        xCandidates,
+        'x',
+        threshold,
+        releaseThreshold
+      )
+      const bestY = this.resolveAlignmentCandidate(
+        yCandidates,
+        'y',
+        threshold,
+        releaseThreshold
+      )
       const guides = []
       if (bestX) {
         guides.push({
           id: `vertical-${bestX.guideX}`,
-          x1: bestX.guideX,
-          y1: 0,
-          x2: bestX.guideX,
-          y2: bounds.height
+          ...this.createAlignmentGuideSpan(
+            'x',
+            bestX.guideX,
+            movingMetrics,
+            bestX.candidateMetrics
+          )
         })
       }
       if (bestY) {
         guides.push({
           id: `horizontal-${bestY.guideY}`,
-          x1: 0,
-          y1: bestY.guideY,
-          x2: bounds.width,
-          y2: bestY.guideY
+          ...this.createAlignmentGuideSpan(
+            'y',
+            bestY.guideY,
+            movingMetrics,
+            bestY.candidateMetrics
+          )
         })
+      }
+      if (this.dragState?.snapLock) {
+        this.dragState.snapLock = {
+          x: bestX ? { lockKey: bestX.lockKey } : null,
+          y: bestY ? { lockKey: bestY.lockKey } : null
+        }
       }
       return {
         offsetX: bestX?.diff || 0,

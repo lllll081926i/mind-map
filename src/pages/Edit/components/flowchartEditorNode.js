@@ -43,19 +43,28 @@ export const flowchartNodeMethods = {
   normalizeAddNodePayload(payload = 'process') {
     if (typeof payload === 'string') {
       return {
-        type: payload
+        type: payload,
+        autoConnect: false,
+        startInlineEdit: true
       }
     }
     return {
       type: payload?.type || 'process',
-      worldPoint: payload?.worldPoint || null
+      worldPoint: payload?.worldPoint || null,
+      autoConnect: !!payload?.autoConnect,
+      startInlineEdit: payload?.startInlineEdit !== false
     }
   },
 
   async addNodeByType(payload = 'process') {
-    const { type, worldPoint } = this.normalizeAddNodePayload(payload)
+    const { type, worldPoint, autoConnect, startInlineEdit } =
+      this.normalizeAddNodePayload(payload)
     const typeDef = FLOWCHART_NODE_TYPES.find(item => item.type === type)
     const size = this.getDefaultNodeSizeByType(type)
+    const sourceNode =
+      autoConnect && !worldPoint && this.selectedNodeIds.length === 1
+        ? this.getNodeById(this.selectedNodeIds[0])
+        : null
     const placementPoint = this.getNodePlacementPoint(type, worldPoint)
     const nextNode = {
       id: createNodeId(type),
@@ -68,22 +77,27 @@ export const flowchartNodeMethods = {
       style: {}
     }
     this.flowchartData.nodes.push(nextNode)
+    if (sourceNode) {
+      this.ensureFlowchartEdge(sourceNode.id, nextNode.id)
+    }
     this.selectedNodeIds = [nextNode.id]
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
     this.closeInspector()
     await this.persistFlowchartState()
-    this.openInlineTextEditor({
-      kind: 'node',
-      id: nextNode.id
-    })
+    if (startInlineEdit) {
+      this.openInlineTextEditor({
+        kind: 'node',
+        id: nextNode.id
+      })
+    }
   },
 
   addNodeAtCanvasPoint(event) {
     const target = event?.target
     if (
       target?.closest?.(
-        '.flowchartNode, .edgePath, .edgeLabel, .edgeLabelBackdrop, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .canvasEmptyActions'
+        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .canvasEmptyActions'
       )
     ) {
       return
@@ -316,6 +330,552 @@ export const flowchartNodeMethods = {
     return true
   },
 
+  getNodeCenterPosition(node) {
+    return {
+      x: Number(node.x || 0) + Number(node.width || 0) / 2,
+      y: Number(node.y || 0) + Number(node.height || 0) / 2
+    }
+  },
+
+  getFlowchartTidyAxisConfig(orientation = 'horizontal') {
+    return orientation === 'horizontal'
+      ? {
+          primaryKey: 'x',
+          secondaryKey: 'y',
+          primarySizeKey: 'width',
+          secondarySizeKey: 'height'
+        }
+      : {
+          primaryKey: 'y',
+          secondaryKey: 'x',
+          primarySizeKey: 'height',
+          secondarySizeKey: 'width'
+        }
+  },
+
+  getFlowchartNodeAxisStart(node, axisKey) {
+    return Number(node?.[axisKey] || 0)
+  },
+
+  getFlowchartNodeAxisSize(node, sizeKey) {
+    return Number(node?.[sizeKey] || 0)
+  },
+
+  getFlowchartNodeAxisCenter(node, axisKey, sizeKey) {
+    return (
+      this.getFlowchartNodeAxisStart(node, axisKey) +
+      this.getFlowchartNodeAxisSize(node, sizeKey) / 2
+    )
+  },
+
+  buildFlowchartNodeRelationMaps(nodes = []) {
+    const nodeLookup = new Map(nodes.map(node => [node.id, node]))
+    const outgoingMap = new Map(nodes.map(node => [node.id, []]))
+    const incomingMap = new Map(nodes.map(node => [node.id, []]))
+    const adjacentMap = new Map(nodes.map(node => [node.id, new Set()]))
+    this.flowchartData.edges.forEach(edge => {
+      if (!nodeLookup.has(edge.source) || !nodeLookup.has(edge.target)) {
+        return
+      }
+      outgoingMap.get(edge.source).push(edge.target)
+      incomingMap.get(edge.target).push(edge.source)
+      adjacentMap.get(edge.source).add(edge.target)
+      adjacentMap.get(edge.target).add(edge.source)
+    })
+    return {
+      nodeLookup,
+      outgoingMap,
+      incomingMap,
+      adjacentMap
+    }
+  },
+
+  getFlowchartTidyLaneAssignments(nodes = [], axisConfig = null) {
+    const resolvedAxisConfig = axisConfig || this.getFlowchartTidyAxisConfig()
+    const lanes = Array.isArray(this.flowchartData?.lanes) ? this.flowchartData.lanes : []
+    if (!lanes.length) {
+      return new Map()
+    }
+    const sortedLanes = [...lanes].sort((a, b) => {
+      return (
+        this.getFlowchartNodeAxisStart(a, resolvedAxisConfig.secondaryKey) -
+          this.getFlowchartNodeAxisStart(b, resolvedAxisConfig.secondaryKey) ||
+        this.getFlowchartNodeAxisStart(a, resolvedAxisConfig.primaryKey) -
+          this.getFlowchartNodeAxisStart(b, resolvedAxisConfig.primaryKey)
+      )
+    })
+    return nodes.reduce((result, node) => {
+      const centerPrimary = this.getFlowchartNodeAxisCenter(
+        node,
+        resolvedAxisConfig.primaryKey,
+        resolvedAxisConfig.primarySizeKey
+      )
+      const centerSecondary = this.getFlowchartNodeAxisCenter(
+        node,
+        resolvedAxisConfig.secondaryKey,
+        resolvedAxisConfig.secondarySizeKey
+      )
+      const lane = sortedLanes.find(item => {
+        const lanePrimaryStart = this.getFlowchartNodeAxisStart(item, resolvedAxisConfig.primaryKey)
+        const laneSecondaryStart = this.getFlowchartNodeAxisStart(item, resolvedAxisConfig.secondaryKey)
+        return (
+          centerPrimary >= lanePrimaryStart &&
+          centerPrimary <= lanePrimaryStart + this.getFlowchartNodeAxisSize(item, resolvedAxisConfig.primarySizeKey) &&
+          centerSecondary >= laneSecondaryStart &&
+          centerSecondary <= laneSecondaryStart + this.getFlowchartNodeAxisSize(item, resolvedAxisConfig.secondarySizeKey)
+        )
+      })
+      if (lane) {
+        result.set(node.id, {
+          laneId: lane.id,
+          rank: sortedLanes.findIndex(item => item.id === lane.id)
+        })
+      }
+      return result
+    }, new Map())
+  },
+
+  getFlowchartConnectedComponents(nodes = [], relationMaps = null, axisConfig = null) {
+    const resolvedAxisConfig = axisConfig || this.getFlowchartTidyAxisConfig()
+    const maps = relationMaps || this.buildFlowchartNodeRelationMaps(nodes)
+    const visited = new Set()
+    const components = []
+    nodes.forEach(node => {
+      if (visited.has(node.id)) {
+        return
+      }
+      const queue = [node.id]
+      const componentNodes = []
+      visited.add(node.id)
+      while (queue.length) {
+        const currentId = queue.shift()
+        const currentNode = maps.nodeLookup.get(currentId)
+        if (currentNode) {
+          componentNodes.push(currentNode)
+        }
+        ;(maps.adjacentMap.get(currentId) || []).forEach(nextId => {
+          if (visited.has(nextId)) {
+            return
+          }
+          visited.add(nextId)
+          queue.push(nextId)
+        })
+      }
+      componentNodes.sort((a, b) => {
+        return (
+          this.getFlowchartNodeAxisStart(a, resolvedAxisConfig.primaryKey) -
+            this.getFlowchartNodeAxisStart(b, resolvedAxisConfig.primaryKey) ||
+          this.getFlowchartNodeAxisStart(a, resolvedAxisConfig.secondaryKey) -
+            this.getFlowchartNodeAxisStart(b, resolvedAxisConfig.secondaryKey)
+        )
+      })
+      components.push(componentNodes)
+    })
+    return components.sort((a, b) => {
+      const firstA = a[0]
+      const firstB = b[0]
+      return (
+        this.getFlowchartNodeAxisStart(firstA, resolvedAxisConfig.primaryKey) -
+          this.getFlowchartNodeAxisStart(firstB, resolvedAxisConfig.primaryKey) ||
+        this.getFlowchartNodeAxisStart(firstA, resolvedAxisConfig.secondaryKey) -
+          this.getFlowchartNodeAxisStart(firstB, resolvedAxisConfig.secondaryKey)
+      )
+    })
+  },
+
+  getFlowchartTidyComponentLevels(componentNodes = [], relationMaps = null, orientation = 'horizontal') {
+    const axisConfig = this.getFlowchartTidyAxisConfig(orientation)
+    const maps = relationMaps || this.buildFlowchartNodeRelationMaps(componentNodes)
+    const componentNodeIds = new Set(componentNodes.map(node => node.id))
+    const indegreeMap = new Map(componentNodes.map(node => [node.id, 0]))
+    componentNodes.forEach(node => {
+      ;(maps.outgoingMap.get(node.id) || []).forEach(targetId => {
+        if (componentNodeIds.has(targetId)) {
+          indegreeMap.set(targetId, Number(indegreeMap.get(targetId) || 0) + 1)
+        }
+      })
+    })
+    const sortNodeIds = nodeIds => {
+      return [...nodeIds].sort((aId, bId) => {
+        const aNode = maps.nodeLookup.get(aId)
+        const bNode = maps.nodeLookup.get(bId)
+        if (!aNode || !bNode) {
+          return 0
+        }
+        return (
+          this.getFlowchartNodeAxisStart(aNode, axisConfig.secondaryKey) -
+            this.getFlowchartNodeAxisStart(bNode, axisConfig.secondaryKey) ||
+          this.getFlowchartNodeAxisStart(aNode, axisConfig.primaryKey) -
+            this.getFlowchartNodeAxisStart(bNode, axisConfig.primaryKey)
+        )
+      })
+    }
+    const seedNodeIds = sortNodeIds(
+      componentNodes
+        .filter(node => {
+          return node.type === 'start' || !Number(indegreeMap.get(node.id) || 0)
+        })
+        .map(node => node.id)
+    )
+    const pendingNodeIds = seedNodeIds.length
+      ? [...seedNodeIds]
+      : sortNodeIds(componentNodes.map(node => node.id).slice(0, 1))
+    const enqueued = new Set(pendingNodeIds)
+    const topoOrder = []
+    while (pendingNodeIds.length) {
+      const currentId = pendingNodeIds.shift()
+      topoOrder.push(currentId)
+      ;(maps.outgoingMap.get(currentId) || []).forEach(targetId => {
+        if (!componentNodeIds.has(targetId)) {
+          return
+        }
+        indegreeMap.set(targetId, Number(indegreeMap.get(targetId) || 0) - 1)
+        if (!Number(indegreeMap.get(targetId) || 0) && !enqueued.has(targetId)) {
+          enqueued.add(targetId)
+          pendingNodeIds.push(targetId)
+        }
+      })
+      pendingNodeIds.sort((aId, bId) => {
+        const aNode = maps.nodeLookup.get(aId)
+        const bNode = maps.nodeLookup.get(bId)
+        if (!aNode || !bNode) {
+          return 0
+        }
+        return (
+          this.getFlowchartNodeAxisStart(aNode, axisConfig.secondaryKey) -
+            this.getFlowchartNodeAxisStart(bNode, axisConfig.secondaryKey) ||
+          this.getFlowchartNodeAxisStart(aNode, axisConfig.primaryKey) -
+            this.getFlowchartNodeAxisStart(bNode, axisConfig.primaryKey)
+        )
+      })
+    }
+    const remainingIds = sortNodeIds(
+      componentNodes
+        .filter(node => !topoOrder.includes(node.id))
+        .map(node => node.id)
+    )
+    topoOrder.push(...remainingIds)
+
+    const levelMap = new Map(componentNodes.map(node => [node.id, 0]))
+    topoOrder.forEach(nodeId => {
+      const currentLevel = Number(levelMap.get(nodeId) || 0)
+      ;(maps.outgoingMap.get(nodeId) || []).forEach(targetId => {
+        if (!componentNodeIds.has(targetId)) {
+          return
+        }
+        const nextLevel = currentLevel + 1
+        if (nextLevel > Number(levelMap.get(targetId) || 0)) {
+          levelMap.set(targetId, nextLevel)
+        }
+      })
+    })
+    return levelMap
+  },
+
+  createFlowchartTidyOrderIndexMap(levelNodes = []) {
+    return new Map(levelNodes.map((node, index) => [node.id, index]))
+  },
+
+  getFlowchartTidyOrderWeight(node, {
+    previousOrderMap = null,
+    nextOrderMap = null,
+    currentOrderMap = null,
+    incomingMap = null,
+    outgoingMap = null,
+    axisConfig = null,
+    laneAssignments = null
+  } = {}) {
+    const resolvedAxisConfig = axisConfig || this.getFlowchartTidyAxisConfig()
+    const laneRank = laneAssignments?.get(node.id)?.rank
+    const currentOrder = Number(currentOrderMap?.get(node.id) || 0)
+    const currentSecondary = this.getFlowchartNodeAxisCenter(
+      node,
+      resolvedAxisConfig.secondaryKey,
+      resolvedAxisConfig.secondarySizeKey
+    )
+    const parentOrders = (incomingMap?.get(node.id) || [])
+      .map(parentId => previousOrderMap?.get(parentId))
+      .filter(value => value !== undefined)
+    const childOrders = (outgoingMap?.get(node.id) || [])
+      .map(childId => nextOrderMap?.get(childId))
+      .filter(value => value !== undefined)
+    let score = 0
+    let weight = 0
+    if (parentOrders.length) {
+      score +=
+        (parentOrders.reduce((sum, value) => sum + value, 0) / parentOrders.length) * 0.6
+      weight += 0.6
+    }
+    if (childOrders.length) {
+      score +=
+        (childOrders.reduce((sum, value) => sum + value, 0) / childOrders.length) * 0.25
+      weight += 0.25
+    }
+    score += currentOrder * 0.15
+    weight += 0.15
+    return {
+      laneRank: laneRank === undefined ? Number.MAX_SAFE_INTEGER : laneRank,
+      score: weight ? score / weight : currentSecondary,
+      currentSecondary
+    }
+  },
+
+  sortFlowchartTidyLevelNodes(levelNodes = [], context = {}) {
+    return [...levelNodes].sort((a, b) => {
+      const aWeight = this.getFlowchartTidyOrderWeight(a, context)
+      const bWeight = this.getFlowchartTidyOrderWeight(b, context)
+      return (
+        aWeight.laneRank - bWeight.laneRank ||
+        aWeight.score - bWeight.score ||
+        aWeight.currentSecondary - bWeight.currentSecondary
+      )
+    })
+  },
+
+  getFlowchartTidyLevelPrimaryPositions(groupedLevels = [], axisConfig = null) {
+    const resolvedAxisConfig = axisConfig || this.getFlowchartTidyAxisConfig()
+    const desiredAnchors = groupedLevels.map(([, levelNodes]) => {
+      const starts = levelNodes.map(node => this.getFlowchartNodeAxisStart(node, resolvedAxisConfig.primaryKey))
+      return starts.reduce((sum, value) => sum + value, 0) / Math.max(starts.length, 1)
+    })
+    const levelGap = resolvedAxisConfig.primaryKey === 'x' ? 156 : 132
+    const positions = []
+    groupedLevels.forEach(([, levelNodes], index) => {
+      const maxPrimarySize = Math.max(
+        ...levelNodes.map(node => this.getFlowchartNodeAxisSize(node, resolvedAxisConfig.primarySizeKey)),
+        0
+      )
+      const desiredPrimary = Number.isFinite(desiredAnchors[index])
+        ? desiredAnchors[index]
+        : positions[index - 1] || 0
+      if (!index) {
+        positions.push(desiredPrimary)
+        return
+      }
+      const previousPrimary = positions[index - 1]
+      const previousPrimarySize = Math.max(
+        ...groupedLevels[index - 1][1].map(node => {
+          return this.getFlowchartNodeAxisSize(node, resolvedAxisConfig.primarySizeKey)
+        }),
+        0
+      )
+      positions.push(
+        Math.max(
+          desiredPrimary,
+          previousPrimary + previousPrimarySize + levelGap
+        )
+      )
+      if (!maxPrimarySize) {
+        positions[index] = desiredPrimary
+      }
+    })
+    return positions
+  },
+
+  getFlowchartTidyLevelSecondaryLayout(levelNodes = [], axisConfig = null) {
+    const resolvedAxisConfig = axisConfig || this.getFlowchartTidyAxisConfig()
+    const itemGap = resolvedAxisConfig.secondaryKey === 'y' ? 96 : 88
+    const currentSecondaryCenter =
+      levelNodes.reduce((sum, node) => {
+        return (
+          sum +
+          this.getFlowchartNodeAxisCenter(
+            node,
+            resolvedAxisConfig.secondaryKey,
+            resolvedAxisConfig.secondarySizeKey
+          )
+        )
+      }, 0) / Math.max(levelNodes.length, 1)
+    const totalSecondarySize = levelNodes.reduce((sum, node, nodeIndex) => {
+      return (
+        sum +
+        this.getFlowchartNodeAxisSize(node, resolvedAxisConfig.secondarySizeKey) +
+        (nodeIndex > 0 ? itemGap : 0)
+      )
+    }, 0)
+    return {
+      itemGap,
+      currentSecondaryCenter,
+      totalSecondarySize,
+      startSecondary: currentSecondaryCenter - totalSecondarySize / 2
+    }
+  },
+
+  getFlowchartTidyOrientation() {
+    const edgeDirectionVotes = this.flowchartData.edges.reduce(
+      (result, edge) => {
+        const sourceNode = this.getNodeById(edge.source)
+        const targetNode = this.getNodeById(edge.target)
+        if (!sourceNode || !targetNode) {
+          return result
+        }
+        const sourceCenter = this.getNodeCenterPosition(sourceNode)
+        const targetCenter = this.getNodeCenterPosition(targetNode)
+        if (Math.abs(targetCenter.x - sourceCenter.x) >= Math.abs(targetCenter.y - sourceCenter.y)) {
+          result.horizontal += 1
+        } else {
+          result.vertical += 1
+        }
+        return result
+      },
+      {
+        horizontal: 0,
+        vertical: 0
+      }
+    )
+    if (edgeDirectionVotes.horizontal || edgeDirectionVotes.vertical) {
+      return edgeDirectionVotes.horizontal >= edgeDirectionVotes.vertical
+        ? 'horizontal'
+        : 'vertical'
+    }
+    const xPositions = this.flowchartData.nodes.map(node => Number(node.x || 0))
+    const yPositions = this.flowchartData.nodes.map(node => Number(node.y || 0))
+    return Math.max(...xPositions) - Math.min(...xPositions) >=
+      Math.max(...yPositions) - Math.min(...yPositions)
+      ? 'horizontal'
+      : 'vertical'
+  },
+
+  async tidyFlowchartLayout(options = {}) {
+    const { silent = false } = options || {}
+    const nodes = this.flowchartData.nodes
+    if (nodes.length < 2) {
+      return
+    }
+    const orientation = this.getFlowchartTidyOrientation()
+    const axisConfig = this.getFlowchartTidyAxisConfig(orientation)
+    const relationMaps = this.buildFlowchartNodeRelationMaps(nodes)
+    const laneAssignments = this.getFlowchartTidyLaneAssignments(nodes, axisConfig)
+    const components = this.getFlowchartConnectedComponents(
+      nodes,
+      relationMaps,
+      axisConfig
+    )
+
+    components.forEach(componentNodes => {
+      const levelMap = this.getFlowchartTidyComponentLevels(
+        componentNodes,
+        relationMaps,
+        orientation
+      )
+      const groupedLevels = Array.from(
+        componentNodes.reduce((result, node) => {
+          const level = Number(levelMap.get(node.id) || 0)
+          if (!result.has(level)) {
+            result.set(level, [])
+          }
+          result.get(level).push(node)
+          return result
+        }, new Map())
+      ).sort((a, b) => a[0] - b[0])
+
+      const orderedLevels = groupedLevels.map(([level, levelNodes]) => {
+        return [
+          level,
+          [...levelNodes].sort((a, b) => {
+            return (
+              this.getFlowchartNodeAxisCenter(
+                a,
+                axisConfig.secondaryKey,
+                axisConfig.secondarySizeKey
+              ) -
+                this.getFlowchartNodeAxisCenter(
+                  b,
+                  axisConfig.secondaryKey,
+                  axisConfig.secondarySizeKey
+                ) ||
+              this.getFlowchartNodeAxisStart(a, axisConfig.primaryKey) -
+                this.getFlowchartNodeAxisStart(b, axisConfig.primaryKey)
+            )
+          })
+        ]
+      })
+
+      for (let index = 1; index < orderedLevels.length; index += 1) {
+        const currentOrderMap = this.createFlowchartTidyOrderIndexMap(
+          orderedLevels[index][1]
+        )
+        orderedLevels[index][1] = this.sortFlowchartTidyLevelNodes(
+          orderedLevels[index][1],
+          {
+            previousOrderMap: this.createFlowchartTidyOrderIndexMap(
+              orderedLevels[index - 1][1]
+            ),
+            nextOrderMap:
+              index < orderedLevels.length - 1
+                ? this.createFlowchartTidyOrderIndexMap(orderedLevels[index + 1][1])
+                : null,
+            currentOrderMap,
+            incomingMap: relationMaps.incomingMap,
+            outgoingMap: relationMaps.outgoingMap,
+            axisConfig,
+            laneAssignments
+          }
+        )
+      }
+      for (let index = orderedLevels.length - 2; index >= 0; index -= 1) {
+        const currentOrderMap = this.createFlowchartTidyOrderIndexMap(
+          orderedLevels[index][1]
+        )
+        orderedLevels[index][1] = this.sortFlowchartTidyLevelNodes(
+          orderedLevels[index][1],
+          {
+            previousOrderMap:
+              index > 0
+                ? this.createFlowchartTidyOrderIndexMap(orderedLevels[index - 1][1])
+                : null,
+            nextOrderMap: this.createFlowchartTidyOrderIndexMap(
+              orderedLevels[index + 1][1]
+            ),
+            currentOrderMap,
+            incomingMap: relationMaps.incomingMap,
+            outgoingMap: relationMaps.outgoingMap,
+            axisConfig,
+            laneAssignments
+          }
+        )
+      }
+
+      const levelPrimaryPositions = this.getFlowchartTidyLevelPrimaryPositions(
+        orderedLevels,
+        axisConfig
+      )
+      orderedLevels.forEach(([, levelNodes], levelIndex) => {
+        const levelPrimary = levelPrimaryPositions[levelIndex]
+        const secondaryLayout = this.getFlowchartTidyLevelSecondaryLayout(
+          levelNodes,
+          axisConfig
+        )
+        let cursorSecondary = secondaryLayout.startSecondary
+        levelNodes.forEach(node => {
+          const nextPosition =
+            orientation === 'horizontal'
+              ? {
+                  x: levelPrimary,
+                  y: cursorSecondary
+                }
+              : {
+                  x: cursorSecondary,
+                  y: levelPrimary
+                }
+          const snappedPosition = this.snapPositionToGrid(nextPosition)
+          node.x = snappedPosition.x
+          node.y = snappedPosition.y
+          cursorSecondary +=
+            this.getFlowchartNodeAxisSize(node, axisConfig.secondarySizeKey) +
+            secondaryLayout.itemGap
+        })
+      })
+    })
+
+    this.clearAlignmentGuides()
+    this.syncEdgeToolbarState()
+    await this.persistFlowchartState()
+    if (!silent) {
+      this.$message.success(this.$t('flowchart.tidyLayoutDone'))
+    }
+  },
+
   alignSelectedNodesLeft() {
     const selectedNodes = this.getSelectedNodes()
     if (selectedNodes.length < 2) {
@@ -341,16 +901,17 @@ export const flowchartNodeMethods = {
       return
     }
     const sortedNodes = [...selectedNodes].sort((a, b) => {
-      return Number(a.x || 0) - Number(b.x || 0)
+      return this.getNodeCenterPosition(a).x - this.getNodeCenterPosition(b).x
     })
     const first = sortedNodes[0]
     const last = sortedNodes[sortedNodes.length - 1]
-    const startX = Number(first.x || 0)
-    const endX = Number(last.x || 0)
+    const startX = this.getNodeCenterPosition(first).x
+    const endX = this.getNodeCenterPosition(last).x
     const step = (endX - startX) / (sortedNodes.length - 1)
     sortedNodes.forEach((node, index) => {
+      const targetCenterX = startX + step * index
       const snappedPosition = this.snapPositionToGrid({
-        x: startX + step * index,
+        x: targetCenterX - Number(node.width || 0) / 2,
         y: Number(node.y || 0)
       })
       node.x = snappedPosition.x
@@ -366,17 +927,18 @@ export const flowchartNodeMethods = {
       return
     }
     const sortedNodes = [...selectedNodes].sort((a, b) => {
-      return Number(a.y || 0) - Number(b.y || 0)
+      return this.getNodeCenterPosition(a).y - this.getNodeCenterPosition(b).y
     })
     const first = sortedNodes[0]
     const last = sortedNodes[sortedNodes.length - 1]
-    const startY = Number(first.y || 0)
-    const endY = Number(last.y || 0)
+    const startY = this.getNodeCenterPosition(first).y
+    const endY = this.getNodeCenterPosition(last).y
     const step = (endY - startY) / (sortedNodes.length - 1)
     sortedNodes.forEach((node, index) => {
+      const targetCenterY = startY + step * index
       const snappedPosition = this.snapPositionToGrid({
         x: Number(node.x || 0),
-        y: startY + step * index
+        y: targetCenterY - Number(node.height || 0) / 2
       })
       node.x = snappedPosition.x
       node.y = snappedPosition.y
@@ -439,6 +1001,10 @@ export const flowchartNodeMethods = {
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
+      snapLock: {
+        x: null,
+        y: null
+      },
       nodes: selectedIds
         .map(id => this.getNodeById(id))
         .filter(Boolean)
