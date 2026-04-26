@@ -1280,7 +1280,10 @@ export default {
             flowchartData: null,
             flowchartConfig: null
           })
-          this.$bus.$emit('setData', normalized.data, { skipSave: true })
+          this.$bus.$emit('setData', normalized.data, {
+            skipSave: true,
+            configData: setDataOptions.configData
+          })
         }
         await recordRecentFile(nextFileRef)
         if (!this.isLatestLocalFileRead(requestId, fileRef)) {
