@@ -12,6 +12,45 @@ const getPlatform = () => {
   return desktopPlatform
 }
 
+const BROWSER_BOOTSTRAP_META_STORAGE_KEY = 'mindmap.bootstrap.meta'
+const BROWSER_BOOTSTRAP_DOCUMENT_STORAGE_KEY = 'mindmap.bootstrap.document'
+
+const getBrowserStorage = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null
+  }
+  return window.localStorage
+}
+
+const readBrowserBootstrapSnapshot = (storageKey, normalizer) => {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return normalizer({})
+  }
+  try {
+    const rawValue = storage.getItem(storageKey)
+    if (!rawValue) {
+      return normalizer({})
+    }
+    return normalizer(JSON.parse(rawValue))
+  } catch (error) {
+    console.error(`read browser bootstrap snapshot failed: ${storageKey}`, error)
+    return normalizer({})
+  }
+}
+
+const writeBrowserBootstrapSnapshot = (storageKey, snapshot) => {
+  const storage = getBrowserStorage()
+  if (!storage) {
+    return
+  }
+  try {
+    storage.setItem(storageKey, JSON.stringify(snapshot || {}))
+  } catch (error) {
+    console.error(`write browser bootstrap snapshot failed: ${storageKey}`, error)
+  }
+}
+
 const syncDocumentSessionFromBootstrap = () => {
   void import('@/services/documentSession')
     .then(module => {
@@ -151,9 +190,12 @@ const openUrlWithBrowserFallback = url => {
 
 export const bootstrapPlatformState = async () => {
   if (!isDesktopRuntime()) {
-    bootstrapState = createDefaultBootstrapState()
-    syncDocumentSessionFromBootstrap()
-    return bootstrapState
+    return applyBootstrapMetaState(
+      readBrowserBootstrapSnapshot(
+        BROWSER_BOOTSTRAP_META_STORAGE_KEY,
+        normalizeBootstrapMetaState
+      )
+    )
   }
   if (!bootstrapMetaPromise) {
     const startVersion = metaMutationVersion
@@ -180,7 +222,12 @@ export const bootstrapPlatformState = async () => {
 
 export const ensureBootstrapDocumentState = async () => {
   if (!isDesktopRuntime()) {
-    return bootstrapState
+    return applyBootstrapDocumentState(
+      readBrowserBootstrapSnapshot(
+        BROWSER_BOOTSTRAP_DOCUMENT_STORAGE_KEY,
+        normalizeBootstrapDocumentState
+      )
+    )
   }
   if (!bootstrapDocumentPromise) {
     const startVersion = documentMutationVersion
@@ -229,6 +276,18 @@ export const saveBootstrapStatePatch = async patch => {
     syncDocumentSessionFromBootstrap()
   }
   if (!isDesktopRuntime()) {
+    if (hasMetaPatch) {
+      writeBrowserBootstrapSnapshot(
+        BROWSER_BOOTSTRAP_META_STORAGE_KEY,
+        pickState(bootstrapState, BOOTSTRAP_META_KEYS)
+      )
+    }
+    if (hasDocumentPatch) {
+      writeBrowserBootstrapSnapshot(
+        BROWSER_BOOTSTRAP_DOCUMENT_STORAGE_KEY,
+        pickState(bootstrapState, BOOTSTRAP_DOCUMENT_KEYS)
+      )
+    }
     return bootstrapState
   }
   const tasks = []
@@ -254,6 +313,10 @@ export const recordRecentFile = async fileRef => {
       ...bootstrapState,
       recentFiles: upsertRecentFile(bootstrapState.recentFiles, fileRef)
     })
+    writeBrowserBootstrapSnapshot(
+      BROWSER_BOOTSTRAP_META_STORAGE_KEY,
+      pickState(bootstrapState, BOOTSTRAP_META_KEYS)
+    )
     return bootstrapState
   }
   const platform = getPlatform()

@@ -85,6 +85,12 @@ export const getDocumentSession = () => sessionState
 
 export const getCurrentFileRef = () => sessionState.fileRef
 
+export const flushDocumentSessionSync = () => {
+  return bootstrapSyncQueue.catch(error => {
+    console.error('flushDocumentSessionSync failed', error)
+  })
+}
+
 export const setCurrentFileRef = (fileRef, source = '') => {
   sessionState = {
     fileRef: fileRef || null,

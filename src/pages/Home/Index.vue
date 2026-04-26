@@ -5,7 +5,6 @@
         <div class="sidebarMeta">{{ $t('home.eyebrow') }}</div>
         <div class="sidebarIntro">
           <h1>{{ $t('home.brandTitle') }}</h1>
-          <p>{{ $t('home.brandDescription') }}</p>
         </div>
 
         <div class="actionList">
@@ -54,7 +53,6 @@
             </div>
             <div class="actionText">
               <strong>{{ $t('home.openLocalFile') }}</strong>
-              <span>{{ $t('home.openLocalFileDesc') }}</span>
             </div>
           </button>
 
@@ -73,7 +71,6 @@
             </div>
             <div class="actionText">
               <strong>{{ $t('home.openLocalFolder') }}</strong>
-              <span>{{ $t('home.openLocalFolderDesc') }}</span>
             </div>
           </button>
         </div>
@@ -98,13 +95,6 @@
             <div class="resumeMain">
               <strong>{{ resumeEntry.title }}</strong>
               <span>{{ resumeEntry.path || $t('home.resumeUnsavedPath') }}</span>
-              <em class="resumeHint">
-                {{
-                  hasDirtyDraft
-                    ? $t('home.resumeDirtyHint')
-                    : $t('home.resumeReadyHint')
-                }}
-              </em>
             </div>
             <span class="resumeAction">{{ $t('home.continueAction') }}</span>
           </button>
@@ -177,9 +167,6 @@
                 </em>
               </div>
               <span>{{ item.path }}</span>
-              <em v-if="lastDirectory" class="recentHint">
-                {{ $t('home.currentDirectory') }}{{ lastDirectory }}
-              </em>
             </div>
             <time class="recentMeta">{{ formatUpdatedAt(item.updatedAt) }}</time>
           </button>
@@ -237,8 +224,7 @@ export default {
       recentFiles: 'recentFiles',
       resumeEntry: 'resumeEntry',
       hasResumeEntry: 'hasResumeEntry',
-      hasDirtyDraft: 'hasDirtyDraft',
-      lastDirectory: 'lastDirectory'
+      hasDirtyDraft: 'hasDirtyDraft'
     }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
@@ -456,10 +442,7 @@ export default {
       }
     }
 
-    .sidebarIntro p,
-    .actionText span,
     .resumeMain span,
-    .resumeMain .resumeHint,
     .resumeEmpty p,
     .recentMain span,
     .recentMeta,
@@ -509,7 +492,6 @@ export default {
     }
 
     .actionIcon,
-    .recentHint,
     .recentMode {
       color: hsla(0, 0%, 100%, 0.42);
     }
@@ -605,14 +587,8 @@ export default {
   h1 {
     font-size: 24px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 0;
     letter-spacing: -0.03em;
-  }
-
-  p {
-    font-size: 13px;
-    line-height: 1.6;
-    color: #4b5563;
   }
 }
 
@@ -735,19 +711,11 @@ export default {
 }
 
 .actionText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
   strong {
+    display: block;
     font-size: 14px;
     font-weight: 500;
     color: #111827;
-  }
-
-  span {
-    font-size: 12px;
-    color: #9ca3af;
   }
 }
 
@@ -828,12 +796,10 @@ export default {
     color: #111827;
   }
 
-  span,
-  .resumeHint {
+  span {
     font-size: 12px;
     color: #6b7280;
     word-break: break-all;
-    font-style: normal;
   }
 }
 
@@ -1006,13 +972,6 @@ export default {
   border-radius: 999px;
   background: #f3f4f6;
   color: #6b7280;
-}
-
-.recentHint {
-  font-style: normal;
-  font-size: 12px;
-  color: #d1d5db;
-  word-break: break-all;
 }
 
 .recentMeta {

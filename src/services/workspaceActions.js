@@ -5,6 +5,7 @@ import platform, {
 } from '@/platform'
 import {
   createDesktopFsError,
+  flushDocumentSessionSync,
   markDocumentDirty,
   getLastDirectory,
   setCurrentFileRef
@@ -121,6 +122,7 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
     documentMode: parsedDocument.documentMode
   }
   setCurrentFileRef(recentProjectRef, recentProjectRef.mode || 'desktop')
+  await flushDocumentSessionSync()
   await applyParsedDocumentState(parsedDocument)
   if (parsedDocument.documentMode !== 'flowchart') {
     storeData(parsedDocument.data)

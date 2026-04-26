@@ -5,7 +5,6 @@
         <header class="dialogHeader">
           <div class="dialogHeaderMain">
             <h1>{{ $t('exportPage.title') }}</h1>
-            <p>{{ $t('exportPage.description') }}</p>
           </div>
         </header>
 
@@ -37,18 +36,6 @@
               <span class="tagExtension">.{{ currentFileExtension }}</span>
             </div>
 
-            <div class="statusMetaList">
-              <div class="statusMetaItem">
-                <span>{{ $t('exportPage.currentDocumentLabel') }}</span>
-                <strong>{{ currentDocumentName }}</strong>
-              </div>
-              <div class="statusMetaItem">
-                <span>{{ $t('exportPage.rememberedLabel') }}</span>
-                <strong>{{ rememberedSummary }}</strong>
-              </div>
-            </div>
-            <p class="rememberedTip">{{ $t('exportPage.rememberedTip') }}</p>
-
             <div class="settingGroup">
               <label class="settingLabel" for="exportFileName">{{
                 $t('exportPage.fileName')
@@ -65,23 +52,8 @@
             </div>
 
             <div class="settingGroup">
-              <label class="settingLabel">{{
-                $t('exportPage.descriptionLabel')
-              }}</label>
-              <div class="infoText">
-                <span class="infoDot"></span>
-                <span>{{ currentFormat.desc }}</span>
-              </div>
-            </div>
-
-            <div class="settingGroup">
               <label class="settingLabel">{{ $t('exportPage.optionsLabel') }}</label>
-
-              <div v-if="isDisabledFormat" class="emptyOption">
-                {{ $t('exportPage.disabledTip') }}
-              </div>
-
-              <template v-else>
+              <template v-if="!isDisabledFormat">
                 <div class="toggleRow" v-if="showConfigOption">
                   <span>{{ $t('exportPage.includeConfig') }}</span>
                   <el-switch v-model="exportState.withConfig" />
@@ -129,13 +101,14 @@
                   <el-switch v-model="exportState.isTransparent" />
                 </div>
 
+                <div class="toggleRow" v-if="showFlowchartBackgroundOption">
+                  <span>{{ $t('exportPage.withBackground') }}</span>
+                  <el-switch v-model="exportState.withBackground" />
+                </div>
+
                 <div class="toggleRow" v-if="showFitBgOption">
                   <span>{{ $t('exportPage.fitBg') }}</span>
                   <el-switch v-model="exportState.isFitBg" />
-                </div>
-
-                <div v-if="!hasVisibleOptions" class="emptyOption">
-                  {{ $t('exportPage.noExtraOptions') }}
                 </div>
               </template>
             </div>
@@ -143,8 +116,6 @@
 
           <aside class="previewPanel" v-loading="previewLoading">
             <div class="previewTitle">{{ $t('exportPage.preview') }}</div>
-            <div class="previewHeader">{{ $t('exportPage.previewDesc') }}</div>
-            <div class="previewWarmupHint">{{ $t('exportPage.warmupHint') }}</div>
             <div class="previewSurface">
               <div
                 ref="previewRef"
@@ -157,7 +128,6 @@
         </div>
 
         <footer class="dialogFooter">
-          <div class="statusText">{{ statusText }}</div>
           <el-button
             type="primary"
             :loading="exporting"
@@ -457,10 +427,16 @@ export default {
       )
     },
     showTransparentOption() {
-      if (this.documentMode === 'flowchart') {
-        return this.exportState.exportType === 'png'
-      }
-      return ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      return (
+        this.documentMode !== 'flowchart' &&
+        ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      )
+    },
+    showFlowchartBackgroundOption() {
+      return (
+        this.documentMode === 'flowchart' &&
+        ['png', 'svg'].includes(this.exportState.exportType)
+      )
     },
     showFitBgOption() {
       return (
@@ -492,47 +468,6 @@ export default {
         aspectRatio: `${bounds.width} / ${bounds.height}`
       }
     },
-    hasVisibleOptions() {
-      return [
-        this.showConfigOption,
-        this.showImageOptions,
-        this.showPaddingOptions,
-        this.showFooterOption,
-        this.showTransparentOption,
-        this.showFitBgOption
-      ].some(Boolean)
-    },
-    rememberedSummary() {
-      const summaryList = [
-        this.currentFormat.displayName,
-        `.${this.currentFileExtension}`
-      ]
-      if (this.showConfigOption && this.exportState.withConfig) {
-        summaryList.push(this.$t('exportPage.includeConfig'))
-      }
-      if (this.showTransparentOption && this.exportState.isTransparent) {
-        summaryList.push(this.$t('exportPage.transparentBg'))
-      }
-      return summaryList.join(' / ')
-    },
-    statusText() {
-      if (this.isDisabledFormat) {
-        return this.$t('exportPage.statusDisabled')
-      }
-      if (this.exporting) {
-        return this.$t('exportPage.statusPreparing')
-      }
-      return this.$t('exportPage.statusReady', {
-        extension: this.currentFileExtension
-      })
-    },
-    currentDocumentName() {
-      return (
-        this.currentDocument?.name ||
-        this.exportContext.fileRef?.name ||
-        `${this.exportContext.fileName}.smm`
-      )
-    }
   },
   watch: {
     exportState: {
@@ -557,6 +492,11 @@ export default {
       }
     },
     'exportState.paddingY'() {
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
+      }
+    },
+    'exportState.withBackground'() {
       if (this.documentMode === 'flowchart') {
         void this.initPreview()
       }
@@ -811,7 +751,8 @@ export default {
         snapToGrid: false,
         gridSize: 24,
         themeId: 'blueprint',
-        strictAlignment: false
+        strictAlignment: false,
+        backgroundStyle: 'grid'
       }
     },
 
@@ -826,7 +767,7 @@ export default {
       this.flowchartPreviewMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
         flowchartConfig: this.getFlowchartConfig(),
         isDark: this.isDark,
-        transparent: false,
+        transparent: !this.exportState.withBackground,
         paddingX: this.exportState.paddingX,
         paddingY: this.exportState.paddingY
       })
@@ -842,7 +783,11 @@ export default {
       })
     },
 
-    async buildFlowchartRasterBlob({ svgMarkup, extension = 'png' }) {
+    async buildFlowchartRasterBlob({
+      svgMarkup,
+      extension = 'png',
+      transparent = false
+    }) {
       const bounds = getFlowchartExportBounds(this.getFlowchartData(), {
         paddingX: this.exportState.paddingX,
         paddingY: this.exportState.paddingY
@@ -860,7 +805,7 @@ export default {
         if (!context) {
           throw new Error(this.$t('exportPage.exportFailed'))
         }
-        if (extension === 'jpg' || !this.exportState.isTransparent) {
+        if (extension === 'jpg' || !transparent) {
           context.fillStyle = this.isDark ? '#171a1f' : '#ffffff'
           context.fillRect(0, 0, canvas.width, canvas.height)
         }
@@ -884,10 +829,16 @@ export default {
       }
     },
 
-    async exportFlowchartAsRaster({ svgMarkup, fileName, extension = 'png' }) {
+    async exportFlowchartAsRaster({
+      svgMarkup,
+      fileName,
+      extension = 'png',
+      transparent = false
+    }) {
       const { blob, mimeType } = await this.buildFlowchartRasterBlob({
         svgMarkup,
-        extension
+        extension,
+        transparent
       })
       await platform.saveBinaryFileAs({
         suggestedName: fileName,
@@ -901,10 +852,11 @@ export default {
 
     async handleFlowchartExport(safeFileName) {
       const exportType = this.exportState.exportType
+      const withBackground = !!this.exportState.withBackground
       const svgMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
         flowchartConfig: this.getFlowchartConfig(),
         isDark: this.isDark,
-        transparent: exportType === 'png' ? this.exportState.isTransparent : false,
+        transparent: !withBackground,
         paddingX: this.exportState.paddingX,
         paddingY: this.exportState.paddingY
       })
@@ -922,7 +874,8 @@ export default {
       await this.exportFlowchartAsRaster({
         svgMarkup,
         fileName: safeFileName,
-        extension: 'png'
+        extension: 'png',
+        transparent: !withBackground
       })
     },
 
@@ -1072,17 +1025,8 @@ export default {
       border-color: rgba(255, 255, 255, 0.08);
     }
 
-    .dialogHeaderMain p,
     .settingLabel,
-    .infoText,
-    .previewHeader,
-    .previewWarmupHint,
-    .previewHint,
-    .statusText,
-    .inputSuffix,
-    .emptyOption,
-    .rememberedTip,
-    .statusMetaItem span {
+    .inputSuffix {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
@@ -1096,12 +1040,6 @@ export default {
 
     .previewPanel {
       background: #171b22;
-    }
-
-    .statusMetaItem,
-    .previewWarmupHint {
-      background: rgba(255, 255, 255, 0.03);
-      border-color: rgba(255, 255, 255, 0.08);
     }
 
     .previewSurface {
@@ -1135,10 +1073,6 @@ export default {
     .inputSuffix {
       background: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.08);
-    }
-
-    .infoDot {
-      background: hsla(0, 0%, 100%, 0.3);
     }
 
     .badgeSoon {
@@ -1207,14 +1141,9 @@ export default {
 
 .dialogHeaderMain {
   h1 {
-    margin: 0 0 2px;
+    margin: 0;
     font-size: 16px;
     font-weight: 600;
-  }
-
-  p {
-    font-size: 12px;
-    color: #9ca3af;
   }
 }
 
@@ -1308,40 +1237,6 @@ export default {
   margin-bottom: 32px;
 }
 
-.statusMetaList {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.statusMetaItem {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(15, 23, 42, 0.02);
-
-  span {
-    font-size: 12px;
-    color: #6b7280;
-  }
-
-  strong {
-    font-size: 13px;
-    color: #111827;
-    word-break: break-all;
-  }
-}
-
-.rememberedTip {
-  margin-bottom: 28px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #6b7280;
-}
-
 .settingGroup.nested {
   margin-top: 16px;
   margin-bottom: 0;
@@ -1381,24 +1276,6 @@ export default {
   font-family: monospace;
 }
 
-.infoText {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #9ca3af;
-}
-
-.infoDot {
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: rgba(156, 163, 175, 0.72);
-}
-
 .toggleRow {
   display: flex;
   align-items: center;
@@ -1413,11 +1290,6 @@ export default {
   align-items: flex-start;
 }
 
-.emptyOption {
-  font-size: 13px;
-  color: #9ca3af;
-}
-
 .previewPanel {
   display: flex;
   flex-direction: column;
@@ -1428,23 +1300,7 @@ export default {
 .previewTitle {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.previewHeader {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-bottom: 8px;
-}
-
-.previewWarmupHint {
   margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(15, 23, 42, 0.02);
-  font-size: 12px;
-  color: #6b7280;
 }
 
 .previewSurface {
@@ -1492,16 +1348,10 @@ export default {
   min-height: 64px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
   padding: 0 32px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   background: #fff;
-}
-
-.statusText {
-  font-size: 13px;
-  color: #4b5563;
 }
 
 :deep(.el-input) {

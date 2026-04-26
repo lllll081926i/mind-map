@@ -251,6 +251,14 @@ test('平台层提供文档状态延迟加载入口', () => {
   assert.equal(platformIndexSource.includes('readBootstrapDocumentState'), true)
 })
 
+test('浏览器态也会持久化 bootstrap 元数据和文档数据，避免刷新后退回默认思维导图', () => {
+  assert.equal(platformIndexSource.includes('BROWSER_BOOTSTRAP_META_STORAGE_KEY'), true)
+  assert.equal(platformIndexSource.includes('BROWSER_BOOTSTRAP_DOCUMENT_STORAGE_KEY'), true)
+  assert.equal(platformIndexSource.includes('readBrowserBootstrapSnapshot'), true)
+  assert.equal(platformIndexSource.includes('writeBrowserBootstrapSnapshot'), true)
+  assert.equal(platformIndexSource.includes('window.localStorage'), true)
+})
+
 test('浏览器回退打开外链时仍限制为 http/https 协议', () => {
   assert.equal(platformIndexSource.includes('new URL('), true)
   assert.equal(platformIndexSource.includes('window.location.href'), true)

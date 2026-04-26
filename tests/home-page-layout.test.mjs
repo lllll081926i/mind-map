@@ -34,14 +34,23 @@ test('桌面工作台首页不再提供设置视图入口', () => {
 test('桌面工作台首页核心文案接入国际化', () => {
   const source = fs.readFileSync(homePagePath, 'utf8')
   assert.match(source, /\$t\('home\.brandTitle'\)/)
-  assert.match(source, /\$t\('home\.brandDescription'\)/)
   assert.match(source, /\$t\('home\.continueEmpty'\)/)
-  assert.match(source, /\$t\('home\.resumeDirtyHint'\)/)
   assert.match(source, /\$t\('home\.openLocalFile'\)/)
   assert.match(source, /\$t\('home\.recentTitle'\)/)
   assert.match(source, /\$t\('home\.emptyTitle'\)/)
   assert.match(source, /\$t\('navigatorToolbar\.darkMode'\)/)
   assert.match(source, /\$t\('navigatorToolbar\.lightMode'\)/)
+})
+
+test('桌面工作台首页已移除附加说明文案', () => {
+  const source = fs.readFileSync(homePagePath, 'utf8')
+  assert.doesNotMatch(source, /\$t\('home\.brandDescription'\)/)
+  assert.doesNotMatch(source, /\$t\('home\.openLocalFileDesc'\)/)
+  assert.doesNotMatch(source, /\$t\('home\.openLocalFolderDesc'\)/)
+  assert.doesNotMatch(source, /\$t\('home\.resumeReadyHint'\)/)
+  assert.doesNotMatch(source, /\$t\('home\.resumeDirtyHint'\)/)
+  assert.doesNotMatch(source, /\$t\('home\.currentDirectory'\)/)
+  assert.doesNotMatch(source, /class="recentHint"/)
 })
 
 test('桌面工作台首页左侧栏宽度加宽并延续编辑页扁平化面板样式', () => {
