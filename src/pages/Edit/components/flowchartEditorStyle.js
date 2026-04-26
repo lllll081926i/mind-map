@@ -1,3 +1,25 @@
+import { normalizeFlowchartEdgeLabelPosition } from '@/services/flowchartDocument'
+
+const normalizeEdgeArrowSize = value => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 1
+  }
+  return Math.max(0.6, Math.min(1.6, numericValue))
+}
+
+const normalizeEdgeArrowCount = value => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 1
+  }
+  return Math.max(0, Math.min(4, Math.round(numericValue)))
+}
+
+const normalizeBackgroundStyle = value => {
+  return value === 'grid' || value === 'dots' ? value : 'none'
+}
+
 export const flowchartStyleMethods = {
   updateFlowchartConfig(configPatch = {}) {
     const wasStrictAlignment = !!this.flowchartConfig?.strictAlignment
@@ -5,6 +27,9 @@ export const flowchartStyleMethods = {
       ...this.flowchartConfig,
       ...configPatch
     }
+    nextFlowchartConfig.backgroundStyle = normalizeBackgroundStyle(
+      nextFlowchartConfig.backgroundStyle
+    )
     if (nextFlowchartConfig.strictAlignment) {
       this.flowchartData.edges.forEach(edge => {
         edge.style = {
@@ -45,7 +70,7 @@ export const flowchartStyleMethods = {
       ...(this.selectedNode.style || {}),
       ...stylePatch
     }
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
   },
 
   resetSelectedNodeStyle() {
@@ -53,7 +78,7 @@ export const flowchartStyleMethods = {
       return
     }
     this.selectedNode.style = {}
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
   },
 
   applySelectedNodePreset(preset) {
@@ -72,6 +97,12 @@ export const flowchartStyleMethods = {
       return
     }
     const nextStylePatch = { ...stylePatch }
+    if (Object.prototype.hasOwnProperty.call(nextStylePatch, 'arrowSize')) {
+      nextStylePatch.arrowSize = normalizeEdgeArrowSize(nextStylePatch.arrowSize)
+    }
+    if (Object.prototype.hasOwnProperty.call(nextStylePatch, 'arrowCount')) {
+      nextStylePatch.arrowCount = normalizeEdgeArrowCount(nextStylePatch.arrowCount)
+    }
     if (this.flowchartConfig.strictAlignment) {
       nextStylePatch.pathType = 'orthogonal'
     }
@@ -79,7 +110,18 @@ export const flowchartStyleMethods = {
       ...(this.selectedEdge.style || {}),
       ...nextStylePatch
     }
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
+  },
+
+  updateSelectedEdgeLabelPosition(positionPatch = {}) {
+    if (!this.selectedEdge) {
+      return
+    }
+    this.selectedEdge.labelPosition = normalizeFlowchartEdgeLabelPosition({
+      ...(this.selectedEdge.labelPosition || {}),
+      ...positionPatch
+    })
+    this.queueInteractiveFlowchartPersist()
   },
 
   resetSelectedEdgeStyle() {
@@ -87,7 +129,7 @@ export const flowchartStyleMethods = {
       return
     }
     this.selectedEdge.style = {}
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
   },
 
   applySelectedEdgePreset(preset) {
@@ -101,5 +143,13 @@ export const flowchartStyleMethods = {
         ? 'orthogonal'
         : preset.pathType || 'orthogonal'
     })
+  },
+
+  resetSelectedEdgeLabelPosition() {
+    if (!this.selectedEdge) {
+      return
+    }
+    this.selectedEdge.labelPosition = null
+    this.queueInteractiveFlowchartPersist()
   }
 }

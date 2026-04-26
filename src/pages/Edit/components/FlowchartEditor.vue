@@ -19,6 +19,7 @@
       <FlowchartCanvas
         ref="flowchartCanvas"
         :is-panning="!!canvasPanState"
+        :background-style="flowchartConfig.backgroundStyle"
         :canvas-world-style="canvasWorldStyle()"
         :viewport-zoom-label="viewportZoomLabel"
         :has-nodes="!!flowchartData.nodes.length"
@@ -35,30 +36,18 @@
         @generate-ai="generateWithAi"
       >
         <template #world>
-          <div
-            v-for="lane in flowchartLanes"
-            :key="lane.id"
-            class="flowchartSwimlane"
-            :style="getSwimlaneStyle(lane)"
-          >
-            <div class="flowchartSwimlaneLabel">
-              {{ lane.label }}
-            </div>
-          </div>
-
           <FlowchartEdgeLayer
             :edges-with-layout="edgesWithLayout"
             :selected-edge-id="selectedEdgeId"
             :alignment-guides="alignmentGuides"
             :canvas-world-bounds="canvasWorldBounds"
             :connector-preview="connectorPreview"
-            :edge-toolbar-state="edgeToolbarState"
             :labels="flowchartUiText"
             @select-edge="selectEdge"
             @edit-edge-label="editEdgeLabel"
-            @insert-node-on-edge="insertNodeOnEdge"
-            @remove-edge="removeEdge"
+            @start-edge-label-drag="startEdgeLabelDrag"
             @start-edge-reconnect="startEdgeReconnect"
+            @start-edge-bend-drag="startEdgeBendDrag"
           />
 
           <FlowchartNodeLayer
@@ -69,6 +58,7 @@
             :show-connector-handles-for-node="showConnectorHandlesForNode"
             :show-resize-handles-for-node="showResizeHandlesForNode"
             :connector-target-node-id="connectorDragState?.targetNodeId || edgeReconnectState?.targetNodeId || ''"
+            :connector-target-direction="connectorTargetDirection"
             @start-node-drag="startNodeDrag"
             @select-node="selectNode"
             @edit-node-text="editNodeText"
@@ -144,11 +134,11 @@
         :flowchart-theme-presets="flowchartThemePresets"
         :flowchart-theme-id="flowchartConfig.themeId"
         :strict-alignment="flowchartConfig.strictAlignment"
+        :background-style="flowchartConfig.backgroundStyle"
         :selected-node="selectedNode"
         :selected-edge="selectedEdge"
         :flowchart-node-types="flowchartNodeTypes"
         :node-style-presets="flowchartNodeStylePresets"
-        :edge-style-presets="flowchartEdgeStylePresets"
         :edge-path-types="flowchartEdgePathTypes"
         @toggle-inspector="toggleInspector"
         @toggle-section="toggleInspectorSection"
@@ -158,13 +148,16 @@
         @update-selected-node-type="updateSelectedNodeType"
         @update-selected-node-text="updateSelectedNodeText"
         @update-selected-edge-label="updateSelectedEdgeLabel"
+        @update-selected-edge-label-position="updateSelectedEdgeLabelPosition"
         @apply-selected-node-preset="applySelectedNodePreset"
-        @apply-selected-edge-preset="applySelectedEdgePreset"
         @update-flowchart-theme="updateFlowchartTheme"
         @update-selected-node-style="updateSelectedNodeStyle"
         @update-selected-edge-style="updateSelectedEdgeStyle"
         @reset-selected-node-style="resetSelectedNodeStyle"
         @reset-selected-edge-style="resetSelectedEdgeStyle"
+        @reset-selected-edge-label-position="resetSelectedEdgeLabelPosition"
+        @insert-node-on-edge="insertNodeOnEdge"
+        @remove-edge="removeEdge"
       />
     </div>
   </div>
@@ -181,12 +174,13 @@ import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
 import { toggleThemeMode } from '@/stores/runtime'
 import {
-  FLOWCHART_EDGE_STYLE_PRESETS,
   FLOWCHART_NODE_STYLE_PRESETS,
   FLOWCHART_TEMPLATE_PRESETS,
   FLOWCHART_THEME_PRESETS,
   FLOWCHART_NODE_TYPES,
   createDefaultFlowchartData,
+  createFlowchartTemplatePreviewData,
+  getFlowchartAnchorDirection,
   getFlowchartEdgeLayout,
   getFlowchartNodeVisualStyle,
   getFlowchartThemeDefinition
@@ -235,7 +229,8 @@ export default {
         snapToGrid: false,
         gridSize: 24,
         themeId: 'blueprint',
-        strictAlignment: false
+        strictAlignment: false,
+        backgroundStyle: 'grid'
       },
       flowchartNodeTypes: FLOWCHART_NODE_TYPES,
       selectedNodeIds: [],
@@ -247,7 +242,18 @@ export default {
       selectionState: null,
       connectorPreview: null,
       connectorDragState: null,
+      connectorDragFrameId: 0,
+      pendingConnectorPoint: null,
       edgeReconnectState: null,
+      edgeReconnectFrameId: 0,
+      pendingEdgeReconnectPoint: null,
+      edgeBendDragState: null,
+      edgeBendDragFrameId: 0,
+      pendingEdgeBendPoint: null,
+      edgeLabelDragState: null,
+      edgeLabelDragFrameId: 0,
+      pendingEdgeLabelDragPoint: null,
+      edgeDirectionLockMap: null,
       edgeToolbarState: null,
       inspectorPanelSection: 'templates',
       inlineTextEditorState: null,
@@ -258,6 +264,9 @@ export default {
         baseline: null,
         restoring: false
       },
+      interactionClickGuardUntil: 0,
+      interactivePersistTimer: 0,
+      interactivePersistOptions: null,
       alignmentGuides: [],
       canvasPanState: null,
       canvasPanFrameId: 0,
@@ -269,8 +278,11 @@ export default {
       resizeState: null,
       persistTimer: 0,
       recoveryTimer: 0,
+      isFlowchartUnmounted: false,
       aiBuffer: '',
-      isGenerating: false
+      isGenerating: false,
+      flowchartAiClient: null,
+      flowchartAiRequestToken: 0
     }
   },
   computed: {
@@ -302,6 +314,13 @@ export default {
       if (!this.selectedEdgeId) return null
       return this.flowchartData.edges.find(edge => edge.id === this.selectedEdgeId) || null
     },
+    connectorTargetDirection() {
+      const previewAnchor =
+        this.edgeReconnectState?.targetAnchor ||
+        this.connectorDragState?.targetAnchor ||
+        null
+      return getFlowchartAnchorDirection(previewAnchor, '')
+    },
     edgesWithLayout() {
       return this.flowchartData.edges
         .map(edge => {
@@ -312,7 +331,8 @@ export default {
             ...edge,
             ...getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
               theme: this.resolvedFlowchartTheme,
-              strictAlignment: !!this.flowchartConfig.strictAlignment
+              strictAlignment: !!this.flowchartConfig.strictAlignment,
+              lockedDirections: this.edgeDirectionLockMap?.[edge.id] || null
             })
           }
         })
@@ -323,9 +343,6 @@ export default {
     },
     flowchartNodeStylePresets() {
       return FLOWCHART_NODE_STYLE_PRESETS
-    },
-    flowchartEdgeStylePresets() {
-      return FLOWCHART_EDGE_STYLE_PRESETS
     },
     resolvedFlowchartTheme() {
       return getFlowchartThemeDefinition(this.flowchartConfig.themeId, {
@@ -447,7 +464,6 @@ export default {
         template: this.$t('flowchart.template'),
         theme: this.$t('flowchart.theme'),
         templatePanelTitle: this.$t('flowchart.templatePanelTitle'),
-        templateBlank: this.$t('flowchart.templateBlank'),
         convertMindMap: this.$t('flowchart.convertMindMap'),
         importMindMapFile: this.$t('flowchart.importMindMapFile'),
         aiGenerate: this.$t('flowchart.aiGenerate'),
@@ -474,19 +490,29 @@ export default {
         nodeTextColor: this.$t('flowchart.nodeTextColor'),
         resetNodeStyle: this.$t('flowchart.resetNodeStyle'),
         edgeLabel: this.$t('flowchart.edgeLabel'),
-        edgePreset: this.$t('flowchart.edgePreset'),
+        edgeLabelPosition: this.$t('flowchart.edgeLabelPosition'),
+        edgeLabelOffsetX: this.$t('flowchart.edgeLabelOffsetX'),
+        edgeLabelOffsetY: this.$t('flowchart.edgeLabelOffsetY'),
         edgeColor: this.$t('flowchart.edgeColor'),
         edgeType: this.$t('flowchart.edgeType'),
-        edgeDashed: this.$t('flowchart.edgeDashed'),
+        edgeLineStyle: this.$t('flowchart.edgeLineStyle'),
+        edgeLineStyleSolid: this.$t('flowchart.edgeLineStyleSolid'),
+        edgeLineStyleDashed: this.$t('flowchart.edgeLineStyleDashed'),
+        edgeArrowSize: this.$t('flowchart.edgeArrowSize'),
+        edgeArrowCount: this.$t('flowchart.edgeArrowCount'),
+        edgeArrowCountNone: this.$t('flowchart.edgeArrowCountNone'),
         edgeTypeStraight: this.$t('flowchart.edgeTypeStraight'),
         edgeTypeCurved: this.$t('flowchart.edgeTypeCurved'),
         edgeTypeOrthogonal: this.$t('flowchart.edgeTypeOrthogonal'),
         strictAlignment: this.$t('flowchart.strictAlignment'),
+        backgroundStyle: this.$t('flowchart.backgroundStyle'),
+        backgroundStyleNone: this.$t('flowchart.backgroundStyleNone'),
+        backgroundStyleDots: this.$t('flowchart.backgroundStyleDots'),
+        backgroundStyleGrid: this.$t('flowchart.backgroundStyleGrid'),
         settingsPanelTitle: this.$t('flowchart.settingsPanelTitle'),
-        inspectorEmpty: this.$t('flowchart.inspectorEmpty'),
-        edgeEditText: this.$t('flowchart.edgeEditText'),
         edgeInsertNode: this.$t('flowchart.edgeInsertNode'),
         edgeDeleteLine: this.$t('flowchart.edgeDeleteLine'),
+        resetEdgeLabelPosition: this.$t('flowchart.resetEdgeLabelPosition'),
         resetEdgeStyle: this.$t('flowchart.resetEdgeStyle'),
         minimap: this.$t('flowchart.minimap'),
         delete: this.$t('flowchart.delete'),
@@ -530,7 +556,7 @@ export default {
       return FLOWCHART_TEMPLATE_PRESETS.map(item => ({
         id: item.id,
         label: this.$t(item.labelKey),
-        preview: createDefaultFlowchartData(this.$t('flowchart.title'), item.id)
+        preview: createFlowchartTemplatePreviewData(this.$t('flowchart.title'), item.id)
       }))
     },
     hasPotentialUnsavedFlowchart() {
@@ -558,10 +584,16 @@ export default {
     window.addEventListener('resize', this.syncCanvasViewportSize)
   },
   beforeUnmount() {
+    this.isFlowchartUnmounted = true
+    this.cancelFlowchartAiRequest({
+      resetGenerating: true
+    })
     this.removeDragListeners()
     this.removeNodeResizeListeners()
-    this.removeConnectorDragListeners()
-    this.removeEdgeReconnectListeners()
+    this.cancelConnectorDrag()
+    this.cancelEdgeReconnect()
+    this.cancelEdgeBendDrag()
+    this.cancelEdgeLabelDrag()
     this.removeCanvasPanListeners()
     this.removeAreaSelectionListeners()
     window.removeEventListener('keydown', this.handleGlobalKeydown)
@@ -575,6 +607,11 @@ export default {
       clearTimeout(this.recoveryTimer)
       this.recoveryTimer = 0
     }
+    if (this.interactivePersistTimer) {
+      clearTimeout(this.interactivePersistTimer)
+      this.interactivePersistTimer = 0
+    }
+    this.interactivePersistOptions = null
     if (this.dragFrameId) {
       cancelAnimationFrame(this.dragFrameId)
       this.dragFrameId = 0
@@ -622,9 +659,14 @@ export default {
         gridSize: 24,
         themeId: 'blueprint',
         strictAlignment: false,
+        backgroundStyle: 'grid',
         ...cloneJson(bootstrapState.flowchartConfig || {})
       }
       nextFlowchartConfig.snapToGrid = false
+      nextFlowchartConfig.backgroundStyle =
+        ['grid', 'dots'].includes(nextFlowchartConfig.backgroundStyle)
+          ? nextFlowchartConfig.backgroundStyle
+          : 'none'
       this.flowchartConfig = nextFlowchartConfig
       this.ensureFlowchartViewport()
       this.initializeFlowchartHistory()
@@ -649,16 +691,6 @@ export default {
         '--flowchart-node-fill-current': visualStyle.fill,
         '--flowchart-node-stroke-current': visualStyle.stroke,
         '--flowchart-node-text-current': visualStyle.textColor
-      }
-    },
-    getSwimlaneStyle(lane) {
-      const accent = String(lane?.accent || this.resolvedFlowchartTheme.accent)
-      return {
-        left: `${Number(lane?.x || 0)}px`,
-        top: `${Number(lane?.y || 0)}px`,
-        width: `${Number(lane?.width || 0)}px`,
-        height: `${Number(lane?.height || 0)}px`,
-        '--flowchart-lane-accent': accent
       }
     },
     ...flowchartConnectorMethods,

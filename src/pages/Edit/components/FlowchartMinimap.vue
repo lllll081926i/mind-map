@@ -7,16 +7,6 @@
     @mousedown.prevent="startMinimapDrag"
   >
     <svg :viewBox="minimapViewBox">
-      <rect
-        v-for="lane in lanes"
-        :key="lane.id"
-        class="flowchartMinimapLane"
-        :x="lane.x"
-        :y="lane.y"
-        :width="lane.width"
-        :height="lane.height"
-        rx="20"
-      ></rect>
       <path
         v-for="edge in edges"
         :key="edge.id"
@@ -289,10 +279,22 @@ export default {
       this.lastWorldPoint = null
       window.removeEventListener('mousemove', this.onMinimapDrag)
       window.removeEventListener('mouseup', this.stopMinimapDrag)
+    },
+    cancelMinimapDrag() {
+      if (this.dragFrameId) {
+        cancelAnimationFrame(this.dragFrameId)
+        this.dragFrameId = 0
+      }
+      this.pendingClientPoint = null
+      this.dragActive = false
+      this.dragPointerOffset = null
+      this.lastWorldPoint = null
+      window.removeEventListener('mousemove', this.onMinimapDrag)
+      window.removeEventListener('mouseup', this.stopMinimapDrag)
     }
   },
   beforeUnmount() {
-    this.stopMinimapDrag()
+    this.cancelMinimapDrag()
   }
 }
 </script>

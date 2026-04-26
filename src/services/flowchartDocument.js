@@ -17,8 +17,11 @@ const DEFAULT_FLOWCHART_CONFIG = {
   snapToGrid: false,
   gridSize: 24,
   themeId: 'blueprint',
-  strictAlignment: false
+  strictAlignment: false,
+  backgroundStyle: 'grid'
 }
+
+const FLOWCHART_BACKGROUND_STYLES = ['none', 'dots', 'grid']
 
 const FLOWCHART_THEME_PRESET_MAP = {
   blueprint: {
@@ -1203,9 +1206,9 @@ const FLOWCHART_TEMPLATES = {
   customerOnboardingSwimlane: title => ({
     title,
     lanes: [
-      createFlowchartLane({ id: 'lane-sales', label: '销售', x: 80, y: 96, width: 1020, height: 150 }),
-      createFlowchartLane({ id: 'lane-success', label: '客户成功', x: 80, y: 266, width: 1020, height: 150 }),
-      createFlowchartLane({ id: 'lane-ops', label: '交付/运维', x: 80, y: 436, width: 1020, height: 150 })
+      createFlowchartLane({ id: 'lane-sales', label: '', x: 80, y: 96, width: 1020, height: 150 }),
+      createFlowchartLane({ id: 'lane-success', label: '', x: 80, y: 266, width: 1020, height: 150 }),
+      createFlowchartLane({ id: 'lane-ops', label: '', x: 80, y: 436, width: 1020, height: 150 })
     ],
     nodes: [
       createFlowchartNode({ id: 'node-contract', type: 'start', text: '合同签署', x: 150, y: 134 }),
@@ -1237,10 +1240,10 @@ const FLOWCHART_TEMPLATES = {
   productLaunchSwimlane: title => ({
     title,
     lanes: [
-      createFlowchartLane({ id: 'lane-product', label: '产品', x: 80, y: 96, width: 1180, height: 140 }),
-      createFlowchartLane({ id: 'lane-rd', label: '研发', x: 80, y: 256, width: 1180, height: 140 }),
-      createFlowchartLane({ id: 'lane-market', label: '市场/运营', x: 80, y: 416, width: 1180, height: 140 }),
-      createFlowchartLane({ id: 'lane-support', label: '客服支持', x: 80, y: 576, width: 1180, height: 140 })
+      createFlowchartLane({ id: 'lane-product', label: '', x: 80, y: 96, width: 1180, height: 140 }),
+      createFlowchartLane({ id: 'lane-rd', label: '', x: 80, y: 256, width: 1180, height: 140 }),
+      createFlowchartLane({ id: 'lane-market', label: '', x: 80, y: 416, width: 1180, height: 140 }),
+      createFlowchartLane({ id: 'lane-support', label: '', x: 80, y: 576, width: 1180, height: 140 })
     ],
     nodes: [
       createFlowchartNode({ id: 'node-prd', type: 'start', text: 'PRD 定稿', x: 150, y: 130 }),
@@ -1273,7 +1276,6 @@ const FLOWCHART_TEMPLATES = {
 }
 
 export const FLOWCHART_TEMPLATE_PRESETS = [
-  { id: 'blank', labelKey: 'flowchart.templateBlank' },
   { id: 'approval', labelKey: 'flowchart.templateApproval' },
   { id: 'troubleshooting', labelKey: 'flowchart.templateTroubleshooting' },
   { id: 'release', labelKey: 'flowchart.templateRelease' },
@@ -1348,11 +1350,54 @@ function createFlowchartNode({
   }
 }
 
+function normalizeFlowchartEdgeRoute(route) {
+  if (!route || typeof route !== 'object') {
+    return null
+  }
+  const laneAxis = String(route?.orthogonalLane?.axis || '').trim()
+  const laneValue = Number(route?.orthogonalLane?.value)
+  if (!['x', 'y'].includes(laneAxis) || !Number.isFinite(laneValue)) {
+    return null
+  }
+  return {
+    orthogonalLane: {
+      axis: laneAxis,
+      value: laneValue
+    }
+  }
+}
+
+export function normalizeFlowchartEdgeLabelPosition(labelPosition) {
+  if (!labelPosition || typeof labelPosition !== 'object') {
+    return null
+  }
+  const ratio = Math.max(0, Math.min(1, Number(labelPosition?.ratio)))
+  const offsetX = Number(labelPosition?.offsetX)
+  const offsetY = Number(labelPosition?.offsetY)
+  const normalizedLabelPosition = {
+    ratio: Number.isFinite(ratio) ? ratio : 0.5,
+    offsetX: Number.isFinite(offsetX) ? offsetX : 0,
+    offsetY: Number.isFinite(offsetY) ? offsetY : 0
+  }
+  if (
+    Math.abs(normalizedLabelPosition.ratio - 0.5) <= 0.0001 &&
+    Math.abs(normalizedLabelPosition.offsetX) <= 0.001 &&
+    Math.abs(normalizedLabelPosition.offsetY) <= 0.001
+  ) {
+    return null
+  }
+  return normalizedLabelPosition
+}
+
 function createFlowchartEdge({
   id,
   source = '',
   target = '',
   label = '',
+  sourceAnchor = null,
+  targetAnchor = null,
+  route = null,
+  labelPosition = null,
   style = {}
 } = {}) {
   return {
@@ -1360,6 +1405,10 @@ function createFlowchartEdge({
     source: String(source || '').trim(),
     target: String(target || '').trim(),
     label: String(label || ''),
+    sourceAnchor: normalizeFlowchartNodeAnchor(sourceAnchor),
+    targetAnchor: normalizeFlowchartNodeAnchor(targetAnchor),
+    route: normalizeFlowchartEdgeRoute(route),
+    labelPosition: normalizeFlowchartEdgeLabelPosition(labelPosition),
     style: style && typeof style === 'object' ? { ...style } : {}
   }
 }
@@ -1375,7 +1424,7 @@ function createFlowchartLane({
 } = {}) {
   return {
     id: String(id || ''),
-    label: String(label || '').trim() || '泳道',
+    label: String(label || '').trim(),
     x: Number.isFinite(Number(x)) ? Number(x) : 0,
     y: Number.isFinite(Number(y)) ? Number(y) : 0,
     width: Number.isFinite(Number(width)) ? Number(width) : 960,
@@ -1394,8 +1443,8 @@ const createFlowchartViewport = viewport => {
   }
 }
 
-const normalizeTemplateLayout = templateData => {
-  return {
+const normalizeTemplateLayout = (templateData, { mode = 'document' } = {}) => {
+  const normalizedTemplate = {
     ...templateData,
     nodes: Array.isArray(templateData?.nodes)
       ? templateData.nodes.map(node => ({
@@ -1410,22 +1459,960 @@ const normalizeTemplateLayout = templateData => {
           ...edge,
           style: {
             ...(edge.style || {}),
-            pathType: 'straight'
+            pathType: 'orthogonal'
           }
         }))
       : [],
     lanes: Array.isArray(templateData?.lanes)
       ? templateData.lanes.map(lane => ({
-          ...lane
+          ...lane,
+          label: ''
         }))
       : []
   }
+
+  compactTemplateLayout(normalizedTemplate, mode)
+  alignTemplateColumnNodes(normalizedTemplate)
+  alignTemplateMergeNodes(normalizedTemplate)
+  alignTemplateColumnNodes(normalizedTemplate)
+  return normalizedTemplate
 }
 
 const getNodeCenter = node => ({
   x: Number(node.x || 0) + Number(node.width || 0) / 2,
   y: Number(node.y || 0) + Number(node.height || 0) / 2
 })
+
+const getTemplateRowAnchor = node => Number(node?.y || 0)
+
+const TEMPLATE_ALIGNMENT_SNAP = 12
+const TEMPLATE_COLUMN_ALIGNMENT_THRESHOLD = 72
+const FLOWCHART_AXIS_ALIGNMENT_TOLERANCE = 40
+const MIN_ORTHOGONAL_TURN_SPAN = 36
+const MIN_EDGE_ARROW_LENGTH = 56
+const MAX_FLOWCHART_EDGE_ARROW_COUNT = 4
+const DEFAULT_FLOWCHART_EDGE_ARROW_COUNT = 1
+const MIN_FLOWCHART_EDGE_ARROW_SIZE = 0.6
+const MAX_FLOWCHART_EDGE_ARROW_SIZE = 1.6
+const DEFAULT_FLOWCHART_EDGE_ARROW_SIZE = 1
+const FLOWCHART_ORTHOGONAL_STUB_LENGTH = 36
+const FLOWCHART_ORTHOGONAL_LANE_GAP = 28
+const FLOWCHART_EDGE_DIRECTION_HYSTERESIS = 36
+const FLOWCHART_EDGE_DIRECTION_AMBIGUOUS_THRESHOLD = 72
+const TEMPLATE_LAYOUT_PRESETS = {
+  document: {
+    baseX: 132,
+    baseY: 120,
+    columnGap: 236,
+    rowGap: 132,
+    columnThreshold: 180,
+    rowThreshold: 112,
+    laneHeight: 152,
+    laneGap: 22,
+    lanePaddingX: 56,
+    laneInnerPaddingY: 42
+  },
+  preview: {
+    baseX: 84,
+    baseY: 84,
+    columnGap: 184,
+    rowGap: 108,
+    columnThreshold: 180,
+    rowThreshold: 112,
+    laneHeight: 128,
+    laneGap: 16,
+    lanePaddingX: 40,
+    laneInnerPaddingY: 34
+  }
+}
+
+const snapTemplateCoordinate = value => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 0
+  }
+  return Math.round(numericValue / TEMPLATE_ALIGNMENT_SNAP) * TEMPLATE_ALIGNMENT_SNAP
+}
+
+const normalizeFlowchartEdgeArrowSize = value => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_FLOWCHART_EDGE_ARROW_SIZE
+  }
+  return Math.max(
+    MIN_FLOWCHART_EDGE_ARROW_SIZE,
+    Math.min(MAX_FLOWCHART_EDGE_ARROW_SIZE, numericValue)
+  )
+}
+
+const normalizeFlowchartEdgeArrowCount = value => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_FLOWCHART_EDGE_ARROW_COUNT
+  }
+  return Math.max(
+    0,
+    Math.min(MAX_FLOWCHART_EDGE_ARROW_COUNT, Math.round(numericValue))
+  )
+}
+
+const buildFlowchartPolylinePath = points => {
+  if (!Array.isArray(points) || !points.length) {
+    return ''
+  }
+  return points.reduce((result, point, index) => {
+    const x = Number(point?.x || 0)
+    const y = Number(point?.y || 0)
+    return `${result}${index === 0 ? 'M' : ' L'} ${x} ${y}`
+  }, '')
+}
+
+const getFlowchartPolylineSegments = points => {
+  const normalizedPoints = Array.isArray(points) ? points : []
+  const segments = []
+  for (let index = 1; index < normalizedPoints.length; index += 1) {
+    const start = normalizedPoints[index - 1]
+    const end = normalizedPoints[index]
+    const deltaX = Number(end?.x || 0) - Number(start?.x || 0)
+    const deltaY = Number(end?.y || 0) - Number(start?.y || 0)
+    const length = Math.hypot(deltaX, deltaY)
+    if (length <= 0.001) {
+      continue
+    }
+    segments.push({
+      start,
+      end,
+      deltaX,
+      deltaY,
+      length,
+      angle: (Math.atan2(deltaY, deltaX) * 180) / Math.PI,
+      isHorizontal: Math.abs(deltaX) >= Math.abs(deltaY)
+    })
+  }
+  return segments
+}
+
+const getFlowchartPolylinePointAtRatio = (points, ratio = 0.5) => {
+  const segments = getFlowchartPolylineSegments(points)
+  if (!segments.length) {
+    const point = points?.[0] || { x: 0, y: 0 }
+    return {
+      point: {
+        x: Number(point.x || 0),
+        y: Number(point.y || 0)
+      },
+      ratio: 0.5,
+      distance: 0,
+      totalLength: 0
+    }
+  }
+  const normalizedRatio = Math.max(0, Math.min(1, Number(ratio)))
+  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0)
+  const targetDistance = totalLength * (Number.isFinite(normalizedRatio) ? normalizedRatio : 0.5)
+  let traversedLength = 0
+  for (const segment of segments) {
+    const nextLength = traversedLength + segment.length
+    if (targetDistance <= nextLength || segment === segments[segments.length - 1]) {
+      const localRatio =
+        segment.length > 0 ? (targetDistance - traversedLength) / segment.length : 0.5
+      return {
+        point: {
+          x: Number(segment.start?.x || 0) + segment.deltaX * localRatio,
+          y: Number(segment.start?.y || 0) + segment.deltaY * localRatio
+        },
+        ratio: Number.isFinite(normalizedRatio) ? normalizedRatio : 0.5,
+        distance: targetDistance,
+        totalLength
+      }
+    }
+    traversedLength = nextLength
+  }
+  const lastPoint = points?.[points.length - 1] || points?.[0] || { x: 0, y: 0 }
+  return {
+    point: {
+      x: Number(lastPoint.x || 0),
+      y: Number(lastPoint.y || 0)
+    },
+    ratio: 1,
+    distance: totalLength,
+    totalLength
+  }
+}
+
+export const projectFlowchartPointToPolyline = (points, referencePoint) => {
+  const segments = getFlowchartPolylineSegments(points)
+  if (!segments.length) {
+    const point = points?.[0] || { x: 0, y: 0 }
+    return {
+      point: {
+        x: Number(point.x || 0),
+        y: Number(point.y || 0)
+      },
+      ratio: 0.5,
+      distance: 0
+    }
+  }
+  const normalizedReferencePoint = {
+    x: Number(referencePoint?.x || 0),
+    y: Number(referencePoint?.y || 0)
+  }
+  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0)
+  let traversedLength = 0
+  let bestProjection = null
+  segments.forEach(segment => {
+    const lengthSquared = segment.length ** 2
+    const projectionRatio =
+      lengthSquared > 0
+        ? (
+            ((normalizedReferencePoint.x - segment.start.x) * segment.deltaX +
+              (normalizedReferencePoint.y - segment.start.y) * segment.deltaY) /
+            lengthSquared
+          )
+        : 0
+    const clampedRatio = Math.max(0, Math.min(1, projectionRatio))
+    const projectedPoint = {
+      x: segment.start.x + segment.deltaX * clampedRatio,
+      y: segment.start.y + segment.deltaY * clampedRatio
+    }
+    const distanceToReference = Math.hypot(
+      normalizedReferencePoint.x - projectedPoint.x,
+      normalizedReferencePoint.y - projectedPoint.y
+    )
+    const distanceOnPath = traversedLength + segment.length * clampedRatio
+    const candidate = {
+      point: projectedPoint,
+      ratio: totalLength > 0 ? distanceOnPath / totalLength : 0.5,
+      distance: distanceOnPath,
+      distanceToReference
+    }
+    if (
+      !bestProjection ||
+      candidate.distanceToReference < bestProjection.distanceToReference
+    ) {
+      bestProjection = candidate
+    }
+    traversedLength += segment.length
+  })
+  return bestProjection || getFlowchartPolylinePointAtRatio(points, 0.5)
+}
+
+const createFlowchartEdgeLabelPlacementFromPoints = (
+  points,
+  { preferredSide = 'right', label = '', labelPosition = null } = {}
+) => {
+  void preferredSide
+  void label
+  const normalizedLabelPosition = normalizeFlowchartEdgeLabelPosition(labelPosition)
+  const placementPoint = getFlowchartPolylinePointAtRatio(
+    points,
+    normalizedLabelPosition?.ratio ?? 0.5
+  ).point
+  return {
+    labelX: placementPoint.x + Number(normalizedLabelPosition?.offsetX || 0),
+    labelY: placementPoint.y + Number(normalizedLabelPosition?.offsetY || 0),
+    labelPlacement: 'inline',
+    labelPosition: normalizedLabelPosition || {
+      ratio: 0.5,
+      offsetX: 0,
+      offsetY: 0
+    }
+  }
+}
+
+const buildFlowchartCurveSamplePoints = (
+  sourcePoint,
+  sourceControl,
+  targetControl,
+  targetPoint,
+  steps = 24
+) => {
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const progress = index / steps
+    return {
+      x: getCubicBezierPoint(
+        sourcePoint.x,
+        sourceControl.x,
+        targetControl.x,
+        targetPoint.x,
+        progress
+      ),
+      y: getCubicBezierPoint(
+        sourcePoint.y,
+        sourceControl.y,
+        targetControl.y,
+        targetPoint.y,
+        progress
+      )
+    }
+  })
+}
+
+const getFlowchartArrowMarkersFromPoints = (points, style) => {
+  const desiredCount = normalizeFlowchartEdgeArrowCount(style?.arrowCount)
+  if (!desiredCount) {
+    return []
+  }
+  const segments = getFlowchartPolylineSegments(points)
+  if (!segments.length) {
+    return []
+  }
+  const totalLength = segments.reduce((total, segment) => total + segment.length, 0)
+  const maxCountByLength = Math.max(1, Math.floor(totalLength / MIN_EDGE_ARROW_LENGTH))
+  const arrowCount = Math.min(desiredCount, maxCountByLength)
+  const distances =
+    arrowCount === 1
+      ? [totalLength]
+      : [
+          ...Array.from({ length: arrowCount - 1 }, (_, index) =>
+            totalLength * ((index + 1) / arrowCount)
+          ),
+          totalLength
+        ]
+  return distances
+    .map(distance => {
+      let traversed = 0
+      for (const segment of segments) {
+        if (distance <= traversed + segment.length || segment === segments[segments.length - 1]) {
+          const localDistance = Math.max(0, Math.min(segment.length, distance - traversed))
+          const progress = segment.length <= 0 ? 0 : localDistance / segment.length
+          return {
+            x: segment.start.x + segment.deltaX * progress,
+            y: segment.start.y + segment.deltaY * progress,
+            angle: segment.angle,
+            size: normalizeFlowchartEdgeArrowSize(style?.arrowSize)
+          }
+        }
+        traversed += segment.length
+      }
+      return null
+    })
+    .filter(Boolean)
+}
+
+const getFlowchartDirectionVector = direction => {
+  if (direction === 'left') {
+    return { x: -1, y: 0 }
+  }
+  if (direction === 'right') {
+    return { x: 1, y: 0 }
+  }
+  if (direction === 'top') {
+    return { x: 0, y: -1 }
+  }
+  return { x: 0, y: 1 }
+}
+
+const offsetFlowchartPoint = (point, direction, distance) => {
+  const vector = getFlowchartDirectionVector(direction)
+  return {
+    x: Number(point?.x || 0) + vector.x * distance,
+    y: Number(point?.y || 0) + vector.y * distance
+  }
+}
+
+const normalizeFlowchartAxisAlignedEndpoints = ({
+  sourceNode = null,
+  sourcePoint,
+  targetNode = null,
+  targetPoint,
+  sourceDirection,
+  targetDirection,
+  allowRangeAlignment = true
+}) => {
+  const nextSourcePoint = {
+    x: Number(sourcePoint?.x || 0),
+    y: Number(sourcePoint?.y || 0)
+  }
+  const nextTargetPoint = {
+    x: Number(targetPoint?.x || 0),
+    y: Number(targetPoint?.y || 0)
+  }
+  const isVerticalOpposite =
+    (sourceDirection === 'bottom' && targetDirection === 'top') ||
+    (sourceDirection === 'top' && targetDirection === 'bottom')
+  const isHorizontalOpposite =
+    (sourceDirection === 'right' && targetDirection === 'left') ||
+    (sourceDirection === 'left' && targetDirection === 'right')
+
+  if (isVerticalOpposite) {
+    const sourceMinX = Number(sourceNode?.x)
+    const sourceMaxX = sourceMinX + Number(sourceNode?.width)
+    const targetMinX = Number(targetNode?.x)
+    const targetMaxX = targetMinX + Number(targetNode?.width)
+    const overlapMinX = Math.max(sourceMinX, targetMinX)
+    const overlapMaxX = Math.min(sourceMaxX, targetMaxX)
+    if (
+      allowRangeAlignment &&
+      Number.isFinite(overlapMinX) &&
+      Number.isFinite(overlapMaxX) &&
+      overlapMinX <= overlapMaxX
+    ) {
+      const midpointX = (nextSourcePoint.x + nextTargetPoint.x) / 2
+      const axisX =
+        Math.round(Math.max(overlapMinX, Math.min(overlapMaxX, midpointX)) * 100) / 100
+      nextSourcePoint.x = axisX
+      nextTargetPoint.x = axisX
+    } else if (Math.abs(nextSourcePoint.x - nextTargetPoint.x) <= FLOWCHART_AXIS_ALIGNMENT_TOLERANCE) {
+      const axisX = Math.round(((nextSourcePoint.x + nextTargetPoint.x) / 2) * 100) / 100
+      nextSourcePoint.x = axisX
+      nextTargetPoint.x = axisX
+    }
+  }
+
+  if (isHorizontalOpposite) {
+    const sourceMinY = Number(sourceNode?.y)
+    const sourceMaxY = sourceMinY + Number(sourceNode?.height)
+    const targetMinY = Number(targetNode?.y)
+    const targetMaxY = targetMinY + Number(targetNode?.height)
+    const overlapMinY = Math.max(sourceMinY, targetMinY)
+    const overlapMaxY = Math.min(sourceMaxY, targetMaxY)
+    if (
+      allowRangeAlignment &&
+      Number.isFinite(overlapMinY) &&
+      Number.isFinite(overlapMaxY) &&
+      overlapMinY <= overlapMaxY
+    ) {
+      const midpointY = (nextSourcePoint.y + nextTargetPoint.y) / 2
+      const axisY =
+        Math.round(Math.max(overlapMinY, Math.min(overlapMaxY, midpointY)) * 100) / 100
+      nextSourcePoint.y = axisY
+      nextTargetPoint.y = axisY
+    } else if (Math.abs(nextSourcePoint.y - nextTargetPoint.y) <= FLOWCHART_AXIS_ALIGNMENT_TOLERANCE) {
+      const axisY = Math.round(((nextSourcePoint.y + nextTargetPoint.y) / 2) * 100) / 100
+      nextSourcePoint.y = axisY
+      nextTargetPoint.y = axisY
+    }
+  }
+
+  return {
+    sourcePoint: nextSourcePoint,
+    targetPoint: nextTargetPoint
+  }
+}
+
+const areFlowchartPointsEqual = (firstPoint, secondPoint) => {
+  return (
+    Math.abs(Number(firstPoint?.x || 0) - Number(secondPoint?.x || 0)) <= 0.001 &&
+    Math.abs(Number(firstPoint?.y || 0) - Number(secondPoint?.y || 0)) <= 0.001
+  )
+}
+
+const isFlowchartCollinearPoint = (previousPoint, currentPoint, nextPoint) => {
+  const previousDeltaX = Number(currentPoint?.x || 0) - Number(previousPoint?.x || 0)
+  const previousDeltaY = Number(currentPoint?.y || 0) - Number(previousPoint?.y || 0)
+  const nextDeltaX = Number(nextPoint?.x || 0) - Number(currentPoint?.x || 0)
+  const nextDeltaY = Number(nextPoint?.y || 0) - Number(currentPoint?.y || 0)
+  const isCollinear =
+    (Math.abs(previousDeltaX) <= 0.001 && Math.abs(nextDeltaX) <= 0.001) ||
+    (Math.abs(previousDeltaY) <= 0.001 && Math.abs(nextDeltaY) <= 0.001)
+  if (!isCollinear) {
+    return false
+  }
+  return previousDeltaX * nextDeltaX + previousDeltaY * nextDeltaY >= 0
+}
+
+const simplifyFlowchartOrthogonalPoints = points => {
+  const uniquePoints = []
+  ;(Array.isArray(points) ? points : []).forEach(point => {
+    const normalizedPoint = {
+      x: Number(point?.x || 0),
+      y: Number(point?.y || 0)
+    }
+    if (!uniquePoints.length || !areFlowchartPointsEqual(uniquePoints[uniquePoints.length - 1], normalizedPoint)) {
+      uniquePoints.push(normalizedPoint)
+    }
+  })
+  const simplifiedPoints = []
+  uniquePoints.forEach(point => {
+    while (
+      simplifiedPoints.length >= 2 &&
+      isFlowchartCollinearPoint(
+        simplifiedPoints[simplifiedPoints.length - 2],
+        simplifiedPoints[simplifiedPoints.length - 1],
+        point
+      )
+    ) {
+      simplifiedPoints.pop()
+    }
+    simplifiedPoints.push(point)
+  })
+  return simplifiedPoints
+}
+
+const resolveFlowchartOrthogonalLaneValue = ({
+  axis,
+  sourcePoint,
+  targetPoint,
+  sourceStub,
+  targetStub,
+  sourceDirection,
+  targetDirection,
+  route = null
+}) => {
+  const sourceValue = axis === 'x' ? sourceStub.x : sourceStub.y
+  const targetValue = axis === 'x' ? targetStub.x : targetStub.y
+  const manualLane =
+    route?.orthogonalLane?.axis === axis && Number.isFinite(Number(route?.orthogonalLane?.value))
+      ? Number(route.orthogonalLane.value)
+      : null
+  const minLane = Math.min(sourceValue, targetValue) - 160
+  const maxLane = Math.max(sourceValue, targetValue) + 160
+  let laneValue =
+    manualLane ??
+    (() => {
+      if (Math.abs(targetValue - sourceValue) >= MIN_ORTHOGONAL_TURN_SPAN) {
+        return sourceValue + (targetValue - sourceValue) / 2
+      }
+      const positiveDirection =
+        axis === 'x'
+          ? sourceDirection === 'right' || targetDirection === 'right'
+          : sourceDirection === 'bottom' || targetDirection === 'bottom'
+      const extentMax =
+        axis === 'x'
+          ? Math.max(sourcePoint.x, targetPoint.x, sourceStub.x, targetStub.x)
+          : Math.max(sourcePoint.y, targetPoint.y, sourceStub.y, targetStub.y)
+      const extentMin =
+        axis === 'x'
+          ? Math.min(sourcePoint.x, targetPoint.x, sourceStub.x, targetStub.x)
+          : Math.min(sourcePoint.y, targetPoint.y, sourceStub.y, targetStub.y)
+      return positiveDirection ? extentMax + 72 : extentMin - 72
+    })()
+  laneValue = Math.max(minLane, Math.min(maxLane, laneValue))
+  if (Math.abs(laneValue - sourceValue) < FLOWCHART_ORTHOGONAL_LANE_GAP) {
+    laneValue =
+      sourceValue +
+      (laneValue >= sourceValue ? FLOWCHART_ORTHOGONAL_LANE_GAP : -FLOWCHART_ORTHOGONAL_LANE_GAP)
+  }
+  if (Math.abs(laneValue - targetValue) < FLOWCHART_ORTHOGONAL_LANE_GAP) {
+    laneValue =
+      targetValue +
+      (laneValue >= targetValue ? FLOWCHART_ORTHOGONAL_LANE_GAP : -FLOWCHART_ORTHOGONAL_LANE_GAP)
+  }
+  return laneValue
+}
+
+const buildFlowchartOrthogonalRoute = ({
+  sourcePoint,
+  targetPoint,
+  sourceDirection,
+  targetDirection,
+  route = null
+}) => {
+  const canUseDirectAxisRoute = (() => {
+    if (Math.abs(sourcePoint.x - targetPoint.x) <= 0.001) {
+      return targetPoint.y >= sourcePoint.y
+        ? sourceDirection === 'bottom' && targetDirection === 'top'
+        : sourceDirection === 'top' && targetDirection === 'bottom'
+    }
+    if (Math.abs(sourcePoint.y - targetPoint.y) <= 0.001) {
+      return targetPoint.x >= sourcePoint.x
+        ? sourceDirection === 'right' && targetDirection === 'left'
+        : sourceDirection === 'left' && targetDirection === 'right'
+    }
+    return false
+  })()
+  if (canUseDirectAxisRoute) {
+    return {
+      pathPoints: [sourcePoint, targetPoint],
+      bendHandles: [],
+      route: null
+    }
+  }
+  const sourceHorizontal =
+    sourceDirection === 'left' || sourceDirection === 'right'
+  const targetHorizontal =
+    targetDirection === 'left' || targetDirection === 'right'
+  const straightForward =
+    sourceHorizontal === targetHorizontal &&
+    ((sourceHorizontal &&
+      Math.abs(sourcePoint.y - targetPoint.y) <= 0.001 &&
+      ((sourceDirection === 'right' && targetDirection === 'left' && sourcePoint.x <= targetPoint.x) ||
+        (sourceDirection === 'left' && targetDirection === 'right' && sourcePoint.x >= targetPoint.x))) ||
+      (!sourceHorizontal &&
+        Math.abs(sourcePoint.x - targetPoint.x) <= 0.001 &&
+        ((sourceDirection === 'bottom' && targetDirection === 'top' && sourcePoint.y <= targetPoint.y) ||
+          (sourceDirection === 'top' && targetDirection === 'bottom' && sourcePoint.y >= targetPoint.y))))
+  if (straightForward) {
+    return {
+      pathPoints: [sourcePoint, targetPoint],
+      bendHandles: [],
+      route: null
+    }
+  }
+  const sourceStub = offsetFlowchartPoint(
+    sourcePoint,
+    sourceDirection,
+    FLOWCHART_ORTHOGONAL_STUB_LENGTH
+  )
+  const targetStub = offsetFlowchartPoint(
+    targetPoint,
+    targetDirection,
+    FLOWCHART_ORTHOGONAL_STUB_LENGTH
+  )
+  const needsPerpendicularLane =
+    sourceHorizontal === targetHorizontal &&
+    ((sourceHorizontal && Math.abs(sourcePoint.y - targetPoint.y) <= 0.001) ||
+      (!sourceHorizontal && Math.abs(sourcePoint.x - targetPoint.x) <= 0.001))
+  const laneAxis = needsPerpendicularLane
+    ? sourceHorizontal
+      ? 'y'
+      : 'x'
+    : sourceHorizontal
+      ? 'x'
+      : 'y'
+  const laneValue = resolveFlowchartOrthogonalLaneValue({
+    axis: laneAxis,
+    sourcePoint,
+    targetPoint,
+    sourceStub,
+    targetStub,
+    sourceDirection,
+    targetDirection,
+    route
+  })
+  const firstLanePoint =
+    laneAxis === 'x'
+      ? { x: laneValue, y: sourceStub.y }
+      : { x: sourceStub.x, y: laneValue }
+  const secondLanePoint =
+    laneAxis === 'x'
+      ? { x: laneValue, y: targetStub.y }
+      : { x: targetStub.x, y: laneValue }
+  return {
+    pathPoints: simplifyFlowchartOrthogonalPoints([
+      sourcePoint,
+      sourceStub,
+      firstLanePoint,
+      secondLanePoint,
+      targetStub,
+      targetPoint
+    ]),
+    bendHandles: [
+      {
+        x: firstLanePoint.x,
+        y: firstLanePoint.y,
+        axis: laneAxis
+      },
+      {
+        x: secondLanePoint.x,
+        y: secondLanePoint.y,
+        axis: laneAxis
+      }
+    ],
+    route: {
+      orthogonalLane: {
+        axis: laneAxis,
+        value: laneValue
+      }
+    }
+  }
+}
+
+const getTemplateLayoutPreset = mode => {
+  const normalizedMode = String(mode || '').trim()
+  return (
+    TEMPLATE_LAYOUT_PRESETS[normalizedMode] || TEMPLATE_LAYOUT_PRESETS.document
+  )
+}
+
+const createTemplateAxisClusters = (values, threshold) => {
+  const numericValues = values
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value))
+    .sort((a, b) => a - b)
+  if (!numericValues.length) {
+    return []
+  }
+  return numericValues.reduce((clusters, value) => {
+    const lastCluster = clusters[clusters.length - 1]
+    if (!lastCluster || value - lastCluster.max > threshold) {
+      clusters.push({
+        min: value,
+        max: value,
+        sum: value,
+        count: 1
+      })
+      return clusters
+    }
+    lastCluster.max = value
+    lastCluster.sum += value
+    lastCluster.count += 1
+    return clusters
+  }, [])
+}
+
+const resolveTemplateClusterIndex = (value, clusters) => {
+  if (!clusters.length) {
+    return 0
+  }
+  let bestIndex = 0
+  let bestDiff = Infinity
+  clusters.forEach((cluster, index) => {
+    const average = cluster.sum / cluster.count
+    const diff = Math.abs(Number(value || 0) - average)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      bestIndex = index
+    }
+  })
+  return bestIndex
+}
+
+const createTemplateColumnCenters = (clusters, preset) => {
+  return clusters.map((_cluster, index) => {
+    return preset.baseX + index * preset.columnGap
+  })
+}
+
+const compactTemplateGridLayout = (templateData, preset) => {
+  const nodes = Array.isArray(templateData?.nodes) ? templateData.nodes : []
+  if (nodes.length <= 0) {
+    return
+  }
+  const xClusters = createTemplateAxisClusters(
+    nodes.map(node => getNodeCenter(node).x),
+    preset.columnThreshold
+  )
+  const yClusters = createTemplateAxisClusters(
+    nodes.map(node => getTemplateRowAnchor(node)),
+    preset.rowThreshold
+  )
+  const columnCenters = createTemplateColumnCenters(xClusters, preset)
+  const rowCenters = yClusters.map((_cluster, index) => {
+    return preset.baseY + index * preset.rowGap
+  })
+
+  nodes.forEach(node => {
+    const center = getNodeCenter(node)
+    const columnIndex = resolveTemplateClusterIndex(center.x, xClusters)
+    const rowIndex = resolveTemplateClusterIndex(getTemplateRowAnchor(node), yClusters)
+    node.x = snapTemplateCoordinate(
+      Number(columnCenters[columnIndex] || preset.baseX) -
+        Number(node.width || 0) / 2
+    )
+    node.y = snapTemplateCoordinate(
+      Number(rowCenters[rowIndex] || preset.baseY) - Number(node.height || 0) / 2
+    )
+  })
+}
+
+const compactTemplateSwimlaneLayout = (templateData, preset) => {
+  const nodes = Array.isArray(templateData?.nodes) ? templateData.nodes : []
+  const lanes = Array.isArray(templateData?.lanes) ? templateData.lanes : []
+  if (nodes.length <= 0 || lanes.length <= 0) {
+    return
+  }
+
+  const orderedLanes = [...lanes].sort((laneA, laneB) => {
+    return Number(laneA.y || 0) - Number(laneB.y || 0)
+  })
+  const xClusters = createTemplateAxisClusters(
+    nodes.map(node => getNodeCenter(node).x),
+    preset.columnThreshold
+  )
+  const columnCenters = createTemplateColumnCenters(xClusters, preset)
+  const laneNodeMap = new Map(orderedLanes.map(lane => [lane.id, []]))
+
+  nodes.forEach(node => {
+    const nodeCenter = getNodeCenter(node)
+    const matchedLane = orderedLanes.find(lane => {
+      const laneTop = Number(lane.y || 0)
+      const laneBottom = laneTop + Number(lane.height || 0)
+      return nodeCenter.y >= laneTop && nodeCenter.y <= laneBottom
+    })
+    const resolvedLane =
+      matchedLane ||
+      orderedLanes.reduce((bestLane, lane) => {
+        if (!bestLane) {
+          return lane
+        }
+        const laneCenter = Number(lane.y || 0) + Number(lane.height || 0) / 2
+        const bestCenter =
+          Number(bestLane.y || 0) + Number(bestLane.height || 0) / 2
+        return Math.abs(nodeCenter.y - laneCenter) < Math.abs(nodeCenter.y - bestCenter)
+          ? lane
+          : bestLane
+      }, null)
+    laneNodeMap.get(resolvedLane?.id)?.push(node)
+  })
+
+  orderedLanes.forEach((lane, laneIndex) => {
+    const laneY = preset.baseY + laneIndex * (preset.laneHeight + preset.laneGap)
+    lane.x = preset.baseX - preset.lanePaddingX
+    lane.y = laneY
+    lane.height = preset.laneHeight
+
+    const laneNodes = laneNodeMap.get(lane.id) || []
+    if (!laneNodes.length) {
+      lane.width = preset.lanePaddingX * 2 + preset.columnGap
+      return
+    }
+
+    const rowClusters = createTemplateAxisClusters(
+      laneNodes.map(node => getTemplateRowAnchor(node)),
+      preset.rowThreshold
+    )
+    const rowCount = Math.max(1, rowClusters.length)
+    const availableHeight = Math.max(
+      0,
+      preset.laneHeight - preset.laneInnerPaddingY * 2
+    )
+    const rowCenters = rowClusters.map((_cluster, rowIndex) => {
+      if (rowCount === 1) {
+        return laneY + preset.laneHeight / 2
+      }
+      return (
+        laneY +
+        preset.laneInnerPaddingY +
+        (availableHeight / (rowCount - 1)) * rowIndex
+      )
+    })
+
+    let maxRight = lane.x
+    laneNodes.forEach(node => {
+      const center = getNodeCenter(node)
+      const columnIndex = resolveTemplateClusterIndex(center.x, xClusters)
+      const rowIndex = resolveTemplateClusterIndex(getTemplateRowAnchor(node), rowClusters)
+      node.x = snapTemplateCoordinate(
+        Number(columnCenters[columnIndex] || preset.baseX) -
+          Number(node.width || 0) / 2
+      )
+      node.y = snapTemplateCoordinate(
+        Number(rowCenters[rowIndex] || laneY + preset.laneHeight / 2) -
+          Number(node.height || 0) / 2
+      )
+      maxRight = Math.max(maxRight, Number(node.x || 0) + Number(node.width || 0))
+    })
+
+    lane.width = snapTemplateCoordinate(
+      maxRight - Number(lane.x || 0) + preset.lanePaddingX
+    )
+  })
+}
+
+const compactTemplateLayout = (templateData, mode = 'document') => {
+  const preset = getTemplateLayoutPreset(mode)
+  if (Array.isArray(templateData?.lanes) && templateData.lanes.length > 0) {
+    compactTemplateSwimlaneLayout(templateData, preset)
+    return
+  }
+  compactTemplateGridLayout(templateData, preset)
+}
+
+const alignTemplateColumnNodes = templateData => {
+  const nodes = Array.isArray(templateData?.nodes) ? templateData.nodes : []
+  const edges = Array.isArray(templateData?.edges) ? templateData.edges : []
+  if (nodes.length <= 1 || edges.length <= 0) {
+    return
+  }
+
+  const nodeLookup = new Map(nodes.map(node => [node.id, node]))
+  const adjacencyMap = new Map(nodes.map(node => [node.id, new Set()]))
+
+  edges.forEach(edge => {
+    const sourceNode = nodeLookup.get(edge?.source)
+    const targetNode = nodeLookup.get(edge?.target)
+    if (!sourceNode || !targetNode) {
+      return
+    }
+    const sourceCenter = getNodeCenter(sourceNode)
+    const targetCenter = getNodeCenter(targetNode)
+    const deltaX = Math.abs(targetCenter.x - sourceCenter.x)
+    const deltaY = Math.abs(targetCenter.y - sourceCenter.y)
+    if (deltaY <= deltaX) {
+      return
+    }
+    if (deltaX > TEMPLATE_COLUMN_ALIGNMENT_THRESHOLD) {
+      return
+    }
+    adjacencyMap.get(sourceNode.id)?.add(targetNode.id)
+    adjacencyMap.get(targetNode.id)?.add(sourceNode.id)
+  })
+
+  const visited = new Set()
+  nodes.forEach(node => {
+    if (visited.has(node.id)) {
+      return
+    }
+    const queue = [node.id]
+    const groupIds = []
+    visited.add(node.id)
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      groupIds.push(currentId)
+      ;(adjacencyMap.get(currentId) || []).forEach(nextId => {
+        if (visited.has(nextId)) {
+          return
+        }
+        visited.add(nextId)
+        queue.push(nextId)
+      })
+    }
+
+    if (groupIds.length < 2) {
+      return
+    }
+
+    const groupNodes = groupIds.map(nodeId => nodeLookup.get(nodeId)).filter(Boolean)
+    const averageCenterX =
+      groupNodes.reduce((sum, currentNode) => sum + getNodeCenter(currentNode).x, 0) /
+      groupNodes.length
+    groupNodes.forEach(groupNode => {
+      groupNode.x = snapTemplateCoordinate(
+        averageCenterX - Number(groupNode.width || 0) / 2
+      )
+    })
+  })
+}
+
+const alignTemplateMergeNodes = templateData => {
+  const nodes = Array.isArray(templateData?.nodes) ? templateData.nodes : []
+  const edges = Array.isArray(templateData?.edges) ? templateData.edges : []
+  if (nodes.length <= 0 || edges.length <= 0) {
+    return
+  }
+
+  const nodeLookup = new Map(nodes.map(node => [node.id, node]))
+  const incomingEdgeMap = new Map()
+  edges.forEach(edge => {
+    const targetId = String(edge?.target || '').trim()
+    if (!targetId) {
+      return
+    }
+    const edgeList = incomingEdgeMap.get(targetId) || []
+    edgeList.push(edge)
+    incomingEdgeMap.set(targetId, edgeList)
+  })
+
+  nodes.forEach(node => {
+    const incomingEdges = incomingEdgeMap.get(node.id) || []
+    if (incomingEdges.length < 2) {
+      return
+    }
+    const sourceNodes = incomingEdges
+      .map(edge => nodeLookup.get(edge.source))
+      .filter(Boolean)
+    if (sourceNodes.length < 2) {
+      return
+    }
+    const sourceCenters = sourceNodes.map(getNodeCenter)
+    const minSourceX = Math.min(...sourceCenters.map(point => point.x))
+    const maxSourceX = Math.max(...sourceCenters.map(point => point.x))
+    const maxSourceY = Math.max(...sourceCenters.map(point => point.y))
+    const currentCenter = getNodeCenter(node)
+
+    if (maxSourceX - minSourceX < 120) {
+      return
+    }
+    if (currentCenter.y <= maxSourceY + 24) {
+      return
+    }
+
+    const averageCenterX =
+      sourceCenters.reduce((sum, point) => sum + point.x, 0) / sourceCenters.length
+    node.x = snapTemplateCoordinate(averageCenterX - Number(node.width || 0) / 2)
+  })
+}
 
 const getStyleColor = (value, fallback) => {
   const color = String(value || '').trim()
@@ -1441,6 +2428,14 @@ const resolveFlowchartThemeFromConfig = (
   return getFlowchartThemeDefinition(themeId, {
     isDark
   })
+}
+
+const normalizeFlowchartBackgroundStyle = value => {
+  const normalizedValue = String(value || '').trim()
+  if (FLOWCHART_BACKGROUND_STYLES.includes(normalizedValue)) {
+    return normalizedValue
+  }
+  return DEFAULT_FLOWCHART_CONFIG.backgroundStyle
 }
 
 export const getFlowchartNodeVisualStyle = (
@@ -1466,6 +2461,8 @@ export const getFlowchartEdgeVisualStyle = (
     stroke: getStyleColor(edge?.style?.stroke, resolvedTheme.edgeStroke),
     labelColor: getStyleColor(edge?.style?.labelColor, resolvedTheme.edgeLabelColor),
     dashed: !!edge?.style?.dashed,
+    arrowSize: normalizeFlowchartEdgeArrowSize(edge?.style?.arrowSize),
+    arrowCount: normalizeFlowchartEdgeArrowCount(edge?.style?.arrowCount),
     pathType: strictAlignment
       ? 'orthogonal'
       : ['straight', 'curved', 'orthogonal'].includes(pathType)
@@ -1474,11 +2471,70 @@ export const getFlowchartEdgeVisualStyle = (
   }
 }
 
+export function normalizeFlowchartNodeAnchor(anchor) {
+  if (!anchor || typeof anchor !== 'object') {
+    return null
+  }
+  const xRatio = Number(anchor.xRatio)
+  const yRatio = Number(anchor.yRatio)
+  if (!Number.isFinite(xRatio) || !Number.isFinite(yRatio)) {
+    return null
+  }
+  const nextAnchor = {
+    xRatio: Math.max(0, Math.min(1, xRatio)),
+    yRatio: Math.max(0, Math.min(1, yRatio))
+  }
+  const distances = [
+    { edge: 'left', distance: nextAnchor.xRatio },
+    { edge: 'right', distance: 1 - nextAnchor.xRatio },
+    { edge: 'top', distance: nextAnchor.yRatio },
+    { edge: 'bottom', distance: 1 - nextAnchor.yRatio }
+  ].sort((first, second) => first.distance - second.distance)
+  const nearestEdge = distances[0]?.edge || 'right'
+  if (nearestEdge === 'left') {
+    nextAnchor.xRatio = 0
+  } else if (nearestEdge === 'right') {
+    nextAnchor.xRatio = 1
+  } else if (nearestEdge === 'top') {
+    nextAnchor.yRatio = 0
+  } else {
+    nextAnchor.yRatio = 1
+  }
+  return nextAnchor
+}
+
+export const getFlowchartAnchorDirection = (anchor, fallbackDirection = 'right') => {
+  const normalizedAnchor = normalizeFlowchartNodeAnchor(anchor)
+  if (!normalizedAnchor) {
+    return fallbackDirection
+  }
+  if (normalizedAnchor.xRatio <= 0) {
+    return 'left'
+  }
+  if (normalizedAnchor.xRatio >= 1) {
+    return 'right'
+  }
+  if (normalizedAnchor.yRatio <= 0) {
+    return 'top'
+  }
+  if (normalizedAnchor.yRatio >= 1) {
+    return 'bottom'
+  }
+  return fallbackDirection
+}
+
 export const getFlowchartNodeConnectionPoint = (node, direction = 'right') => {
   const x = Number(node?.x || 0)
   const y = Number(node?.y || 0)
   const width = Number(node?.width || 0)
   const height = Number(node?.height || 0)
+  const normalizedAnchor = normalizeFlowchartNodeAnchor(direction)
+  if (normalizedAnchor) {
+    return {
+      x: x + width * normalizedAnchor.xRatio,
+      y: y + height * normalizedAnchor.yRatio
+    }
+  }
   if (direction === 'top') {
     return {
       x: x + width / 2,
@@ -1503,19 +2559,174 @@ export const getFlowchartNodeConnectionPoint = (node, direction = 'right') => {
   }
 }
 
-const resolveFlowchartEdgeDirections = (sourceNode, targetNode) => {
+const createFlowchartDirectionalPair = orientation => {
+  if (orientation === 'horizontal') {
+    return (deltaX, _deltaY) => {
+      return deltaX >= 0
+        ? { sourceDirection: 'right', targetDirection: 'left' }
+        : { sourceDirection: 'left', targetDirection: 'right' }
+    }
+  }
+  return (_deltaX, deltaY) => {
+    return deltaY >= 0
+      ? { sourceDirection: 'bottom', targetDirection: 'top' }
+      : { sourceDirection: 'top', targetDirection: 'bottom' }
+  }
+}
+
+const hasEnoughForwardSpaceForOrientation = ({
+  sourceNode,
+  targetNode,
+  deltaX,
+  deltaY,
+  orientation
+}) => {
+  if (orientation === 'horizontal') {
+    const sourceExitX =
+      deltaX >= 0 ? Number(sourceNode?.x || 0) + Number(sourceNode?.width || 0) : Number(sourceNode?.x || 0)
+    const targetEntryX =
+      deltaX >= 0 ? Number(targetNode?.x || 0) : Number(targetNode?.x || 0) + Number(targetNode?.width || 0)
+    return Math.abs(targetEntryX - sourceExitX) >= MIN_ORTHOGONAL_TURN_SPAN
+  }
+  const sourceExitY =
+    deltaY >= 0 ? Number(sourceNode?.y || 0) + Number(sourceNode?.height || 0) : Number(sourceNode?.y || 0)
+  const targetEntryY =
+    deltaY >= 0 ? Number(targetNode?.y || 0) : Number(targetNode?.y || 0) + Number(targetNode?.height || 0)
+  return Math.abs(targetEntryY - sourceExitY) >= MIN_ORTHOGONAL_TURN_SPAN
+}
+
+const resolveFlowchartOrientationForwardSpace = ({
+  sourceNode,
+  targetNode,
+  deltaX,
+  deltaY,
+  orientation
+}) => {
+  if (
+    orientation === 'horizontal' &&
+    Math.abs(deltaY) > FLOWCHART_AXIS_ALIGNMENT_TOLERANCE &&
+    !hasEnoughForwardSpaceForOrientation({
+      sourceNode,
+      targetNode,
+      deltaX,
+      deltaY,
+      orientation: 'horizontal'
+    })
+  ) {
+    return 'vertical'
+  }
+  if (
+    orientation === 'vertical' &&
+    Math.abs(deltaX) > FLOWCHART_AXIS_ALIGNMENT_TOLERANCE &&
+    !hasEnoughForwardSpaceForOrientation({
+      sourceNode,
+      targetNode,
+      deltaX,
+      deltaY,
+      orientation: 'vertical'
+    })
+  ) {
+    return 'horizontal'
+  }
+  return orientation
+}
+
+const resolveFlowchartEdgeDirections = (sourceNode, targetNode, previousDirections = null) => {
   const sourceCenter = getNodeCenter(sourceNode)
   const targetCenter = getNodeCenter(targetNode)
   const deltaX = targetCenter.x - sourceCenter.x
   const deltaY = targetCenter.y - sourceCenter.y
-  if (Math.abs(deltaX) >= Math.abs(deltaY)) {
-    return deltaX >= 0
-      ? { sourceDirection: 'right', targetDirection: 'left' }
-      : { sourceDirection: 'left', targetDirection: 'right' }
+  const absoluteDeltaX = Math.abs(deltaX)
+  const absoluteDeltaY = Math.abs(deltaY)
+  const preferredOrientation =
+    previousDirections?.sourceDirection === 'left' ||
+    previousDirections?.sourceDirection === 'right'
+      ? 'horizontal'
+      : previousDirections?.sourceDirection === 'top' ||
+          previousDirections?.sourceDirection === 'bottom'
+        ? 'vertical'
+        : ''
+  if (preferredOrientation === 'horizontal') {
+    if (absoluteDeltaY > absoluteDeltaX + FLOWCHART_EDGE_DIRECTION_HYSTERESIS) {
+      return createFlowchartDirectionalPair('vertical')(deltaX, deltaY)
+    }
+    return createFlowchartDirectionalPair(
+      resolveFlowchartOrientationForwardSpace({
+        sourceNode,
+        targetNode,
+        deltaX,
+        deltaY,
+        orientation: 'horizontal'
+      })
+    )(deltaX, deltaY)
   }
-  return deltaY >= 0
-    ? { sourceDirection: 'bottom', targetDirection: 'top' }
-    : { sourceDirection: 'top', targetDirection: 'bottom' }
+  if (preferredOrientation === 'vertical') {
+    if (absoluteDeltaX > absoluteDeltaY + FLOWCHART_EDGE_DIRECTION_HYSTERESIS) {
+      return createFlowchartDirectionalPair('horizontal')(deltaX, deltaY)
+    }
+    return createFlowchartDirectionalPair(
+      resolveFlowchartOrientationForwardSpace({
+        sourceNode,
+        targetNode,
+        deltaX,
+        deltaY,
+        orientation: 'vertical'
+      })
+    )(deltaX, deltaY)
+  }
+  if (absoluteDeltaX > absoluteDeltaY + FLOWCHART_EDGE_DIRECTION_AMBIGUOUS_THRESHOLD) {
+    return createFlowchartDirectionalPair(
+      resolveFlowchartOrientationForwardSpace({
+        sourceNode,
+        targetNode,
+        deltaX,
+        deltaY,
+        orientation: 'horizontal'
+      })
+    )(deltaX, deltaY)
+  }
+  if (absoluteDeltaY > absoluteDeltaX + FLOWCHART_EDGE_DIRECTION_AMBIGUOUS_THRESHOLD) {
+    return createFlowchartDirectionalPair(
+      resolveFlowchartOrientationForwardSpace({
+        sourceNode,
+        targetNode,
+        deltaX,
+        deltaY,
+        orientation: 'vertical'
+      })
+    )(deltaX, deltaY)
+  }
+  const maxNodeWidth = Math.max(
+    Number(sourceNode?.width || 0),
+    Number(targetNode?.width || 0)
+  )
+  const maxNodeHeight = Math.max(
+    Number(sourceNode?.height || 0),
+    Number(targetNode?.height || 0)
+  )
+  const spansMultipleColumns = absoluteDeltaX > maxNodeWidth
+  const spansMultipleRows = absoluteDeltaY > maxNodeHeight
+  if (spansMultipleColumns && spansMultipleRows) {
+    return createFlowchartDirectionalPair(
+      resolveFlowchartOrientationForwardSpace({
+        sourceNode,
+        targetNode,
+        deltaX,
+        deltaY,
+        orientation: 'vertical'
+      })
+    )(deltaX, deltaY)
+  }
+  const fallbackOrientation = absoluteDeltaX >= absoluteDeltaY ? 'horizontal' : 'vertical'
+  return createFlowchartDirectionalPair(
+    resolveFlowchartOrientationForwardSpace({
+      sourceNode,
+      targetNode,
+      deltaX,
+      deltaY,
+      orientation: fallbackOrientation
+    })
+  )(deltaX, deltaY)
 }
 
 const getCubicBezierPoint = (start, control1, control2, end, progress) => {
@@ -1529,47 +2740,71 @@ const getCubicBezierPoint = (start, control1, control2, end, progress) => {
   )
 }
 
-const createFlowchartEdgeLabelPlacement = ({
+const _createFlowchartEdgeLabelPlacement = ({
   startPoint,
   endPoint,
-  preferredSide = 'right'
+  preferredSide = 'right',
+  labelPosition = null
 } = {}) => {
-  const horizontal = Math.abs(endPoint.x - startPoint.x) >= Math.abs(endPoint.y - startPoint.y)
-  const offset = 18
-  if (horizontal) {
-    return {
-      labelX: (startPoint.x + endPoint.x) / 2,
-      labelY: (startPoint.y + endPoint.y) / 2,
-      labelPlacement: 'inline'
+  void preferredSide
+  return createFlowchartEdgeLabelPlacementFromPoints(
+    [startPoint, endPoint],
+    {
+      preferredSide,
+      labelPosition
     }
-  }
-  const sideOffset = preferredSide === 'left' ? -offset : offset
-  return {
-    labelX: (startPoint.x + endPoint.x) / 2 + sideOffset,
-    labelY: (startPoint.y + endPoint.y) / 2,
-    labelPlacement: preferredSide === 'left' ? 'left' : 'right'
-  }
+  )
 }
 
 export const getFlowchartEdgeLayout = (edge, sourceNode, targetNode, options = {}) => {
   const style = getFlowchartEdgeVisualStyle(edge, options)
-  const { sourceDirection, targetDirection } = resolveFlowchartEdgeDirections(
+  const autoDirections = resolveFlowchartEdgeDirections(
     sourceNode,
-    targetNode
+    targetNode,
+    options?.lockedDirections || null
   )
-  const sourcePoint = getFlowchartNodeConnectionPoint(sourceNode, sourceDirection)
-  const targetPoint = getFlowchartNodeConnectionPoint(targetNode, targetDirection)
+  const sourceDirection = getFlowchartAnchorDirection(
+    edge?.sourceAnchor,
+    autoDirections.sourceDirection
+  )
+  const targetDirection = getFlowchartAnchorDirection(
+    edge?.targetAnchor,
+    autoDirections.targetDirection
+  )
+  const rawSourcePoint = getFlowchartNodeConnectionPoint(
+    sourceNode,
+    edge?.sourceAnchor || sourceDirection
+  )
+  const rawTargetPoint = getFlowchartNodeConnectionPoint(
+    targetNode,
+    edge?.targetAnchor || targetDirection
+  )
+  const { sourcePoint, targetPoint } = normalizeFlowchartAxisAlignedEndpoints({
+    sourceNode,
+    sourcePoint: rawSourcePoint,
+    targetNode,
+    targetPoint: rawTargetPoint,
+    sourceDirection,
+    targetDirection,
+    allowRangeAlignment: !edge?.sourceAnchor && !edge?.targetAnchor
+  })
+  const preferredSide = targetPoint.x < sourcePoint.x ? 'left' : 'right'
   if (style.pathType === 'straight') {
-    const labelPlacement = createFlowchartEdgeLabelPlacement({
-      startPoint: sourcePoint,
-      endPoint: targetPoint,
-      preferredSide: targetPoint.x < sourcePoint.x ? 'left' : 'right'
+    const pathPoints = [sourcePoint, targetPoint]
+    const labelPlacement = createFlowchartEdgeLabelPlacementFromPoints(pathPoints, {
+      preferredSide,
+      label: edge?.label,
+      labelPosition: edge?.labelPosition
     })
     return {
-      path: `M ${sourcePoint.x} ${sourcePoint.y} L ${targetPoint.x} ${targetPoint.y}`,
+      path: buildFlowchartPolylinePath(pathPoints),
       ...labelPlacement,
       sourcePoint,
       targetPoint,
+      sourceDirection,
+      targetDirection,
+      pathPoints,
+      arrowMarkers: getFlowchartArrowMarkersFromPoints(pathPoints, style),
       style
     }
   }
@@ -1606,68 +2841,54 @@ export const getFlowchartEdgeLayout = (edge, sourceNode, targetNode, options = {
             targetPoint.y +
             (targetDirection === 'top' ? -strength : strength)
         }
-    const curveMidPoint = {
-      x: getCubicBezierPoint(
-        sourcePoint.x,
-        sourceControl.x,
-        targetControl.x,
-        targetPoint.x,
-        0.5
-      ),
-      y: getCubicBezierPoint(
-        sourcePoint.y,
-        sourceControl.y,
-        targetControl.y,
-        targetPoint.y,
-        0.5
-      )
-    }
-    const labelPlacement = createFlowchartEdgeLabelPlacement({
-      startPoint: sourcePoint,
-      endPoint: targetPoint,
-      preferredSide: targetPoint.x < sourcePoint.x ? 'left' : 'right'
+    const curveSamplePoints = buildFlowchartCurveSamplePoints(
+      sourcePoint,
+      sourceControl,
+      targetControl,
+      targetPoint
+    )
+    const labelPlacement = createFlowchartEdgeLabelPlacementFromPoints(curveSamplePoints, {
+      preferredSide,
+      label: edge?.label,
+      labelPosition: edge?.labelPosition
     })
     return {
       path: `M ${sourcePoint.x} ${sourcePoint.y} C ${sourceControl.x} ${sourceControl.y} ${targetControl.x} ${targetControl.y} ${targetPoint.x} ${targetPoint.y}`,
       ...labelPlacement,
-      labelX: labelPlacement.labelPlacement === 'inline'
-        ? curveMidPoint.x
-        : curveMidPoint.x + (labelPlacement.labelPlacement === 'left' ? -18 : 18),
-      labelY: curveMidPoint.y,
       sourcePoint,
       targetPoint,
+      sourceDirection,
+      targetDirection,
+      pathPoints: curveSamplePoints,
+      arrowMarkers: getFlowchartArrowMarkersFromPoints(curveSamplePoints, style),
       style
     }
   }
-  const useHorizontalMid =
-    sourceDirection === 'left' || sourceDirection === 'right'
-  const midX = (sourcePoint.x + targetPoint.x) / 2
-  const midY = (sourcePoint.y + targetPoint.y) / 2
-  const path = useHorizontalMid
-    ? `M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`
-    : `M ${sourcePoint.x} ${sourcePoint.y} L ${sourcePoint.x} ${midY} L ${targetPoint.x} ${midY} L ${targetPoint.x} ${targetPoint.y}`
-  const labelSegmentStart = useHorizontalMid
-    ? sourcePoint
-    : sourcePoint
-  const labelSegmentEnd = useHorizontalMid
-    ? {
-        x: midX,
-        y: sourcePoint.y
-      }
-    : {
-        x: sourcePoint.x,
-        y: midY
-      }
-  const labelPlacement = createFlowchartEdgeLabelPlacement({
-    startPoint: labelSegmentStart,
-    endPoint: labelSegmentEnd,
-    preferredSide: targetPoint.x < sourcePoint.x ? 'left' : 'right'
+  const useStrictOrthogonal = !!options?.strictAlignment
+  const orthogonalRoute = buildFlowchartOrthogonalRoute({
+    sourcePoint,
+    targetPoint,
+    sourceDirection,
+    targetDirection,
+    route: useStrictOrthogonal ? null : edge?.route || null
+  })
+  const pathPoints = orthogonalRoute.pathPoints
+  const labelPlacement = createFlowchartEdgeLabelPlacementFromPoints(pathPoints, {
+    preferredSide,
+    label: edge?.label,
+    labelPosition: edge?.labelPosition
   })
   return {
-    path,
+    path: buildFlowchartPolylinePath(pathPoints),
     ...labelPlacement,
     sourcePoint,
     targetPoint,
+    sourceDirection,
+    targetDirection,
+    pathPoints,
+    bendHandles: orthogonalRoute.bendHandles,
+    route: orthogonalRoute.route,
+    arrowMarkers: getFlowchartArrowMarkersFromPoints(pathPoints, style),
     style
   }
 }
@@ -1703,6 +2924,13 @@ export const getFlowchartEdgeLabelBox = layout => {
   }
 }
 
+export const getFlowchartArrowHeadPath = marker => {
+  const arrowSize = normalizeFlowchartEdgeArrowSize(marker?.size)
+  const length = Math.round(6 * arrowSize * 100) / 100
+  const halfWidth = Math.round(2.8 * arrowSize * 100) / 100
+  return `M 0 0 L ${-length} ${halfWidth} L ${-length} ${-halfWidth} Z`
+}
+
 const buildSvgNodeShapeMarkup = (node, { isDark = false, theme = null } = {}) => {
   const x = Number(node.x || 0)
   const y = Number(node.y || 0)
@@ -1736,17 +2964,11 @@ const buildSvgNodeShapeMarkup = (node, { isDark = false, theme = null } = {}) =>
   }" fill="${escapeXml(visualStyle.fill)}" stroke="${escapeXml(visualStyle.stroke)}" stroke-width="2"/>`
 }
 
-const buildSvgLaneMarkup = (lane, { theme = null } = {}) => {
-  const x = Number(lane.x || 0)
-  const y = Number(lane.y || 0)
-  const width = Number(lane.width || 0)
-  const height = Number(lane.height || 0)
-  const accent = escapeXml(
-    String(lane.accent || theme?.accent || '#2563eb').trim() || '#2563eb'
-  )
-  const labelX = x + 24
-  const labelY = y + Math.min(34, Math.max(24, height / 2))
-  return `<g class="flowchart-swimlane"><rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${accent}" opacity="0.08" stroke="${accent}" stroke-width="1.5" stroke-dasharray="10 8"/><rect x="${x}" y="${y}" width="8" height="${height}" rx="4" fill="${accent}" opacity="0.56"/><text x="${labelX}" y="${labelY}" font-size="13" font-weight="700" fill="${accent}" text-anchor="start">${escapeXml(lane.label)}</text></g>`
+const buildSvgLaneMarkup = (lane, { theme = null, flowchartConfig = null } = {}) => {
+  void lane
+  void theme
+  void flowchartConfig
+  return ''
 }
 
 const createNodeId = (prefix, index) => `${prefix}-${index + 1}`
@@ -1835,6 +3057,10 @@ const normalizeFlowchartConfig = (config, _templateId = 'blank') => {
   nextConfig.themeId =
     String(nextConfig.themeId || DEFAULT_FLOWCHART_CONFIG.themeId).trim() ||
     DEFAULT_FLOWCHART_CONFIG.themeId
+  nextConfig.backgroundStyle = normalizeFlowchartBackgroundStyle(
+    nextConfig.backgroundStyle
+  )
+  delete nextConfig.laneBackgroundStyle
   return nextConfig
 }
 
@@ -1939,7 +3165,25 @@ export const createDefaultFlowchartData = (
   const templateFactory =
     FLOWCHART_TEMPLATES[templateId] || FLOWCHART_TEMPLATES.blank
   const templateData = normalizeTemplateLayout(
-    templateFactory(String(title || DEFAULT_FLOWCHART_TITLE))
+    templateFactory(String(title || DEFAULT_FLOWCHART_TITLE)),
+    { mode: 'document' }
+  )
+  return normalizeFlowchartData({
+    ...templateData,
+    title: String(title || templateData.title || DEFAULT_FLOWCHART_TITLE),
+    templateId
+  })
+}
+
+export const createFlowchartTemplatePreviewData = (
+  title = DEFAULT_FLOWCHART_TITLE,
+  templateId = 'blank'
+) => {
+  const templateFactory =
+    FLOWCHART_TEMPLATES[templateId] || FLOWCHART_TEMPLATES.blank
+  const templateData = normalizeTemplateLayout(
+    templateFactory(String(title || DEFAULT_FLOWCHART_TITLE)),
+    { mode: 'preview' }
   )
   return normalizeFlowchartData({
     ...templateData,
@@ -2178,8 +3422,12 @@ export const buildFlowchartSvgMarkup = (
   } = {}
 ) => {
   const normalizedData = normalizeFlowchartData(flowchartData || {})
-  const theme = resolveFlowchartThemeFromConfig(
+  const normalizedConfig = normalizeFlowchartConfig(
     flowchartConfig,
+    normalizedData.templateId
+  )
+  const theme = resolveFlowchartThemeFromConfig(
+    normalizedConfig,
     normalizedData.templateId,
     { isDark }
   )
@@ -2197,27 +3445,68 @@ export const buildFlowchartSvgMarkup = (
         markerId: `flowchart-arrow-${createSvgSafeId(edge.id)}`,
         layout: getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
           theme,
-          strictAlignment: !!flowchartConfig?.strictAlignment
+          strictAlignment: !!normalizedConfig.strictAlignment
         })
       }
     })
     .filter(Boolean)
   const markerDefs = edgeItems
     .map(({ markerId, layout }) => {
-      return `<marker id="${markerId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${escapeXml(layout.style.stroke)}"/></marker>`
+      if (!layout.style.arrowCount) {
+        return ''
+      }
+      const arrowSize = normalizeFlowchartEdgeArrowSize(layout.style.arrowSize)
+      const markerWidth = Math.round(6 * arrowSize * 100) / 100
+      const markerHeight = Math.round(6 * arrowSize * 100) / 100
+      const refX = Math.round(7.6 * arrowSize * 100) / 100
+      return `<marker id="${markerId}" viewBox="0 0 8 8" refX="${refX}" refY="4" markerWidth="${markerWidth}" markerHeight="${markerHeight}" orient="auto-start-reverse"><path d="M 0 0 L 8 4 L 0 8 z" fill="${escapeXml(layout.style.stroke)}"/></marker>`
     })
     .join('')
+  const backgroundStyle = normalizeFlowchartBackgroundStyle(
+    normalizedConfig.backgroundStyle
+  )
+  const backgroundPatternId = `flowchart-bg-${createSvgSafeId(
+    `${normalizedData.title || 'document'}-${backgroundStyle}`
+  )}`
+  const backgroundPatternDefs =
+    backgroundStyle === 'dots'
+      ? `<pattern id="${backgroundPatternId}" width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill="${escapeXml(
+          theme.canvasBg
+        )}"/><circle cx="2" cy="2" r="1.4" fill="${escapeXml(
+          theme.gridColor
+        )}"/></pattern>`
+      : backgroundStyle === 'grid'
+      ? `<pattern id="${backgroundPatternId}" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="${escapeXml(
+          theme.canvasBg
+        )}"/><path d="M 24 0 L 0 0 0 24" fill="none" stroke="${escapeXml(
+          theme.gridColor
+        )}" stroke-width="1"/></pattern>`
+      : ''
   const edges = edgeItems
     .map(({ edge, markerId, layout }) => {
       const dash = layout.style.dashed ? ' stroke-dasharray="8 6"' : ''
+      const markerEnd = layout.style.arrowCount ? ` marker-end="url(#${markerId})"` : ''
       const label = edge.label
         ? `<text x="${layout.labelX}" y="${layout.labelY}" font-size="12" font-weight="700" fill="${escapeXml(layout.style.labelColor)}" stroke="${escapeXml(theme.canvasBg)}" stroke-width="4" paint-order="stroke" stroke-linejoin="round" text-anchor="middle" dominant-baseline="middle">${escapeXml(edge.label)}</text>`
         : ''
-      return `<g><path d="${layout.path}" fill="none" stroke="${escapeXml(layout.style.stroke)}" stroke-width="2"${dash} marker-end="url(#${markerId})"/>${label}</g>`
+      const extraArrows = (layout.arrowMarkers || [])
+        .slice(0, -1)
+        .map(marker => {
+          return `<path class="flowchart-arrow-head" d="${getFlowchartArrowHeadPath(
+            marker
+          )}" transform="translate(${marker.x} ${marker.y}) rotate(${marker.angle})" fill="${escapeXml(layout.style.stroke)}"/>`
+        })
+        .join('')
+      return `<g><path d="${layout.path}" fill="none" stroke="${escapeXml(layout.style.stroke)}" stroke-width="2"${dash}${markerEnd}/>${extraArrows}${label}</g>`
     })
     .join('')
   const lanes = normalizedData.lanes
-    .map(lane => buildSvgLaneMarkup(lane, { theme }))
+    .map(lane =>
+      buildSvgLaneMarkup(lane, {
+        theme,
+        flowchartConfig: normalizedConfig
+      })
+    )
     .join('')
   const nodes = normalizedData.nodes
     .map(node => {
@@ -2238,9 +3527,13 @@ export const buildFlowchartSvgMarkup = (
   const background = transparent
     ? ''
     : `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="${
-        theme.canvasBg
+        backgroundStyle === 'grid'
+          ? `url(#${backgroundPatternId})`
+          : backgroundStyle === 'dots'
+            ? `url(#${backgroundPatternId})`
+          : theme.canvasBg
       }"/>`
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}"><defs>${markerDefs}</defs>${background}${lanes}${edges}${nodes}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}"><defs>${backgroundPatternDefs}${markerDefs}</defs>${background}${lanes}${edges}${nodes}</svg>`
 }
 
 export const getFlowchartTemplateIds = () => Object.keys(FLOWCHART_TEMPLATES)

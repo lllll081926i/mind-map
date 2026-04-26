@@ -5,6 +5,7 @@ import platform, {
 } from '@/platform'
 import {
   createDesktopFsError,
+  flushDocumentSessionSync,
   getCurrentFileRef,
   getLastDirectory,
   markDocumentDirty,
@@ -30,21 +31,63 @@ import {
 } from './flowchartEditorShared'
 
 export const flowchartDocumentMethods = {
+  queueInteractiveFlowchartPersist(options = {}) {
+    const nextOptions = {
+      dirty: true,
+      autoSave: true,
+      recordHistory: true,
+      delay: 160,
+      ...options
+    }
+    this.interactivePersistOptions = nextOptions
+    if (this.interactivePersistTimer) {
+      clearTimeout(this.interactivePersistTimer)
+    }
+    this.interactivePersistTimer = window.setTimeout(() => {
+      const pendingOptions = this.interactivePersistOptions
+      this.interactivePersistTimer = 0
+      this.interactivePersistOptions = null
+      if (!pendingOptions) {
+        return
+      }
+      const { delay: _delay, ...persistOptions } = pendingOptions
+      void this.persistFlowchartState(persistOptions)
+    }, nextOptions.delay)
+  },
+
+  async flushInteractiveFlowchartPersist() {
+    if (!this.interactivePersistTimer || !this.interactivePersistOptions) {
+      return
+    }
+    clearTimeout(this.interactivePersistTimer)
+    this.interactivePersistTimer = 0
+    const pendingOptions = this.interactivePersistOptions
+    this.interactivePersistOptions = null
+    const { delay: _delay, ...persistOptions } = pendingOptions
+    await this.persistFlowchartState(persistOptions)
+  },
+
   async persistFlowchartState({
     dirty = true,
     autoSave = true,
     recordHistory = true
   } = {}) {
+    if (this.interactivePersistTimer) {
+      clearTimeout(this.interactivePersistTimer)
+      this.interactivePersistTimer = 0
+    }
+    this.interactivePersistOptions = null
     this.syncEdgeToolbarState()
     if (recordHistory) {
       this.commitFlowchartHistorySnapshot()
     }
-    this.ensureFlowchartDocumentSession()
+    await this.ensureFlowchartDocumentSession()
     await saveBootstrapStatePatch({
       flowchartData: cloneJson(this.flowchartData),
       flowchartConfig: cloneJson(this.flowchartConfig)
     })
     markDocumentDirty(dirty)
+    await flushDocumentSessionSync()
     if (dirty && this.currentDocument?.path) {
       this.queueRecoveryDraftWrite()
     }
@@ -53,7 +96,7 @@ export const flowchartDocumentMethods = {
     }
   },
 
-  ensureFlowchartDocumentSession() {
+  async ensureFlowchartDocumentSession() {
     const path = String(this.currentDocument?.path || '').trim()
     if (!path) {
       return
@@ -68,6 +111,7 @@ export const flowchartDocumentMethods = {
     const currentPath = String(currentFileRef?.path || '').trim()
     if (!currentPath || currentPath !== path) {
       setCurrentFileRef(nextFileRef, this.currentDocument.source || 'desktop')
+      await flushDocumentSessionSync()
       return
     }
     if (
@@ -78,6 +122,7 @@ export const flowchartDocumentMethods = {
         documentMode: 'flowchart',
         isFullDataFile: true
       })
+      await flushDocumentSessionSync()
     }
   },
 
@@ -152,7 +197,27 @@ export const flowchartDocumentMethods = {
     return message
   },
 
+  resetTransientFlowchartInteractionState() {
+    this.cancelConnectorDrag()
+    this.cancelEdgeReconnect()
+    this.cancelEdgeBendDrag()
+    this.cancelEdgeLabelDrag()
+    this.dragState = null
+    this.pendingDragPoint = null
+    this.edgeDirectionLockMap = null
+    this.removeDragListeners()
+    this.canvasPanState = null
+    this.pendingCanvasPanPoint = null
+    this.removeCanvasPanListeners()
+    this.selectionState = null
+    this.removeAreaSelectionListeners()
+    this.resizeState = null
+    this.removeNodeResizeListeners()
+    this.clearAlignmentGuides()
+  },
+
   applyTemplate(templateId = 'blank') {
+    this.resetTransientFlowchartInteractionState()
     this.flowchartData = createDefaultFlowchartData(
       this.flowchartData.title || this.$t('flowchart.fileNameFallback'),
       templateId
@@ -171,6 +236,7 @@ export const flowchartDocumentMethods = {
   },
 
   async openExportCenter() {
+    await this.flushInteractiveFlowchartPersist()
     await this.persistFlowchartState({
       dirty: !!this.currentDocument?.dirty,
       autoSave: false,
@@ -222,16 +288,23 @@ export const flowchartDocumentMethods = {
 
   applyGeneratedFlowchart(result) {
     const normalized = normalizeFlowchartAiResult(result)
+    this.resetTransientFlowchartInteractionState()
     this.flowchartData = cloneJson(normalized.flowchartData)
     const nextFlowchartConfig = {
       snapToGrid: false,
       gridSize: 24,
       themeId: this.flowchartConfig?.themeId || 'blueprint',
       strictAlignment: false,
+      backgroundStyle: this.flowchartConfig?.backgroundStyle || 'grid',
       ...cloneJson(normalized.flowchartConfig || {})
     }
     nextFlowchartConfig.snapToGrid = false
     nextFlowchartConfig.themeId = this.flowchartConfig?.themeId || 'blueprint'
+    nextFlowchartConfig.backgroundStyle = ['grid', 'dots'].includes(
+      nextFlowchartConfig.backgroundStyle
+    )
+      ? nextFlowchartConfig.backgroundStyle
+      : 'none'
     this.flowchartConfig = nextFlowchartConfig
     this.selectedNodeIds = []
     this.selectedEdgeId = ''
@@ -248,6 +321,7 @@ export const flowchartDocumentMethods = {
 
   async saveCurrentFile({ silent = false } = {}) {
     try {
+      await this.flushInteractiveFlowchartPersist()
       if (this.persistTimer) {
         clearTimeout(this.persistTimer)
         this.persistTimer = 0
@@ -314,6 +388,7 @@ export const flowchartDocumentMethods = {
         }
       : null
     try {
+      await this.flushInteractiveFlowchartPersist()
       const { createWorkspaceFlowchartFile } = await import('@/services/workspaceActions')
       await createWorkspaceFlowchartFile({
         router: this.$router,
@@ -361,6 +436,7 @@ export const flowchartDocumentMethods = {
   },
 
   async goHome() {
+    await this.flushInteractiveFlowchartPersist()
     if (!(await this.confirmPotentialFlowchartLeave())) {
       return
     }

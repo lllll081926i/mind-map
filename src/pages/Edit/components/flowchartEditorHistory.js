@@ -50,23 +50,29 @@ export const flowchartHistoryMethods = {
   restoreFlowchartHistorySnapshot(snapshot) {
     if (!snapshot) return
     this.flowchartHistory.restoring = true
+    this.resetTransientFlowchartInteractionState()
     this.flowchartData = cloneJson(
       snapshot.flowchartData || createDefaultFlowchartData()
     )
     const nextFlowchartConfig = {
       snapToGrid: false,
       gridSize: 24,
+      themeId: 'blueprint',
       strictAlignment: false,
+      backgroundStyle: 'grid',
       ...cloneJson(snapshot.flowchartConfig || {})
     }
     nextFlowchartConfig.snapToGrid = false
+    nextFlowchartConfig.backgroundStyle = ['grid', 'dots'].includes(
+      nextFlowchartConfig.backgroundStyle
+    )
+      ? nextFlowchartConfig.backgroundStyle
+      : 'none'
     this.flowchartConfig = nextFlowchartConfig
     this.selectedNodeIds = []
     this.selectedEdgeId = ''
-    this.clearAlignmentGuides()
     this.edgeToolbarState = null
     this.inlineTextEditorState = null
-    this.cancelConnectorDrag()
     this.flowchartHistory.baseline = this.createFlowchartHistorySnapshot()
     this.flowchartHistory.restoring = false
   },

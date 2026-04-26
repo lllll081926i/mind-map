@@ -97,7 +97,7 @@ export const flowchartNodeMethods = {
     const target = event?.target
     if (
       target?.closest?.(
-        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .canvasEmptyActions'
+        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .canvasEmptyActions'
       )
     ) {
       return
@@ -985,7 +985,11 @@ export const flowchartNodeMethods = {
   startNodeDrag(event, node) {
     this.cancelConnectorDrag()
     this.cancelEdgeReconnect()
-    this.inlineTextEditorState = null
+    this.cancelEdgeLabelDrag()
+    if (this.inlineTextEditorState) {
+      void this.commitInlineTextEditor()
+    }
+    event.preventDefault?.()
     const isAppendSelectionDrag = !!(event.shiftKey || event.ctrlKey || event.metaKey)
     if (isAppendSelectionDrag && !this.selectedNodeIds.includes(node.id)) {
       return
@@ -996,6 +1000,17 @@ export const flowchartNodeMethods = {
     this.selectedNodeIds = selectedIds
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
+    const selectedSet = new Set(selectedIds)
+    this.edgeDirectionLockMap = this.edgesWithLayout.reduce((result, edgeLayout) => {
+      if (!selectedSet.has(edgeLayout.source) && !selectedSet.has(edgeLayout.target)) {
+        return result
+      }
+      result[edgeLayout.id] = {
+        sourceDirection: edgeLayout.sourceDirection,
+        targetDirection: edgeLayout.targetDirection
+      }
+      return result
+    }, {})
     this.dragState = {
       primaryId: node.id,
       startX: event.clientX,
@@ -1085,9 +1100,13 @@ export const flowchartNodeMethods = {
     const shouldPersist = this.dragState.moved
     this.dragState = null
     this.pendingDragPoint = null
+    this.edgeDirectionLockMap = null
     this.clearAlignmentGuides()
     this.removeDragListeners()
     this.syncEdgeToolbarState()
+    if (shouldPersist) {
+      this.suppressPointerClick()
+    }
     if (shouldPersist) {
       void this.persistFlowchartState()
     }

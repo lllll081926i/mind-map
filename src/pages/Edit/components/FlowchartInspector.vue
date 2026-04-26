@@ -105,6 +105,16 @@
         </div>
         <div class="flowchartPanelSection">
           <div class="flowchartPanelSectionTitle">{{ labels.settingsPanelTitle }}</div>
+          <label class="fieldLabel">{{ labels.backgroundStyle }}</label>
+          <select
+            class="fieldSelect"
+            :value="backgroundStyle"
+            @change="$emit('update-flowchart-config', { backgroundStyle: $event.target.value })"
+          >
+            <option value="none">{{ labels.backgroundStyleNone }}</option>
+            <option value="dots">{{ labels.backgroundStyleDots }}</option>
+            <option value="grid">{{ labels.backgroundStyleGrid }}</option>
+          </select>
           <label class="fieldLabel flowchartToggleRow">
             <span>{{ labels.strictAlignment }}</span>
             <input
@@ -131,20 +141,6 @@
               :style="getTemplatePreviewStyle(templateItem)"
             >
               <svg :viewBox="getTemplatePreviewViewBox(templateItem.preview)">
-                <g
-                  v-for="lane in templateItem.preview.lanes"
-                  :key="lane.id"
-                  class="flowchartTemplateLane"
-                >
-                  <rect
-                    :x="lane.x"
-                    :y="lane.y"
-                    :width="lane.width"
-                    :height="lane.height"
-                    rx="20"
-                    :style="getTemplateLaneStyle(templateItem, lane)"
-                  ></rect>
-                </g>
                 <path
                   v-for="edge in templateItem.preview.edges"
                   :key="edge.id"
@@ -259,24 +255,33 @@
           :value="selectedEdge.label"
           @input="$emit('update-selected-edge-label', $event.target.value)"
         />
-        <label class="fieldLabel">{{ labels.edgePreset }}</label>
-        <div class="flowchartStylePresetGrid">
-          <button
-            v-for="preset in edgeStylePresets"
-            :key="preset.id"
-            type="button"
-            class="flowchartStylePreset"
-            @click="$emit('apply-selected-edge-preset', preset)"
-          >
-            <span
-              class="flowchartEdgePresetSwatch"
-              :style="{
-                borderColor: preset.stroke,
-                borderStyle: preset.dashed ? 'dashed' : 'solid'
-              }"
-            ></span>
-          </button>
+        <label class="fieldLabel">{{ labels.edgeLabelPosition }}</label>
+        <div class="fieldMetaRow">
+          <input
+            class="fieldRange"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="Math.round(selectedEdgeLabelPosition.ratio * 100)"
+            @input="$emit('update-selected-edge-label-position', { ratio: Number($event.target.value) / 100 })"
+          />
+          <span class="fieldHint">{{ formatLabelRatioLabel(selectedEdgeLabelPosition.ratio) }}</span>
         </div>
+        <label class="fieldLabel">{{ labels.edgeLabelOffsetX }}</label>
+        <input
+          class="fieldInput isSingleLine"
+          type="number"
+          :value="selectedEdgeLabelPosition.offsetX"
+          @input="$emit('update-selected-edge-label-position', { offsetX: Number($event.target.value) || 0 })"
+        />
+        <label class="fieldLabel">{{ labels.edgeLabelOffsetY }}</label>
+        <input
+          class="fieldInput isSingleLine"
+          type="number"
+          :value="selectedEdgeLabelPosition.offsetY"
+          @input="$emit('update-selected-edge-label-position', { offsetY: Number($event.target.value) || 0 })"
+        />
         <label class="fieldLabel">{{ labels.edgeColor }}</label>
         <input
           class="fieldColorInput"
@@ -287,7 +292,7 @@
         <label class="fieldLabel">{{ labels.edgeType }}</label>
         <select
           class="fieldSelect"
-          :value="selectedEdge.style?.pathType || 'orthogonal'"
+          :value="selectedEdgeVisualStyle.pathType"
           @change="$emit('update-selected-edge-style', { pathType: $event.target.value })"
         >
           <option
@@ -298,14 +303,49 @@
             {{ item.label }}
           </option>
         </select>
-        <label class="fieldLabel flowchartToggleRow">
-          <span>{{ labels.edgeDashed }}</span>
+        <label class="fieldLabel">{{ labels.edgeLineStyle }}</label>
+        <select
+          class="fieldSelect"
+          :value="selectedEdgeVisualStyle.dashed ? 'dashed' : 'solid'"
+          @change="$emit('update-selected-edge-style', { dashed: $event.target.value === 'dashed' })"
+        >
+          <option value="solid">{{ labels.edgeLineStyleSolid }}</option>
+          <option value="dashed">{{ labels.edgeLineStyleDashed }}</option>
+        </select>
+        <label class="fieldLabel">{{ labels.edgeArrowSize }}</label>
+        <div class="fieldMetaRow">
           <input
-            type="checkbox"
-            :checked="!!selectedEdge.style?.dashed"
-            @change="$emit('update-selected-edge-style', { dashed: $event.target.checked })"
+            class="fieldRange"
+            type="range"
+            min="0.6"
+            max="1.6"
+            step="0.1"
+            :value="selectedEdgeVisualStyle.arrowSize"
+            @input="$emit('update-selected-edge-style', { arrowSize: Number($event.target.value) })"
           />
-        </label>
+          <span class="fieldHint">{{ formatArrowSizeLabel(selectedEdgeVisualStyle.arrowSize) }}</span>
+        </div>
+        <label class="fieldLabel">{{ labels.edgeArrowCount }}</label>
+        <select
+          class="fieldSelect"
+          :value="selectedEdgeVisualStyle.arrowCount"
+          @change="$emit('update-selected-edge-style', { arrowCount: Number($event.target.value) })"
+        >
+          <option
+            v-for="item in edgeArrowCountOptions"
+            :key="item.value"
+            :value="item.value"
+          >
+            {{ item.label }}
+          </option>
+        </select>
+        <button
+          type="button"
+          class="flowchartPanelBtn isBlock"
+          @click="$emit('reset-selected-edge-label-position')"
+        >
+          {{ labels.resetEdgeLabelPosition }}
+        </button>
         <button
           type="button"
           class="flowchartPanelBtn isBlock"
@@ -313,16 +353,29 @@
         >
           {{ labels.resetEdgeStyle }}
         </button>
+        <button
+          type="button"
+          class="flowchartPanelBtn isBlock"
+          @click="$emit('insert-node-on-edge', selectedEdge.id)"
+        >
+          {{ labels.edgeInsertNode }}
+        </button>
+        <button
+          type="button"
+          class="flowchartPanelBtn isBlock isDanger"
+          @click="$emit('remove-edge', selectedEdge.id)"
+        >
+          {{ labels.edgeDeleteLine }}
+        </button>
       </template>
-      <div v-else class="emptyInspector">
-        {{ labels.inspectorEmpty }}
-      </div>
     </aside>
 </template>
 
 <script>
 import {
-  getFlowchartEdgeLayout
+  getFlowchartEdgeLayout,
+  getFlowchartEdgeVisualStyle,
+  normalizeFlowchartEdgeLabelPosition
 } from '@/services/flowchartDocument'
 
 export default {
@@ -335,14 +388,17 @@ export default {
     'update-selected-node-type',
     'update-selected-node-text',
     'update-selected-edge-label',
+    'update-selected-edge-label-position',
     'apply-selected-node-preset',
-    'apply-selected-edge-preset',
     'update-flowchart-theme',
     'update-flowchart-config',
     'update-selected-node-style',
     'update-selected-edge-style',
     'reset-selected-node-style',
-    'reset-selected-edge-style'
+    'reset-selected-edge-style',
+    'reset-selected-edge-label-position',
+    'insert-node-on-edge',
+    'remove-edge'
   ],
   props: {
     isOpen: {
@@ -373,6 +429,10 @@ export default {
       type: Boolean,
       default: false
     },
+    backgroundStyle: {
+      type: String,
+      default: 'grid'
+    },
     selectedNode: {
       type: Object,
       default: null
@@ -389,13 +449,38 @@ export default {
       type: Array,
       default: () => []
     },
-    edgeStylePresets: {
-      type: Array,
-      default: () => []
-    },
     edgePathTypes: {
       type: Array,
       default: () => []
+    }
+  },
+  computed: {
+    selectedEdgeVisualStyle() {
+      if (!this.selectedEdge) {
+        return {
+          pathType: 'orthogonal',
+          arrowSize: 1,
+          arrowCount: 1
+        }
+      }
+      return getFlowchartEdgeVisualStyle(this.selectedEdge, {
+        strictAlignment: this.strictAlignment
+      })
+    },
+    edgeArrowCountOptions() {
+      return [0, 1, 2, 3, 4].map(value => ({
+        value,
+        label: value === 0 ? this.labels.edgeArrowCountNone : `${value}`
+      }))
+    },
+    selectedEdgeLabelPosition() {
+      return (
+        normalizeFlowchartEdgeLabelPosition(this.selectedEdge?.labelPosition) || {
+          ratio: 0.5,
+          offsetX: 0,
+          offsetY: 0
+        }
+      )
     }
   },
   methods: {
@@ -423,8 +508,7 @@ export default {
     },
     getTemplatePreviewViewBox(preview) {
       const nodes = Array.isArray(preview?.nodes) ? preview.nodes : []
-      const lanes = Array.isArray(preview?.lanes) ? preview.lanes : []
-      const items = [...lanes, ...nodes]
+      const items = [...nodes]
       if (!items.length) {
         return '0 0 320 200'
       }
@@ -472,15 +556,6 @@ export default {
         strokeDasharray: edge?.style?.dashed ? '18 12' : null
       }
     },
-    getTemplateLaneStyle(_templateItem, _lane) {
-      return {
-        fill: '#111111',
-        fillOpacity: 0.04,
-        stroke: '#111111',
-        strokeOpacity: 0.18,
-        strokeDasharray: '24 16'
-      }
-    },
     getDecisionPolygon(node) {
       const x = Number(node.x || 0)
       const y = Number(node.y || 0)
@@ -505,6 +580,12 @@ export default {
         `${x + width - offset},${y + height}`,
         `${x},${y + height}`
       ].join(' ')
+    },
+    formatArrowSizeLabel(value) {
+      return `${Math.round(Number(value || 1) * 100)}%`
+    },
+    formatLabelRatioLabel(value) {
+      return `${Math.round(Number(value || 0.5) * 100)}%`
     }
   }
 }

@@ -2,6 +2,7 @@ import {
   DEFAULT_VIEWPORT,
   MAX_VIEWPORT_ZOOM,
   MIN_VIEWPORT_ZOOM,
+  FLOWCHART_SELECTION_BOX_MIN_SIZE,
   clampNumber
 } from './flowchartEditorShared'
 
@@ -210,7 +211,7 @@ export const flowchartViewportMethods = {
     const target = event.target
     if (
       target?.closest?.(
-        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartEdgeToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .flowchartEdgeReconnectHandle'
+        '.flowchartNode, .edgePath, .edgeLabel, .flowchartViewportToolbar, .flowchartInlineEditor, .flowchartConnectorHandle, .flowchartEdgeReconnectHandle'
       )
     ) {
       return
@@ -226,6 +227,11 @@ export const flowchartViewportMethods = {
     if (event.button !== 0) {
       return
     }
+    this.cancelEdgeLabelDrag()
+    if (this.inlineTextEditorState) {
+      void this.commitInlineTextEditor()
+    }
+    event.preventDefault?.()
     const viewport = this.getViewport()
     this.canvasPanState = {
       startX: event.clientX,
@@ -292,9 +298,9 @@ export const flowchartViewportMethods = {
     this.removeCanvasPanListeners()
     if (shouldClearSelection) {
       this.clearSelection()
-      this.inlineTextEditorState = null
     }
     if (shouldPersist) {
+      this.suppressPointerClick()
       this.persistViewport()
     }
   },
@@ -313,13 +319,19 @@ export const flowchartViewportMethods = {
     if (event.button !== 0) {
       return
     }
-    this.inlineTextEditorState = null
+    event.preventDefault?.()
+    this.cancelEdgeLabelDrag()
+    if (this.inlineTextEditorState) {
+      void this.commitInlineTextEditor()
+    }
     const start = this.getWorldPointFromEvent(event)
     this.selectionState = {
       startX: start.x,
       startY: start.y,
       currentX: start.x,
-      currentY: start.y
+      currentY: start.y,
+      appendSelection: !!(event.shiftKey || event.ctrlKey || event.metaKey),
+      initialSelectedNodeIds: [...this.selectedNodeIds]
     }
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
@@ -340,7 +352,20 @@ export const flowchartViewportMethods = {
 
   stopAreaSelection() {
     if (!this.selectionState) return
-    this.selectedNodeIds = this.findNodesInSelectionBox()
+    const bounds = this.getSelectionBounds()
+    const nextSelectedNodeIds = this.findNodesInSelectionBox()
+    if (
+      bounds &&
+      bounds.width < FLOWCHART_SELECTION_BOX_MIN_SIZE &&
+      bounds.height < FLOWCHART_SELECTION_BOX_MIN_SIZE
+    ) {
+      this.selectedNodeIds = this.selectionState.appendSelection
+        ? [...this.selectionState.initialSelectedNodeIds]
+        : this.selectedNodeIds
+    } else {
+      this.selectedNodeIds = nextSelectedNodeIds
+      this.suppressPointerClick()
+    }
     this.selectionState = null
     this.removeAreaSelectionListeners()
   },
@@ -380,7 +405,7 @@ export const flowchartViewportMethods = {
   findNodesInSelectionBox() {
     const bounds = this.getSelectionBounds()
     if (!bounds) return []
-    return this.flowchartData.nodes
+    const hitNodeIds = this.flowchartData.nodes
       .filter(node => {
         const left = Number(node.x || 0)
         const top = Number(node.y || 0)
@@ -394,5 +419,11 @@ export const flowchartViewportMethods = {
         )
       })
       .map(node => node.id)
+    if (!this.selectionState?.appendSelection) {
+      return hitNodeIds
+    }
+    return Array.from(
+      new Set([...(this.selectionState.initialSelectedNodeIds || []), ...hitNodeIds])
+    )
   }
 }

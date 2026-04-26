@@ -11,34 +11,50 @@
           v-for="edge in edgesWithLayout"
           :id="getEdgeMarkerId(edge.id)"
           :key="`marker-${edge.id}`"
-          viewBox="0 0 10 10"
-          refX="9"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
+          viewBox="0 0 8 8"
+          :refX="getEdgeMarkerRefX(edge)"
+          refY="4"
+          :markerWidth="getEdgeMarkerSize(edge)"
+          :markerHeight="getEdgeMarkerSize(edge)"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" :fill="getEdgeStroke(edge)"></path>
+          <path d="M 0 0 L 8 4 L 0 8 z" :fill="getEdgeStroke(edge)"></path>
         </marker>
       </defs>
       <g v-for="edge in edgesWithLayout" :key="edge.id">
+        <path
+          class="edgeHitArea"
+          :d="edge.path"
+          @click.stop="$emit('select-edge', edge.id)"
+          @dblclick.stop="$emit('edit-edge-label', edge.id)"
+        />
         <path
           class="edgePath"
           :class="{ isSelected: selectedEdgeId === edge.id }"
           :d="edge.path"
           :stroke="getEdgeStroke(edge)"
           :stroke-dasharray="edge.style.dashed ? '8 6' : null"
-          :marker-end="`url(#${getEdgeMarkerId(edge.id)})`"
-          @click.stop="$emit('select-edge', edge.id)"
-          @dblclick.stop="$emit('edit-edge-label', edge.id)"
+          :marker-end="edge.style.arrowCount ? `url(#${getEdgeMarkerId(edge.id)})` : null"
+          pointer-events="none"
+        />
+        <path
+          v-for="(marker, markerIndex) in getInlineArrowMarkers(edge)"
+          :key="`arrow-${edge.id}-${markerIndex}`"
+          class="flowchartArrowHead"
+          :d="getArrowPath(marker)"
+          :transform="`translate(${marker.x} ${marker.y}) rotate(${marker.angle})`"
+          :fill="getEdgeStroke(edge)"
+          pointer-events="none"
         />
         <text
           v-if="edge.label"
           class="edgeLabel"
+          :class="{ isSelected: selectedEdgeId === edge.id }"
           :x="edge.labelX"
           :y="edge.labelY"
           :fill="edge.style.labelColor"
           dominant-baseline="middle"
+          @mousedown.stop="$emit('start-edge-label-drag', $event, edge.id)"
           @click.stop="$emit('select-edge', edge.id)"
           @dblclick.stop="$emit('edit-edge-label', edge.id)"
         >
@@ -46,18 +62,49 @@
         </text>
         <template v-if="selectedEdgeId === edge.id">
           <circle
+            v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
+            :key="`bend-hit-${edge.id}-${bendIndex}`"
+            class="flowchartEdgeHandleHitArea"
+            :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
+            :cx="bendHandle.x"
+            :cy="bendHandle.y"
+            r="15"
+            @mousedown.stop.prevent="$emit('start-edge-bend-drag', $event, edge.id, bendIndex)"
+          ></circle>
+          <circle
+            v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
+            :key="`bend-${edge.id}-${bendIndex}`"
+            class="flowchartEdgeBendHandle"
+            :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
+            :cx="bendHandle.x"
+            :cy="bendHandle.y"
+            r="6.5"
+          ></circle>
+          <circle
+            class="flowchartEdgeHandleHitArea"
+            :cx="edge.sourcePoint.x"
+            :cy="edge.sourcePoint.y"
+            r="16"
+            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'source')"
+          ></circle>
+          <circle
+            class="flowchartEdgeHandleHitArea"
+            :cx="edge.targetPoint.x"
+            :cy="edge.targetPoint.y"
+            r="16"
+            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'target')"
+          ></circle>
+          <circle
             class="flowchartEdgeReconnectHandle"
             :cx="edge.sourcePoint.x"
             :cy="edge.sourcePoint.y"
-            r="6"
-            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'source')"
+            r="7.5"
           ></circle>
           <circle
             class="flowchartEdgeReconnectHandle"
             :cx="edge.targetPoint.x"
             :cy="edge.targetPoint.y"
-            r="6"
-            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'target')"
+            r="7.5"
           ></circle>
         </template>
       </g>
@@ -77,68 +124,19 @@
       />
     </svg>
 
-    <div
-      v-if="edgeToolbarState"
-      class="flowchartEdgeToolbar"
-      :class="edgeToolbarState.placement ? `is-${edgeToolbarState.placement}` : ''"
-      :style="edgeToolbarState.style"
-    >
-      <button
-        type="button"
-        class="flowchartEdgeToolbarBtn"
-        :aria-label="labels.edgeEditText"
-        :title="labels.edgeEditText"
-        @click.stop="$emit('edit-edge-label', edgeToolbarState.edgeId)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 20h4l9.5-9.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path>
-          <path d="M13.5 6.5l4 4"></path>
-        </svg>
-        <span class="flowchartEdgeToolbarText">{{ labels.edgeEditText }}</span>
-      </button>
-      <button
-        type="button"
-        class="flowchartEdgeToolbarBtn"
-        :aria-label="labels.edgeInsertNode"
-        :title="labels.edgeInsertNode"
-        @click.stop="$emit('insert-node-on-edge', edgeToolbarState.edgeId)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 5v14"></path>
-          <path d="M5 12h14"></path>
-          <path d="M4 18h16"></path>
-        </svg>
-        <span class="flowchartEdgeToolbarText">{{ labels.edgeInsertNode }}</span>
-      </button>
-      <button
-        type="button"
-        class="flowchartEdgeToolbarBtn isDanger"
-        :aria-label="labels.edgeDeleteLine"
-        :title="labels.edgeDeleteLine"
-        @click.stop="$emit('remove-edge', edgeToolbarState.edgeId)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 7h14"></path>
-          <path d="M9 7V5h6v2"></path>
-          <path d="M8 10v8"></path>
-          <path d="M12 10v8"></path>
-          <path d="M16 10v8"></path>
-          <path d="M7 7l1 12h8l1-12"></path>
-        </svg>
-        <span class="flowchartEdgeToolbarText">{{ labels.edgeDeleteLine }}</span>
-      </button>
-    </div>
 </template>
 
 <script>
+import { getFlowchartArrowHeadPath } from '@/services/flowchartDocument'
+
 export default {
   name: 'FlowchartEdgeLayer',
   emits: [
     'select-edge',
     'edit-edge-label',
-    'insert-node-on-edge',
-    'remove-edge',
-    'start-edge-reconnect'
+    'start-edge-label-drag',
+    'start-edge-reconnect',
+    'start-edge-bend-drag'
   ],
   props: {
     edgesWithLayout: {
@@ -161,10 +159,6 @@ export default {
       type: Object,
       default: null
     },
-    edgeToolbarState: {
-      type: Object,
-      default: null
-    },
     labels: {
       type: Object,
       required: true
@@ -174,8 +168,27 @@ export default {
     getEdgeMarkerId(edgeId) {
       return `flowchart-editor-arrow-${String(edgeId || '').replace(/[^a-zA-Z0-9_-]/g, '-')}`
     },
+    getEdgeMarkerSize(edge) {
+      return Math.round(6 * Number(edge?.style?.arrowSize || 1) * 100) / 100
+    },
+    getEdgeMarkerRefX(edge) {
+      return Math.round(7.6 * Number(edge?.style?.arrowSize || 1) * 100) / 100
+    },
     getEdgeStroke(edge) {
       return this.selectedEdgeId === edge.id ? 'var(--flowchart-selection)' : edge.style.stroke
+    },
+    getArrowPath(marker) {
+      return getFlowchartArrowHeadPath(marker)
+    },
+    getInlineArrowMarkers(edge) {
+      const markers = Array.isArray(edge?.arrowMarkers) ? edge.arrowMarkers : []
+      if (markers.length <= 1) {
+        return []
+      }
+      return markers.slice(0, -1)
+    },
+    getBendHandles(edge) {
+      return Array.isArray(edge?.bendHandles) ? edge.bendHandles : []
     }
   }
 }

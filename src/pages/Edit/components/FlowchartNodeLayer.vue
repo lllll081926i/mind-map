@@ -45,6 +45,20 @@
         @mousedown.stop.prevent="$emit('start-connector-drag', $event, node.id, direction)"
       ></button>
     </template>
+    <template v-else-if="connectorTargetNodeId === node.id">
+      <span
+        v-for="direction in connectorDirections"
+        :key="`preview-${direction}`"
+        class="flowchartConnectorHandle isPreview"
+        :class="[
+          `is-${direction}`,
+          {
+            isActive: isPreviewDirectionActive(direction)
+          }
+        ]"
+        :style="getConnectorHandleStyle(node, direction)"
+      ></span>
+    </template>
     <template v-if="showResizeHandlesForNode(node.id)">
       <button
         v-for="direction in resizeDirections"
@@ -99,6 +113,10 @@ export default {
     connectorTargetNodeId: {
       type: String,
       default: ''
+    },
+    connectorTargetDirection: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -116,6 +134,9 @@ export default {
     },
     getInputPolygonPoints() {
       return '13,1 99,1 87,99 1,99'
+    },
+    isPreviewDirectionActive(direction) {
+      return this.connectorTargetDirection === direction
     }
   }
 }

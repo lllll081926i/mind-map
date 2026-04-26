@@ -3,7 +3,11 @@
     <div
       ref="canvasRef"
       class="flowchartCanvasViewport"
-      :class="{ isPanning }"
+      :class="{
+        isPanning,
+        hasDotsBackground: backgroundStyle === 'dots',
+        hasGridBackground: backgroundStyle === 'grid'
+      }"
       @mousedown="$emit('canvas-pointer-down', $event)"
       @dblclick="$emit('canvas-double-click', $event)"
       @wheel.prevent="$emit('canvas-wheel', $event)"
@@ -62,6 +66,10 @@ export default {
     isPanning: {
       type: Boolean,
       default: false
+    },
+    backgroundStyle: {
+      type: String,
+      default: 'grid'
     },
     canvasWorldStyle: {
       type: Object,

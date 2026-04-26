@@ -1,22 +1,27 @@
-const getEdgeLabelToolbarPlacement = edge => {
-  const deltaX = Math.abs(Number(edge?.targetPoint?.x || 0) - Number(edge?.sourcePoint?.x || 0))
-  const deltaY = Math.abs(Number(edge?.targetPoint?.y || 0) - Number(edge?.sourcePoint?.y || 0))
-  const isHorizontal = deltaX >= deltaY
-  if (isHorizontal) {
-    return Number(edge?.labelY || 0) < 72 ? 'bottom' : 'top'
-  }
-  return edge?.labelPlacement === 'left' ? 'left' : 'right'
-}
+import { FLOWCHART_INTERACTION_CLICK_GUARD_MS } from './flowchartEditorShared'
 
 export const flowchartSelectionMethods = {
+  suppressPointerClick(duration = FLOWCHART_INTERACTION_CLICK_GUARD_MS) {
+    this.interactionClickGuardUntil = Date.now() + Math.max(0, Number(duration || 0))
+  },
+
+  hasSuppressedPointerClick() {
+    return Number(this.interactionClickGuardUntil || 0) > Date.now()
+  },
+
   selectNode(nodeId, event) {
+    if (this.hasSuppressedPointerClick()) {
+      return
+    }
     this.cancelConnectorDrag()
     this.cancelEdgeReconnect()
+    this.cancelEdgeBendDrag()
+    this.cancelEdgeLabelDrag()
     if (
       this.inlineTextEditorState &&
       !(this.inlineTextEditorState.kind === 'node' && this.inlineTextEditorState.id === nodeId)
     ) {
-      this.inlineTextEditorState = null
+      void this.commitInlineTextEditor()
     }
     const isAppend = !!(event?.shiftKey || event?.ctrlKey || event?.metaKey)
     if (isAppend) {
@@ -35,48 +40,39 @@ export const flowchartSelectionMethods = {
   },
 
   selectEdge(edgeId) {
+    if (this.hasSuppressedPointerClick()) {
+      return
+    }
     this.cancelConnectorDrag()
     this.cancelEdgeReconnect()
+    this.cancelEdgeBendDrag()
+    this.cancelEdgeLabelDrag()
     if (
       this.inlineTextEditorState &&
       !(this.inlineTextEditorState.kind === 'edge' && this.inlineTextEditorState.id === edgeId)
     ) {
-      this.inlineTextEditorState = null
+      void this.commitInlineTextEditor()
     }
     this.selectedEdgeId = edgeId
     this.selectedNodeIds = []
-    if (this.isInspectorOpen) {
-      this.inspectorPanelSection = 'inspector'
-    }
-    this.syncEdgeToolbarState(edgeId)
+    this.inspectorPanelSection = 'inspector'
+    this.isInspectorOpen = true
+    this.edgeToolbarState = null
   },
 
   clearSelection() {
     this.cancelConnectorDrag()
     this.cancelEdgeReconnect()
+    this.cancelEdgeBendDrag()
+    this.cancelEdgeLabelDrag()
     this.selectedNodeIds = []
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
   },
 
   syncEdgeToolbarState(edgeId = this.selectedEdgeId) {
-    if (!edgeId || this.inlineTextEditorState?.kind === 'edge') {
-      this.edgeToolbarState = null
-      return
-    }
-    const edge = this.edgesWithLayout.find(item => item.id === edgeId)
-    if (!edge) {
-      this.edgeToolbarState = null
-      return
-    }
-    this.edgeToolbarState = {
-      edgeId,
-      placement: getEdgeLabelToolbarPlacement(edge),
-      style: {
-        left: `${edge.labelX}px`,
-        top: `${edge.labelY}px`
-      }
-    }
+    void edgeId
+    this.edgeToolbarState = null
   },
 
   toggleInspector() {
@@ -103,7 +99,7 @@ export const flowchartSelectionMethods = {
     }
     if (event.key === 'Escape') {
       event.preventDefault()
-      this.inlineTextEditorState = null
+      this.discardInlineTextEditor()
       this.closeInspector()
       this.clearSelection()
       return
@@ -191,7 +187,7 @@ export const flowchartSelectionMethods = {
       })
       this.selectedNodeIds = []
     }
-    this.inlineTextEditorState = null
+    this.discardInlineTextEditor()
     this.$message.success(this.$t('flowchart.deleteSuccess'))
     void this.persistFlowchartState()
   }

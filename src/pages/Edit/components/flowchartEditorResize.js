@@ -18,6 +18,9 @@ export const flowchartResizeMethods = {
     if (!node || !direction) {
       return
     }
+    if (this.inlineTextEditorState) {
+      void this.commitInlineTextEditor()
+    }
     this.resizeState = {
       nodeId: node.id,
       direction,
@@ -89,6 +92,9 @@ export const flowchartResizeMethods = {
     const shouldPersist = this.resizeState.moved
     this.resizeState = null
     this.removeNodeResizeListeners()
+    if (shouldPersist) {
+      this.suppressPointerClick()
+    }
     if (shouldPersist) {
       void this.persistFlowchartState()
     }

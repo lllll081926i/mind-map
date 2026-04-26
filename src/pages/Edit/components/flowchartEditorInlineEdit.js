@@ -15,7 +15,7 @@ export const flowchartInlineEditMethods = {
         value: this.selectedNode.text
       }
     }
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
   },
 
   updateSelectedEdgeLabel(value) {
@@ -31,7 +31,7 @@ export const flowchartInlineEditMethods = {
         value: this.selectedEdge.label
       }
     }
-    void this.persistFlowchartState()
+    this.queueInteractiveFlowchartPersist()
   },
 
   getInlineTextEditorStyle(kind, target) {
@@ -82,11 +82,15 @@ export const flowchartInlineEditMethods = {
     })
   },
 
+  discardInlineTextEditor() {
+    this.inlineTextEditorState = null
+    this.syncEdgeToolbarState()
+  },
+
   handleInlineTextEditorKeydown(event) {
     if (event.key === 'Escape') {
       event.preventDefault()
-      this.inlineTextEditorState = null
-      this.syncEdgeToolbarState()
+      this.discardInlineTextEditor()
       return
     }
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -95,12 +99,24 @@ export const flowchartInlineEditMethods = {
     }
   },
 
+  getInlineTextEditorLiveValue() {
+    const editor = this.$refs.inlineTextEditorRef
+    const inputEl = Array.isArray(editor) ? editor[0] : editor
+    if (inputEl && typeof inputEl.value === 'string') {
+      return inputEl.value
+    }
+    return this.inlineTextEditorState?.value || ''
+  },
+
   async commitInlineTextEditor() {
-    if (!this.inlineTextEditorState) {
+    const editorState = this.inlineTextEditorState
+    if (!editorState) {
       return
     }
-    const { kind, id, value } = this.inlineTextEditorState
-    const normalizedValue = String(value || '').trim()
+    const liveValue = this.getInlineTextEditorLiveValue()
+    this.inlineTextEditorState = null
+    const { kind, id } = editorState
+    const normalizedValue = String(liveValue || '').trim()
     if (kind === 'node') {
       const targetNode = this.getNodeById(id)
       if (targetNode) {
@@ -114,7 +130,6 @@ export const flowchartInlineEditMethods = {
         await this.persistFlowchartState()
       }
     }
-    this.inlineTextEditorState = null
     this.syncEdgeToolbarState()
   },
 
