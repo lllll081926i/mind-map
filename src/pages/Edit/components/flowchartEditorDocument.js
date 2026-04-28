@@ -216,6 +216,22 @@ export const flowchartDocumentMethods = {
     this.clearAlignmentGuides()
   },
 
+  async requestApplyTemplate(templateId = 'blank') {
+    try {
+      await this.$confirm(
+        this.$t('flowchart.templateReplaceConfirmMessage'),
+        this.$t('flowchart.templateReplaceConfirmTitle'),
+        {
+          type: 'warning'
+        }
+      )
+    } catch (_error) {
+      return false
+    }
+    this.applyTemplate(templateId)
+    return true
+  },
+
   applyTemplate(templateId = 'blank') {
     this.resetTransientFlowchartInteractionState()
     this.flowchartData = createDefaultFlowchartData(

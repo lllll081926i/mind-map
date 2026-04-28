@@ -6,21 +6,6 @@
       :height="canvasWorldBounds.height"
       :viewBox="`0 0 ${canvasWorldBounds.width} ${canvasWorldBounds.height}`"
     >
-      <defs>
-        <marker
-          v-for="edge in edgesWithLayout"
-          :id="getEdgeMarkerId(edge.id)"
-          :key="`marker-${edge.id}`"
-          viewBox="0 0 8 8"
-          :refX="getEdgeMarkerRefX(edge)"
-          refY="4"
-          :markerWidth="getEdgeMarkerSize(edge)"
-          :markerHeight="getEdgeMarkerSize(edge)"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 8 4 L 0 8 z" :fill="getEdgeStroke(edge)"></path>
-        </marker>
-      </defs>
       <g v-for="edge in edgesWithLayout" :key="edge.id">
         <path
           class="edgeHitArea"
@@ -33,17 +18,7 @@
           :class="{ isSelected: selectedEdgeId === edge.id }"
           :d="edge.path"
           :stroke="getEdgeStroke(edge)"
-          :stroke-dasharray="edge.style.dashed ? '8 6' : null"
-          :marker-end="edge.style.arrowCount ? `url(#${getEdgeMarkerId(edge.id)})` : null"
-          pointer-events="none"
-        />
-        <path
-          v-for="(marker, markerIndex) in getInlineArrowMarkers(edge)"
-          :key="`arrow-${edge.id}-${markerIndex}`"
-          class="flowchartArrowHead"
-          :d="getArrowPath(marker)"
-          :transform="`translate(${marker.x} ${marker.y}) rotate(${marker.angle})`"
-          :fill="getEdgeStroke(edge)"
+          :stroke-dasharray="edge.style.dashArray || null"
           pointer-events="none"
         />
         <text
@@ -60,53 +35,6 @@
         >
           {{ edge.label }}
         </text>
-        <template v-if="selectedEdgeId === edge.id">
-          <circle
-            v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
-            :key="`bend-hit-${edge.id}-${bendIndex}`"
-            class="flowchartEdgeHandleHitArea"
-            :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
-            :cx="bendHandle.x"
-            :cy="bendHandle.y"
-            r="15"
-            @mousedown.stop.prevent="$emit('start-edge-bend-drag', $event, edge.id, bendIndex)"
-          ></circle>
-          <circle
-            v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
-            :key="`bend-${edge.id}-${bendIndex}`"
-            class="flowchartEdgeBendHandle"
-            :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
-            :cx="bendHandle.x"
-            :cy="bendHandle.y"
-            r="6.5"
-          ></circle>
-          <circle
-            class="flowchartEdgeHandleHitArea"
-            :cx="edge.sourcePoint.x"
-            :cy="edge.sourcePoint.y"
-            r="16"
-            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'source')"
-          ></circle>
-          <circle
-            class="flowchartEdgeHandleHitArea"
-            :cx="edge.targetPoint.x"
-            :cy="edge.targetPoint.y"
-            r="16"
-            @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'target')"
-          ></circle>
-          <circle
-            class="flowchartEdgeReconnectHandle"
-            :cx="edge.sourcePoint.x"
-            :cy="edge.sourcePoint.y"
-            r="7.5"
-          ></circle>
-          <circle
-            class="flowchartEdgeReconnectHandle"
-            :cx="edge.targetPoint.x"
-            :cy="edge.targetPoint.y"
-            r="7.5"
-          ></circle>
-        </template>
       </g>
       <line
         v-for="guide in alignmentGuides"
@@ -124,6 +52,94 @@
       />
     </svg>
 
+    <svg
+      class="edgeArrowLayer"
+      xmlns="http://www.w3.org/2000/svg"
+      :width="canvasWorldBounds.width"
+      :height="canvasWorldBounds.height"
+      :viewBox="`0 0 ${canvasWorldBounds.width} ${canvasWorldBounds.height}`"
+    >
+      <g v-for="edge in edgesWithLayout" :key="`arrows-${edge.id}`">
+        <path
+          v-for="(marker, markerIndex) in getRenderedArrowMarkers(edge)"
+          :key="`arrow-${edge.id}-${markerIndex}`"
+          class="flowchartArrowHead"
+          :d="getArrowPath(marker)"
+          :transform="`translate(${marker.x} ${marker.y}) rotate(${marker.angle})`"
+          :fill="getEdgeStroke(edge)"
+          pointer-events="none"
+        />
+      </g>
+    </svg>
+
+    <svg
+      v-if="selectedEdges.length"
+      class="edgeHandleLayer"
+      xmlns="http://www.w3.org/2000/svg"
+      :width="canvasWorldBounds.width"
+      :height="canvasWorldBounds.height"
+      :viewBox="`0 0 ${canvasWorldBounds.width} ${canvasWorldBounds.height}`"
+    >
+      <g v-for="edge in selectedEdges" :key="`handles-${edge.id}`">
+        <line
+          v-for="segmentHandle in getSegmentHandles(edge)"
+          :key="`segment-hit-${edge.id}-${segmentHandle.index}`"
+          class="flowchartEdgeSegmentHitArea"
+          :class="segmentHandle.axis === 'y' ? 'isHorizontal' : 'isVertical'"
+          :x1="segmentHandle.start.x"
+          :y1="segmentHandle.start.y"
+          :x2="segmentHandle.end.x"
+          :y2="segmentHandle.end.y"
+          @mousedown.stop.prevent="$emit('start-edge-segment-drag', $event, edge.id, segmentHandle.index)"
+        ></line>
+        <circle
+          v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
+          :key="`bend-hit-${edge.id}-${bendIndex}`"
+          class="flowchartEdgeHandleHitArea"
+          :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
+          :cx="bendHandle.x"
+          :cy="bendHandle.y"
+          r="15"
+          @mousedown.stop.prevent="$emit('start-edge-bend-drag', $event, edge.id, bendIndex)"
+        ></circle>
+        <circle
+          v-for="(bendHandle, bendIndex) in getBendHandles(edge)"
+          :key="`bend-${edge.id}-${bendIndex}`"
+          class="flowchartEdgeBendHandle"
+          :class="bendHandle.axis === 'y' ? 'isVertical' : 'isHorizontal'"
+          :cx="bendHandle.x"
+          :cy="bendHandle.y"
+          r="6.5"
+        ></circle>
+        <circle
+          class="flowchartEdgeHandleHitArea"
+          :cx="edge.sourcePoint.x"
+          :cy="edge.sourcePoint.y"
+          r="18"
+          @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'source')"
+        ></circle>
+        <circle
+          class="flowchartEdgeHandleHitArea"
+          :cx="edge.targetPoint.x"
+          :cy="edge.targetPoint.y"
+          r="18"
+          @mousedown.stop.prevent="$emit('start-edge-reconnect', $event, edge.id, 'target')"
+        ></circle>
+        <circle
+          class="flowchartEdgeReconnectHandle"
+          :cx="edge.sourcePoint.x"
+          :cy="edge.sourcePoint.y"
+          r="8"
+        ></circle>
+        <circle
+          class="flowchartEdgeReconnectHandle"
+          :cx="edge.targetPoint.x"
+          :cy="edge.targetPoint.y"
+          r="8"
+        ></circle>
+      </g>
+    </svg>
+
 </template>
 
 <script>
@@ -136,7 +152,8 @@ export default {
     'edit-edge-label',
     'start-edge-label-drag',
     'start-edge-reconnect',
-    'start-edge-bend-drag'
+    'start-edge-bend-drag',
+    'start-edge-segment-drag'
   ],
   props: {
     edgesWithLayout: {
@@ -164,31 +181,60 @@ export default {
       required: true
     }
   },
+  computed: {
+    selectedEdges() {
+      if (!this.selectedEdgeId) {
+        return []
+      }
+      return this.edgesWithLayout.filter(edge => edge.id === this.selectedEdgeId)
+    }
+  },
   methods: {
-    getEdgeMarkerId(edgeId) {
-      return `flowchart-editor-arrow-${String(edgeId || '').replace(/[^a-zA-Z0-9_-]/g, '-')}`
-    },
-    getEdgeMarkerSize(edge) {
-      return Math.round(6 * Number(edge?.style?.arrowSize || 1) * 100) / 100
-    },
-    getEdgeMarkerRefX(edge) {
-      return Math.round(7.6 * Number(edge?.style?.arrowSize || 1) * 100) / 100
-    },
     getEdgeStroke(edge) {
       return this.selectedEdgeId === edge.id ? 'var(--flowchart-selection)' : edge.style.stroke
     },
     getArrowPath(marker) {
       return getFlowchartArrowHeadPath(marker)
     },
-    getInlineArrowMarkers(edge) {
-      const markers = Array.isArray(edge?.arrowMarkers) ? edge.arrowMarkers : []
-      if (markers.length <= 1) {
-        return []
-      }
-      return markers.slice(0, -1)
+    getRenderedArrowMarkers(edge) {
+      return Array.isArray(edge?.arrowMarkers) ? edge.arrowMarkers : []
     },
     getBendHandles(edge) {
       return Array.isArray(edge?.bendHandles) ? edge.bendHandles : []
+    },
+    getSegmentHandles(edge) {
+      const points = Array.isArray(edge?.pathPoints) ? edge.pathPoints : []
+      if (points.length < 2 || edge?.style?.pathType !== 'orthogonal') {
+        return []
+      }
+      const routeAxis = String(edge?.route?.orthogonalLane?.axis || '')
+      if (!routeAxis) {
+        return []
+      }
+      return points.slice(0, -1).reduce((result, start, index) => {
+        const end = points[index + 1]
+        const isVertical = Math.abs(Number(start?.x || 0) - Number(end?.x || 0)) <= 0.001
+        const isHorizontal = Math.abs(Number(start?.y || 0) - Number(end?.y || 0)) <= 0.001
+        const moveAxis = isVertical ? 'x' : 'y'
+        const segmentLength = Math.hypot(
+          Number(end?.x || 0) - Number(start?.x || 0),
+          Number(end?.y || 0) - Number(start?.y || 0)
+        )
+        if (
+          (!isVertical && !isHorizontal) ||
+          segmentLength < 24 ||
+          routeAxis !== moveAxis
+        ) {
+          return result
+        }
+        result.push({
+          index,
+          start,
+          end,
+          axis: moveAxis
+        })
+        return result
+      }, [])
     }
   }
 }

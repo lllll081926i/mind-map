@@ -1,5 +1,7 @@
 import { normalizeFlowchartEdgeLabelPosition } from '@/services/flowchartDocument'
 
+const EDGE_DASH_PATTERNS = new Set(['solid', 'dash', 'longDash', 'dot', 'dashDot'])
+
 const normalizeEdgeArrowSize = value => {
   const numericValue = Number(value)
   if (!Number.isFinite(numericValue)) {
@@ -103,6 +105,15 @@ export const flowchartStyleMethods = {
     if (Object.prototype.hasOwnProperty.call(nextStylePatch, 'arrowCount')) {
       nextStylePatch.arrowCount = normalizeEdgeArrowCount(nextStylePatch.arrowCount)
     }
+    if (Object.prototype.hasOwnProperty.call(nextStylePatch, 'dashPattern')) {
+      const normalizedDashPattern = EDGE_DASH_PATTERNS.has(nextStylePatch.dashPattern)
+        ? nextStylePatch.dashPattern
+        : 'solid'
+      nextStylePatch.dashPattern = normalizedDashPattern
+      nextStylePatch.dashed = normalizedDashPattern !== 'solid'
+    } else if (Object.prototype.hasOwnProperty.call(nextStylePatch, 'dashed')) {
+      nextStylePatch.dashPattern = nextStylePatch.dashed ? 'dash' : 'solid'
+    }
     if (this.flowchartConfig.strictAlignment) {
       nextStylePatch.pathType = 'orthogonal'
     }
@@ -139,6 +150,7 @@ export const flowchartStyleMethods = {
     this.updateSelectedEdgeStyle({
       stroke: preset.stroke,
       dashed: !!preset.dashed,
+      dashPattern: preset.dashPattern || (preset.dashed ? 'dash' : 'solid'),
       pathType: this.flowchartConfig.strictAlignment
         ? 'orthogonal'
         : preset.pathType || 'orthogonal'

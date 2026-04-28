@@ -106,15 +106,22 @@
         <div class="flowchartPanelSection">
           <div class="flowchartPanelSectionTitle">{{ labels.settingsPanelTitle }}</div>
           <label class="fieldLabel">{{ labels.backgroundStyle }}</label>
-          <select
-            class="fieldSelect"
-            :value="backgroundStyle"
-            @change="$emit('update-flowchart-config', { backgroundStyle: $event.target.value })"
-          >
-            <option value="none">{{ labels.backgroundStyleNone }}</option>
-            <option value="dots">{{ labels.backgroundStyleDots }}</option>
-            <option value="grid">{{ labels.backgroundStyleGrid }}</option>
-          </select>
+          <div class="flowchartBackgroundOptionGrid">
+            <button
+              v-for="item in backgroundStyleOptions"
+              :key="item.value"
+              type="button"
+              class="flowchartBackgroundOption"
+              :class="{ isActive: backgroundStyle === item.value }"
+              @click="$emit('update-flowchart-config', { backgroundStyle: item.value })"
+            >
+              <span
+                class="flowchartBackgroundOptionPreview"
+                :class="`is-${item.value}`"
+              ></span>
+              <span class="flowchartBackgroundOptionText">{{ item.label }}</span>
+            </button>
+          </div>
           <label class="fieldLabel flowchartToggleRow">
             <span>{{ labels.strictAlignment }}</span>
             <input
@@ -127,55 +134,64 @@
       </template>
 
       <template v-else-if="panelSection === 'templates'">
-        <div class="flowchartTemplateGrid">
-          <button
-            v-for="templateItem in templates"
-            :key="templateItem.id"
-            type="button"
-            class="flowchartTemplateCard"
-            @click="$emit('apply-template', templateItem.id)"
-          >
-            <span
-              class="flowchartTemplatePreview"
-              aria-hidden="true"
-              :style="getTemplatePreviewStyle(templateItem)"
+        <div
+          v-for="templateGroup in templates"
+          :key="templateGroup.id"
+          class="flowchartTemplateGroup"
+        >
+          <div class="flowchartPanelSectionTitle flowchartTemplateGroupTitle">
+            {{ templateGroup.label }}
+          </div>
+          <div class="flowchartTemplateGrid">
+            <button
+              v-for="templateItem in templateGroup.items"
+              :key="templateItem.id"
+              type="button"
+              class="flowchartTemplateCard"
+              @click="$emit('request-template-apply', templateItem.id)"
             >
-              <svg :viewBox="getTemplatePreviewViewBox(templateItem.preview)">
-                <path
-                  v-for="edge in templateItem.preview.edges"
-                  :key="edge.id"
-                  class="flowchartTemplateEdge"
-                  :d="getTemplatePreviewPath(templateItem, edge)"
-                  :style="getTemplateEdgeStyle(templateItem, edge)"
-                ></path>
-                <template v-for="node in templateItem.preview.nodes" :key="node.id">
-                  <polygon
-                    v-if="node.type === 'decision'"
-                    class="flowchartTemplateNode"
-                    :points="getDecisionPolygon(node)"
-                    :style="getTemplateNodeStyle(templateItem, node)"
-                  ></polygon>
-                  <polygon
-                    v-else-if="node.type === 'input'"
-                    class="flowchartTemplateNode"
-                    :points="getInputPolygon(node)"
-                    :style="getTemplateNodeStyle(templateItem, node)"
-                  ></polygon>
-                  <rect
-                    v-else
-                    class="flowchartTemplateNode"
-                    :x="node.x"
-                    :y="node.y"
-                    :width="node.width"
-                    :height="node.height"
-                    :rx="node.type === 'start' || node.type === 'end' ? 22 : 10"
-                    :style="getTemplateNodeStyle(templateItem, node)"
-                  ></rect>
-                </template>
-              </svg>
-            </span>
-            <span class="flowchartTemplateName">{{ templateItem.label }}</span>
-          </button>
+              <span
+                class="flowchartTemplatePreview"
+                aria-hidden="true"
+                :style="getTemplatePreviewStyle(templateItem)"
+              >
+                <svg :viewBox="getTemplatePreviewViewBox(templateItem.preview)">
+                  <path
+                    v-for="edge in templateItem.preview.edges"
+                    :key="edge.id"
+                    class="flowchartTemplateEdge"
+                    :d="getTemplatePreviewPath(templateItem, edge)"
+                    :style="getTemplateEdgeStyle(templateItem, edge)"
+                  ></path>
+                  <template v-for="node in templateItem.preview.nodes" :key="node.id">
+                    <polygon
+                      v-if="node.type === 'decision'"
+                      class="flowchartTemplateNode"
+                      :points="getDecisionPolygon(node)"
+                      :style="getTemplateNodeStyle(templateItem, node)"
+                    ></polygon>
+                    <polygon
+                      v-else-if="node.type === 'input'"
+                      class="flowchartTemplateNode"
+                      :points="getInputPolygon(node)"
+                      :style="getTemplateNodeStyle(templateItem, node)"
+                    ></polygon>
+                    <rect
+                      v-else
+                      class="flowchartTemplateNode"
+                      :x="node.x"
+                      :y="node.y"
+                      :width="node.width"
+                      :height="node.height"
+                      :rx="node.type === 'start' || node.type === 'end' ? 22 : 10"
+                      :style="getTemplateNodeStyle(templateItem, node)"
+                    ></rect>
+                  </template>
+                </svg>
+              </span>
+              <span class="flowchartTemplateName">{{ templateItem.label }}</span>
+            </button>
+          </div>
         </div>
       </template>
 
@@ -220,33 +236,62 @@
           </button>
         </div>
         <label class="fieldLabel">{{ labels.nodeFill }}</label>
-        <input
-          class="fieldColorInput"
-          type="color"
-          :value="selectedNode.style?.fill || '#ffffff'"
-          @input="$emit('update-selected-node-style', { fill: $event.target.value })"
-        />
+        <div class="flowchartColorSwatchGrid">
+          <button
+            v-for="color in nodeFillPalette"
+            :key="`node-fill-${color}`"
+            type="button"
+            class="flowchartColorSwatch"
+            :class="{ isActive: getSelectedNodeColor('fill', '#ffffff') === color }"
+            :style="{ backgroundColor: color }"
+            @click="$emit('update-selected-node-style', { fill: color })"
+          ></button>
+          <label class="flowchartColorPickerButton">
+            <input
+              type="color"
+              :value="getSelectedNodeColor('fill', '#ffffff')"
+              @input="$emit('update-selected-node-style', { fill: $event.target.value })"
+            />
+          </label>
+        </div>
         <label class="fieldLabel">{{ labels.nodeStroke }}</label>
-        <input
-          class="fieldColorInput"
-          type="color"
-          :value="selectedNode.style?.stroke || '#111827'"
-          @input="$emit('update-selected-node-style', { stroke: $event.target.value })"
-        />
+        <div class="flowchartColorSwatchGrid">
+          <button
+            v-for="color in strokeColorPalette"
+            :key="`node-stroke-${color}`"
+            type="button"
+            class="flowchartColorSwatch"
+            :class="{ isActive: getSelectedNodeColor('stroke', '#111827') === color }"
+            :style="{ backgroundColor: color }"
+            @click="$emit('update-selected-node-style', { stroke: color })"
+          ></button>
+          <label class="flowchartColorPickerButton">
+            <input
+              type="color"
+              :value="getSelectedNodeColor('stroke', '#111827')"
+              @input="$emit('update-selected-node-style', { stroke: $event.target.value })"
+            />
+          </label>
+        </div>
         <label class="fieldLabel">{{ labels.nodeTextColor }}</label>
-        <input
-          class="fieldColorInput"
-          type="color"
-          :value="selectedNode.style?.textColor || '#111827'"
-          @input="$emit('update-selected-node-style', { textColor: $event.target.value })"
-        />
-        <button
-          type="button"
-          class="flowchartPanelBtn isBlock"
-          @click="$emit('reset-selected-node-style')"
-        >
-          {{ labels.resetNodeStyle }}
-        </button>
+        <div class="flowchartColorSwatchGrid">
+          <button
+            v-for="color in textColorPalette"
+            :key="`node-text-${color}`"
+            type="button"
+            class="flowchartColorSwatch"
+            :class="{ isActive: getSelectedNodeColor('textColor', '#111827') === color }"
+            :style="{ backgroundColor: color }"
+            @click="$emit('update-selected-node-style', { textColor: color })"
+          ></button>
+          <label class="flowchartColorPickerButton">
+            <input
+              type="color"
+              :value="getSelectedNodeColor('textColor', '#111827')"
+              @input="$emit('update-selected-node-style', { textColor: $event.target.value })"
+            />
+          </label>
+        </div>
       </template>
       <template v-else-if="selectedEdge">
         <label class="fieldLabel">{{ labels.edgeLabel }}</label>
@@ -283,12 +328,24 @@
           @input="$emit('update-selected-edge-label-position', { offsetY: Number($event.target.value) || 0 })"
         />
         <label class="fieldLabel">{{ labels.edgeColor }}</label>
-        <input
-          class="fieldColorInput"
-          type="color"
-          :value="selectedEdge.style?.stroke || '#64748b'"
-          @input="$emit('update-selected-edge-style', { stroke: $event.target.value })"
-        />
+        <div class="flowchartColorSwatchGrid">
+          <button
+            v-for="color in strokeColorPalette"
+            :key="`edge-stroke-${color}`"
+            type="button"
+            class="flowchartColorSwatch"
+            :class="{ isActive: selectedEdgeVisualStyle.stroke === color }"
+            :style="{ backgroundColor: color }"
+            @click="$emit('update-selected-edge-style', { stroke: color })"
+          ></button>
+          <label class="flowchartColorPickerButton">
+            <input
+              type="color"
+              :value="selectedEdgeVisualStyle.stroke"
+              @input="$emit('update-selected-edge-style', { stroke: $event.target.value })"
+            />
+          </label>
+        </div>
         <label class="fieldLabel">{{ labels.edgeType }}</label>
         <select
           class="fieldSelect"
@@ -304,79 +361,76 @@
           </option>
         </select>
         <label class="fieldLabel">{{ labels.edgeLineStyle }}</label>
-        <select
-          class="fieldSelect"
-          :value="selectedEdgeVisualStyle.dashed ? 'dashed' : 'solid'"
-          @change="$emit('update-selected-edge-style', { dashed: $event.target.value === 'dashed' })"
-        >
-          <option value="solid">{{ labels.edgeLineStyleSolid }}</option>
-          <option value="dashed">{{ labels.edgeLineStyleDashed }}</option>
-        </select>
-        <label class="fieldLabel">{{ labels.edgeArrowSize }}</label>
-        <div class="fieldMetaRow">
-          <input
-            class="fieldRange"
-            type="range"
-            min="0.6"
-            max="1.6"
-            step="0.1"
-            :value="selectedEdgeVisualStyle.arrowSize"
-            @input="$emit('update-selected-edge-style', { arrowSize: Number($event.target.value) })"
-          />
-          <span class="fieldHint">{{ formatArrowSizeLabel(selectedEdgeVisualStyle.arrowSize) }}</span>
-        </div>
-        <label class="fieldLabel">{{ labels.edgeArrowCount }}</label>
-        <select
-          class="fieldSelect"
-          :value="selectedEdgeVisualStyle.arrowCount"
-          @change="$emit('update-selected-edge-style', { arrowCount: Number($event.target.value) })"
-        >
-          <option
-            v-for="item in edgeArrowCountOptions"
+        <div class="flowchartLineStyleGrid">
+          <button
+            v-for="item in edgeDashPatternOptions"
             :key="item.value"
-            :value="item.value"
+            type="button"
+            class="flowchartLineStyleOption"
+            :class="{ isActive: selectedEdgeVisualStyle.dashPattern === item.value }"
+            @click="$emit('update-selected-edge-style', { dashPattern: item.value })"
           >
-            {{ item.label }}
-          </option>
-        </select>
-        <button
-          type="button"
-          class="flowchartPanelBtn isBlock"
-          @click="$emit('reset-selected-edge-label-position')"
-        >
-          {{ labels.resetEdgeLabelPosition }}
-        </button>
-        <button
-          type="button"
-          class="flowchartPanelBtn isBlock"
-          @click="$emit('reset-selected-edge-style')"
-        >
-          {{ labels.resetEdgeStyle }}
-        </button>
-        <button
-          type="button"
-          class="flowchartPanelBtn isBlock"
-          @click="$emit('insert-node-on-edge', selectedEdge.id)"
-        >
-          {{ labels.edgeInsertNode }}
-        </button>
-        <button
-          type="button"
-          class="flowchartPanelBtn isBlock isDanger"
-          @click="$emit('remove-edge', selectedEdge.id)"
-        >
-          {{ labels.edgeDeleteLine }}
-        </button>
+            <span
+              class="flowchartLineStyleSample"
+            >
+              <svg viewBox="0 0 92 8" aria-hidden="true">
+                <path
+                  d="M 2 4 H 90"
+                  :stroke="selectedEdgeVisualStyle.stroke"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  :stroke-dasharray="item.dashArray || null"
+                ></path>
+              </svg>
+            </span>
+            <span class="flowchartLineStyleText">{{ item.label }}</span>
+          </button>
+        </div>
       </template>
+      <div v-else class="flowchartPanelEmpty">
+        {{ labels.selectionEmpty }}
+      </div>
     </aside>
 </template>
 
 <script>
 import {
+  getFlowchartEdgeDashArray,
   getFlowchartEdgeLayout,
   getFlowchartEdgeVisualStyle,
   normalizeFlowchartEdgeLabelPosition
 } from '@/services/flowchartDocument'
+
+const NODE_FILL_PALETTE = [
+  '#ffffff',
+  '#f8fafc',
+  '#eff6ff',
+  '#ecfdf5',
+  '#fffbeb',
+  '#fff1f2',
+  '#f5f3ff',
+  '#ecfeff'
+]
+const STROKE_COLOR_PALETTE = [
+  '#111827',
+  '#64748b',
+  '#2563eb',
+  '#059669',
+  '#d97706',
+  '#e11d48',
+  '#7c3aed',
+  '#0891b2'
+]
+const TEXT_COLOR_PALETTE = [
+  '#111827',
+  '#334155',
+  '#1e3a8a',
+  '#065f46',
+  '#92400e',
+  '#9f1239',
+  '#4c1d95',
+  '#164e63'
+]
 
 export default {
   name: 'FlowchartInspector',
@@ -384,7 +438,7 @@ export default {
     'toggle-inspector',
     'toggle-section',
     'close-inspector',
-    'apply-template',
+    'request-template-apply',
     'update-selected-node-type',
     'update-selected-node-text',
     'update-selected-edge-label',
@@ -394,11 +448,6 @@ export default {
     'update-flowchart-config',
     'update-selected-node-style',
     'update-selected-edge-style',
-    'reset-selected-node-style',
-    'reset-selected-edge-style',
-    'reset-selected-edge-label-position',
-    'insert-node-on-edge',
-    'remove-edge'
   ],
   props: {
     isOpen: {
@@ -424,6 +473,10 @@ export default {
     flowchartThemeId: {
       type: String,
       default: 'blueprint'
+    },
+    resolvedTheme: {
+      type: Object,
+      default: () => ({})
     },
     strictAlignment: {
       type: Boolean,
@@ -459,19 +512,61 @@ export default {
       if (!this.selectedEdge) {
         return {
           pathType: 'orthogonal',
-          arrowSize: 1,
+          stroke: this.resolvedTheme.edgeStroke || '#64748b',
+          labelColor: this.resolvedTheme.edgeLabelColor || '#64748b',
+          dashPattern: 'solid',
           arrowCount: 1
         }
       }
       return getFlowchartEdgeVisualStyle(this.selectedEdge, {
+        theme: this.resolvedTheme,
         strictAlignment: this.strictAlignment
       })
     },
-    edgeArrowCountOptions() {
-      return [0, 1, 2, 3, 4].map(value => ({
-        value,
-        label: value === 0 ? this.labels.edgeArrowCountNone : `${value}`
-      }))
+    backgroundStyleOptions() {
+      return [
+        { value: 'none', label: this.labels.backgroundStyleNone },
+        { value: 'dots', label: this.labels.backgroundStyleDots },
+        { value: 'grid', label: this.labels.backgroundStyleGrid }
+      ]
+    },
+    nodeFillPalette() {
+      return NODE_FILL_PALETTE
+    },
+    strokeColorPalette() {
+      return STROKE_COLOR_PALETTE
+    },
+    textColorPalette() {
+      return TEXT_COLOR_PALETTE
+    },
+    edgeDashPatternOptions() {
+      return [
+        {
+          value: 'solid',
+          label: this.labels.edgeLineStyleSolid,
+          dashArray: getFlowchartEdgeDashArray('solid')
+        },
+        {
+          value: 'dash',
+          label: this.labels.edgeLineStyleDash,
+          dashArray: getFlowchartEdgeDashArray('dash')
+        },
+        {
+          value: 'longDash',
+          label: this.labels.edgeLineStyleLongDash,
+          dashArray: getFlowchartEdgeDashArray('longDash')
+        },
+        {
+          value: 'dot',
+          label: this.labels.edgeLineStyleDot,
+          dashArray: getFlowchartEdgeDashArray('dot')
+        },
+        {
+          value: 'dashDot',
+          label: this.labels.edgeLineStyleDashDot,
+          dashArray: getFlowchartEdgeDashArray('dashDot')
+        }
+      ]
     },
     selectedEdgeLabelPosition() {
       return (
@@ -506,6 +601,18 @@ export default {
         y: Number(node.y || 0) + Number(node.height || 0) / 2
       }
     },
+    getSelectedNodeColor(styleKey, fallback) {
+      const themeFallbackMap = {
+        fill: this.resolvedTheme.nodeFill || fallback,
+        stroke: this.resolvedTheme.nodeStroke || fallback,
+        textColor: this.resolvedTheme.nodeTextColor || fallback
+      }
+      return String(
+        this.selectedNode?.style?.[styleKey] ||
+          themeFallbackMap[styleKey] ||
+          fallback
+      ).trim()
+    },
     getTemplatePreviewViewBox(preview) {
       const nodes = Array.isArray(preview?.nodes) ? preview.nodes : []
       const items = [...nodes]
@@ -537,7 +644,9 @@ export default {
       if (!source || !target) {
         return ''
       }
-      return getFlowchartEdgeLayout(edge, source, target).path
+      return getFlowchartEdgeLayout(edge, source, target, {
+        nodes: preview.nodes
+      }).path
     },
     getTemplatePreviewStyle(_templateItem) {
       return {
@@ -553,7 +662,10 @@ export default {
     getTemplateEdgeStyle(_templateItem, edge) {
       return {
         stroke: '#111111',
-        strokeDasharray: edge?.style?.dashed ? '18 12' : null
+        strokeDasharray: getFlowchartEdgeDashArray(
+          edge?.style?.dashPattern,
+          edge?.style?.dashed
+        ) || null
       }
     },
     getDecisionPolygon(node) {
@@ -580,9 +692,6 @@ export default {
         `${x + width - offset},${y + height}`,
         `${x},${y + height}`
       ].join(' ')
-    },
-    formatArrowSizeLabel(value) {
-      return `${Math.round(Number(value || 1) * 100)}%`
     },
     formatLabelRatioLabel(value) {
       return `${Math.round(Number(value || 0.5) * 100)}%`

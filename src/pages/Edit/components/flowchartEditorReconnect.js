@@ -1,4 +1,7 @@
-import { FLOWCHART_NODE_HIT_PADDING } from './flowchartEditorShared'
+import {
+  FLOWCHART_NODE_HIT_PADDING,
+  FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD
+} from './flowchartEditorShared'
 import {
   normalizeFlowchartEdgeLabelPosition,
   projectFlowchartPointToPolyline
@@ -11,6 +14,27 @@ export const flowchartReconnectMethods = {
 
   startEdgeBendDrag(event, edgeId, bendIndex) {
     this.beginEdgeBendDrag(edgeId, bendIndex, event)
+  },
+
+  startEdgeSegmentDrag(event, edgeId, segmentIndex) {
+    this.beginEdgeSegmentDrag(edgeId, segmentIndex, event)
+  },
+
+  getEdgeStraightRouteSnap(edge, axis) {
+    const sourcePoint = edge?.sourcePoint || null
+    const targetPoint = edge?.targetPoint || null
+    if (!sourcePoint || !targetPoint) {
+      return null
+    }
+    const sourceValue = axis === 'y' ? Number(sourcePoint.y || 0) : Number(sourcePoint.x || 0)
+    const targetValue = axis === 'y' ? Number(targetPoint.y || 0) : Number(targetPoint.x || 0)
+    if (Math.abs(sourceValue - targetValue) > 0.001) {
+      return null
+    }
+    return {
+      axis,
+      value: sourceValue
+    }
   },
 
   beginEdgeReconnect(edgeId, endpoint, pointerEvent) {
@@ -79,6 +103,8 @@ export const flowchartReconnectMethods = {
       excludeIds: [this.edgeReconnectState.fixedNodeId],
       padding: FLOWCHART_NODE_HIT_PADDING
     })
+    const edge = this.getEdgeById(this.edgeReconnectState.edgeId)
+    const fixedNode = this.getNodeById(this.edgeReconnectState.fixedNodeId)
     const previewAnchor = targetNode
       ? this.getNodeConnectionAnchor(targetNode, currentPoint)
       : null
@@ -88,6 +114,29 @@ export const flowchartReconnectMethods = {
       movingPoint: previewPoint,
       targetNodeId: targetNode?.id || '',
       targetAnchor: previewAnchor?.anchor || null
+    }
+    if (targetNode && fixedNode && edge) {
+      this.connectorPreview =
+        this.edgeReconnectState.endpoint === 'source'
+          ? this.createFlowchartConnectionPreview({
+              sourceNode: targetNode,
+              targetNode: fixedNode,
+              sourceAnchor: previewAnchor?.anchor || null,
+              targetAnchor: edge.targetAnchor || null,
+              style: edge.style || {},
+              fallbackSourcePoint: previewPoint,
+              fallbackTargetPoint: this.edgeReconnectState.fixedPoint
+            })
+          : this.createFlowchartConnectionPreview({
+              sourceNode: fixedNode,
+              targetNode,
+              sourceAnchor: edge.sourceAnchor || null,
+              targetAnchor: previewAnchor?.anchor || null,
+              style: edge.style || {},
+              fallbackSourcePoint: this.edgeReconnectState.fixedPoint,
+              fallbackTargetPoint: previewPoint
+            })
+      return
     }
     this.connectorPreview =
       this.edgeReconnectState.endpoint === 'source'
@@ -172,6 +221,41 @@ export const flowchartReconnectMethods = {
     window.removeEventListener('mouseup', this.commitEdgeReconnect)
   },
 
+  beginEdgeSegmentDrag(edgeId, segmentIndex, pointerEvent) {
+    const edge = this.edgesWithLayout.find(item => item.id === edgeId)
+    const pathPoints = Array.isArray(edge?.pathPoints) ? edge.pathPoints : []
+    const startPoint = pathPoints[segmentIndex]
+    const endPoint = pathPoints[segmentIndex + 1]
+    if (!edge || !startPoint || !endPoint) {
+      return
+    }
+    const isVertical =
+      Math.abs(Number(startPoint.x || 0) - Number(endPoint.x || 0)) <= 0.001
+    const isHorizontal =
+      Math.abs(Number(startPoint.y || 0) - Number(endPoint.y || 0)) <= 0.001
+    if (!isVertical && !isHorizontal) {
+      return
+    }
+    if (this.inlineTextEditorState) {
+      void this.commitInlineTextEditor()
+    }
+    this.cancelEdgeReconnect()
+    this.cancelEdgeLabelDrag()
+    this.selectedEdgeId = edgeId
+    this.selectedNodeIds = []
+    this.edgeToolbarState = null
+    this.edgeBendDragState = {
+      edgeId,
+      bendIndex: Number(segmentIndex || 0),
+      axis: isVertical ? 'x' : 'y',
+      straightSnap: this.getEdgeStraightRouteSnap(edge, isVertical ? 'x' : 'y')
+    }
+    this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
+    window.addEventListener('mousemove', this.updateEdgeBendDrag)
+    window.addEventListener('mouseup', this.commitEdgeBendDrag)
+    pointerEvent?.preventDefault?.()
+  },
+
   beginEdgeBendDrag(edgeId, bendIndex, pointerEvent) {
     const edge = this.edgesWithLayout.find(item => item.id === edgeId)
     const bendHandles = Array.isArray(edge?.bendHandles) ? edge.bendHandles : []
@@ -190,7 +274,8 @@ export const flowchartReconnectMethods = {
     this.edgeBendDragState = {
       edgeId,
       bendIndex,
-      axis: bendHandle.axis
+      axis: bendHandle.axis,
+      straightSnap: this.getEdgeStraightRouteSnap(edge, bendHandle.axis)
     }
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
     window.addEventListener('mousemove', this.updateEdgeBendDrag)
@@ -227,6 +312,16 @@ export const flowchartReconnectMethods = {
     }
     const axis = this.edgeBendDragState.axis === 'y' ? 'y' : 'x'
     const nextValue = axis === 'x' ? Number(nextPoint.x || 0) : Number(nextPoint.y || 0)
+    const snapThreshold = this.getStraightEdgeSnapThreshold
+      ? this.getStraightEdgeSnapThreshold()
+      : FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD
+    if (
+      this.edgeBendDragState.straightSnap?.axis === axis &&
+      Math.abs(nextValue - this.edgeBendDragState.straightSnap.value) <= snapThreshold
+    ) {
+      edge.route = null
+      return
+    }
     edge.route = {
       orthogonalLane: {
         axis,

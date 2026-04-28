@@ -32,7 +32,7 @@
         @fit-canvas="fitCanvasToView"
         @zoom-in="zoomIn"
         @add-node="addNodeByType"
-        @apply-template="applyTemplate"
+        @apply-template="requestApplyTemplate"
         @generate-ai="generateWithAi"
       >
         <template #world>
@@ -48,6 +48,7 @@
             @start-edge-label-drag="startEdgeLabelDrag"
             @start-edge-reconnect="startEdgeReconnect"
             @start-edge-bend-drag="startEdgeBendDrag"
+            @start-edge-segment-drag="startEdgeSegmentDrag"
           />
 
           <FlowchartNodeLayer
@@ -55,6 +56,7 @@
             :selected-node-ids="selectedNodeIds"
             :get-node-style="getNodeStyle"
             :get-connector-handle-style="getConnectorHandleStyle"
+            :get-connector-directions-for-node="getConnectorDirectionsForNode"
             :show-connector-handles-for-node="showConnectorHandlesForNode"
             :show-resize-handles-for-node="showResizeHandlesForNode"
             :connector-target-node-id="connectorDragState?.targetNodeId || edgeReconnectState?.targetNodeId || ''"
@@ -100,24 +102,12 @@
 
       <FlowchartMinimap
         :nodes="flowchartData.nodes"
-        :edges="edgesWithLayout"
+        :edges="minimapEdges"
         :lanes="flowchartLanes"
         :viewport="getViewport()"
         :canvas-viewport-size="canvasViewportSize"
         :labels="flowchartUiText"
         @jump-to-point="centerViewportAt"
-      />
-
-      <FlowchartSelectionToolbar
-        :selected-node-count="selectedNodeIds.length"
-        :labels="flowchartUiText"
-        @align-left="alignSelectedNodesLeft"
-        @distribute-horizontal="distributeSelectedNodesHorizontally"
-        @distribute-vertical="distributeSelectedNodesVertically"
-        @bring-front="bringSelectedNodesToFront"
-        @send-back="sendSelectedNodesToBack"
-        @duplicate="duplicateSelectedNodes"
-        @delete="removeSelection"
       />
 
       <FlowchartQuickAddBar
@@ -133,6 +123,7 @@
         :templates="flowchartTemplates"
         :flowchart-theme-presets="flowchartThemePresets"
         :flowchart-theme-id="flowchartConfig.themeId"
+        :resolved-theme="resolvedFlowchartTheme"
         :strict-alignment="flowchartConfig.strictAlignment"
         :background-style="flowchartConfig.backgroundStyle"
         :selected-node="selectedNode"
@@ -143,7 +134,7 @@
         @toggle-inspector="toggleInspector"
         @toggle-section="toggleInspectorSection"
         @close-inspector="closeInspector"
-        @apply-template="applyTemplate"
+        @request-template-apply="requestApplyTemplate"
         @update-flowchart-config="updateFlowchartConfig"
         @update-selected-node-type="updateSelectedNodeType"
         @update-selected-node-text="updateSelectedNodeText"
@@ -153,11 +144,6 @@
         @update-flowchart-theme="updateFlowchartTheme"
         @update-selected-node-style="updateSelectedNodeStyle"
         @update-selected-edge-style="updateSelectedEdgeStyle"
-        @reset-selected-node-style="resetSelectedNodeStyle"
-        @reset-selected-edge-style="resetSelectedEdgeStyle"
-        @reset-selected-edge-label-position="resetSelectedEdgeLabelPosition"
-        @insert-node-on-edge="insertNodeOnEdge"
-        @remove-edge="removeEdge"
       />
     </div>
   </div>
@@ -180,7 +166,7 @@ import {
   FLOWCHART_NODE_TYPES,
   createDefaultFlowchartData,
   createFlowchartTemplatePreviewData,
-  getFlowchartAnchorDirection,
+  getFlowchartAnchorHandleKey,
   getFlowchartEdgeLayout,
   getFlowchartNodeVisualStyle,
   getFlowchartThemeDefinition
@@ -191,7 +177,6 @@ import FlowchartInspector from './FlowchartInspector.vue'
 import FlowchartMinimap from './FlowchartMinimap.vue'
 import FlowchartNodeLayer from './FlowchartNodeLayer.vue'
 import FlowchartQuickAddBar from './FlowchartQuickAddBar.vue'
-import FlowchartSelectionToolbar from './FlowchartSelectionToolbar.vue'
 import FlowchartToolbar from './FlowchartToolbar.vue'
 import './FlowchartEditor.less'
 import { flowchartHistoryMethods } from './flowchartEditorHistory'
@@ -207,6 +192,7 @@ import { flowchartDocumentMethods } from './flowchartEditorDocument'
 import { flowchartAiMethods } from './flowchartEditorAi'
 import {
   FLOWCHART_ALIGNMENT_THRESHOLD,
+  FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD,
   cloneJson
 } from './flowchartEditorShared'
 
@@ -219,7 +205,6 @@ export default {
     FlowchartMinimap,
     FlowchartNodeLayer,
     FlowchartQuickAddBar,
-    FlowchartSelectionToolbar,
     FlowchartToolbar
   },
   data() {
@@ -319,7 +304,16 @@ export default {
         this.edgeReconnectState?.targetAnchor ||
         this.connectorDragState?.targetAnchor ||
         null
-      return getFlowchartAnchorDirection(previewAnchor, '')
+      return getFlowchartAnchorHandleKey(previewAnchor, '')
+    },
+    isInteractiveEdgeRouting() {
+      return !!(
+        this.dragState ||
+        this.connectorDragState ||
+        this.edgeReconnectState ||
+        this.edgeBendDragState ||
+        this.resizeState
+      )
     },
     edgesWithLayout() {
       return this.flowchartData.edges
@@ -332,11 +326,16 @@ export default {
             ...getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
               theme: this.resolvedFlowchartTheme,
               strictAlignment: !!this.flowchartConfig.strictAlignment,
-              lockedDirections: this.edgeDirectionLockMap?.[edge.id] || null
+              lockedDirections: this.edgeDirectionLockMap?.[edge.id] || null,
+              nodes: this.flowchartData.nodes,
+              interactive: this.isInteractiveEdgeRouting
             })
           }
         })
         .filter(Boolean)
+    },
+    minimapEdges() {
+      return this.isInteractiveEdgeRouting ? [] : this.edgesWithLayout
     },
     flowchartLanes() {
       return Array.isArray(this.flowchartData.lanes) ? this.flowchartData.lanes : []
@@ -488,7 +487,6 @@ export default {
         nodeFill: this.$t('flowchart.nodeFill'),
         nodeStroke: this.$t('flowchart.nodeStroke'),
         nodeTextColor: this.$t('flowchart.nodeTextColor'),
-        resetNodeStyle: this.$t('flowchart.resetNodeStyle'),
         edgeLabel: this.$t('flowchart.edgeLabel'),
         edgeLabelPosition: this.$t('flowchart.edgeLabelPosition'),
         edgeLabelOffsetX: this.$t('flowchart.edgeLabelOffsetX'),
@@ -498,9 +496,6 @@ export default {
         edgeLineStyle: this.$t('flowchart.edgeLineStyle'),
         edgeLineStyleSolid: this.$t('flowchart.edgeLineStyleSolid'),
         edgeLineStyleDashed: this.$t('flowchart.edgeLineStyleDashed'),
-        edgeArrowSize: this.$t('flowchart.edgeArrowSize'),
-        edgeArrowCount: this.$t('flowchart.edgeArrowCount'),
-        edgeArrowCountNone: this.$t('flowchart.edgeArrowCountNone'),
         edgeTypeStraight: this.$t('flowchart.edgeTypeStraight'),
         edgeTypeCurved: this.$t('flowchart.edgeTypeCurved'),
         edgeTypeOrthogonal: this.$t('flowchart.edgeTypeOrthogonal'),
@@ -510,10 +505,6 @@ export default {
         backgroundStyleDots: this.$t('flowchart.backgroundStyleDots'),
         backgroundStyleGrid: this.$t('flowchart.backgroundStyleGrid'),
         settingsPanelTitle: this.$t('flowchart.settingsPanelTitle'),
-        edgeInsertNode: this.$t('flowchart.edgeInsertNode'),
-        edgeDeleteLine: this.$t('flowchart.edgeDeleteLine'),
-        resetEdgeLabelPosition: this.$t('flowchart.resetEdgeLabelPosition'),
-        resetEdgeStyle: this.$t('flowchart.resetEdgeStyle'),
         minimap: this.$t('flowchart.minimap'),
         delete: this.$t('flowchart.delete'),
         selectionEmpty: this.$t('flowchart.selectionEmpty'),
@@ -533,8 +524,7 @@ export default {
         templateContentReview: this.$t('flowchart.templateContentReview'),
         templateProcurement: this.$t('flowchart.templateProcurement'),
         templateSalesPipeline: this.$t('flowchart.templateSalesPipeline'),
-        templateCustomerOnboardingSwimlane: this.$t('flowchart.templateCustomerOnboardingSwimlane'),
-        templateProductLaunchSwimlane: this.$t('flowchart.templateProductLaunchSwimlane'),
+        templateEnterpriseDelivery: this.$t('flowchart.templateEnterpriseDelivery'),
         close: this.$t('ai.close')
       }
     },
@@ -553,11 +543,24 @@ export default {
       }
     },
     flowchartTemplates() {
-      return FLOWCHART_TEMPLATE_PRESETS.map(item => ({
-        id: item.id,
-        label: this.$t(item.labelKey),
-        preview: createFlowchartTemplatePreviewData(this.$t('flowchart.title'), item.id)
-      }))
+      const groupedTemplates = FLOWCHART_TEMPLATE_PRESETS.reduce((result, item) => {
+        const categoryId = String(item.categoryKey || 'flowchart.templateCategoryOps')
+        if (!result.has(categoryId)) {
+          result.set(categoryId, {
+            id: categoryId,
+            label: this.$t(categoryId),
+            items: []
+          })
+        }
+        result.get(categoryId).items.push({
+          id: item.id,
+          label: this.$t(item.labelKey),
+          category: this.$t(item.categoryKey),
+          preview: createFlowchartTemplatePreviewData(this.$t('flowchart.title'), item.id)
+        })
+        return result
+      }, new Map())
+      return Array.from(groupedTemplates.values())
     },
     hasPotentialUnsavedFlowchart() {
       return (
@@ -735,6 +738,13 @@ export default {
       return Math.max(4, Math.min(14, baseThreshold))
     },
 
+    getStraightEdgeSnapThreshold() {
+      const viewport = this.getViewport()
+      const zoom = Math.max(0.25, Number(viewport.zoom || 1) || 1)
+      const baseThreshold = FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD / zoom
+      return Math.max(8, Math.min(24, baseThreshold))
+    },
+
     resolveAlignmentCandidate(candidates, axis, threshold, releaseThreshold) {
       const lock = this.dragState?.snapLock?.[axis] || null
       if (!candidates.length) {
@@ -752,7 +762,7 @@ export default {
         }
       }
       const activeCandidates = candidates.filter(candidate => {
-        return Math.abs(candidate.diff) <= threshold
+        return Math.abs(candidate.diff) <= (candidate.snapThreshold || threshold)
       })
       if (!activeCandidates.length) {
         return null
@@ -810,6 +820,59 @@ export default {
       }
     },
 
+    computeStraightEdgeSnap({
+      node,
+      movingMetrics,
+      selectedSet,
+      threshold,
+      releaseThreshold
+    }) {
+      const connectedNodeIds = this.getConnectedNodeIds(node.id)
+      const xCandidates = []
+      const yCandidates = []
+      if (!connectedNodeIds.size) {
+        return { xCandidates, yCandidates }
+      }
+      const axisDistanceFloor = 24
+      this.flowchartData.nodes.forEach(candidate => {
+        if (!connectedNodeIds.has(candidate.id) || selectedSet.has(candidate.id)) {
+          return
+        }
+        const candidateMetrics = this.createNodeAlignmentMetrics(candidate)
+        const centerXDiff = candidateMetrics.centerX - movingMetrics.centerX
+        const centerYDiff = candidateMetrics.centerY - movingMetrics.centerY
+        const centerXDistance = Math.abs(centerXDiff)
+        const centerYDistance = Math.abs(centerYDiff)
+        if (
+          centerXDistance <= releaseThreshold &&
+          centerYDistance >= Math.max(axisDistanceFloor, centerXDistance * 2)
+        ) {
+          xCandidates.push({
+            diff: centerXDiff,
+            guideX: candidateMetrics.centerX,
+            candidateMetrics,
+            priority: 8,
+            snapThreshold: threshold,
+            lockKey: `straight:${candidate.id}:centerX`
+          })
+        }
+        if (
+          centerYDistance <= releaseThreshold &&
+          centerXDistance >= Math.max(axisDistanceFloor, centerYDistance * 2)
+        ) {
+          yCandidates.push({
+            diff: centerYDiff,
+            guideY: candidateMetrics.centerY,
+            candidateMetrics,
+            priority: 8,
+            snapThreshold: threshold,
+            lockKey: `straight:${candidate.id}:centerY`
+          })
+        }
+      })
+      return { xCandidates, yCandidates }
+    },
+
     computeAlignmentSnap({ node, x, y, selectedIds = [] } = {}) {
       if (!node) {
         return {
@@ -821,13 +884,22 @@ export default {
       const selectedSet = new Set(selectedIds)
       const movingMetrics = this.createNodeAlignmentMetrics(node, x, y)
       const threshold = this.getAlignmentSnapThreshold()
+      const straightThreshold = this.getStraightEdgeSnapThreshold()
       const releaseThreshold = threshold * 1.75
+      const straightReleaseThreshold = straightThreshold * 1.75
       const strictAlignment = !!this.flowchartConfig.strictAlignment
-      const connectedNodeIds = strictAlignment
-        ? this.getConnectedNodeIds(node.id)
-        : new Set()
+      const connectedNodeIds = this.getConnectedNodeIds(node.id)
       const xCandidates = []
       const yCandidates = []
+      const straightSnap = this.computeStraightEdgeSnap({
+        node,
+        movingMetrics,
+        selectedSet,
+        threshold: straightThreshold,
+        releaseThreshold: straightReleaseThreshold
+      })
+      xCandidates.push(...straightSnap.xCandidates)
+      yCandidates.push(...straightSnap.yCandidates)
       this.flowchartData.nodes.forEach(candidate => {
         if (selectedSet.has(candidate.id)) return
         const candidateMetrics = this.createNodeAlignmentMetrics(candidate)
@@ -886,13 +958,13 @@ export default {
         xCandidates,
         'x',
         threshold,
-        releaseThreshold
+        Math.max(releaseThreshold, straightReleaseThreshold)
       )
       const bestY = this.resolveAlignmentCandidate(
         yCandidates,
         'y',
         threshold,
-        releaseThreshold
+        Math.max(releaseThreshold, straightReleaseThreshold)
       )
       const guides = []
       if (bestX) {

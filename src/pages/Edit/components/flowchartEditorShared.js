@@ -14,6 +14,7 @@ export const getNodeCenter = node => ({
 export const MIN_VIEWPORT_ZOOM = 0.25
 export const MAX_VIEWPORT_ZOOM = 2.5
 export const FLOWCHART_ALIGNMENT_THRESHOLD = 8
+export const FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD = 12
 export const FLOWCHART_HISTORY_LIMIT = 60
 export const FLOWCHART_AUTO_SAVE_INTERVAL = 60 * 1000
 export const FLOWCHART_INTERACTION_CLICK_GUARD_MS = 160

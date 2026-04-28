@@ -1,4 +1,7 @@
 import {
+  getFlowchartEdgeLayout,
+  getFlowchartNodeConnectionPoint,
+  getFlowchartNodeAnchorPresets,
   normalizeFlowchartNodeAnchor
 } from '@/services/flowchartDocument'
 import {
@@ -6,8 +9,6 @@ import {
   createNodeId,
   getNodeCenter
 } from './flowchartEditorShared'
-
-const FLOWCHART_CORNER_SNAP_DISTANCE = 22
 
 export const flowchartConnectorMethods = {
   getNodeById(nodeId) {
@@ -30,125 +31,64 @@ export const flowchartConnectorMethods = {
     )
   },
 
-  getNodeConnectorPoint(node, direction) {
-    const x = Number(node?.x || 0)
-    const y = Number(node?.y || 0)
-    const width = Number(node?.width || 0)
-    const height = Number(node?.height || 0)
-    const normalizedAnchor = normalizeFlowchartNodeAnchor(direction)
-    if (normalizedAnchor) {
-      return {
-        x: x + width * normalizedAnchor.xRatio,
-        y: y + height * normalizedAnchor.yRatio
-      }
-    }
-    if (direction === 'top') {
-      return {
-        x: x + width / 2,
-        y
-      }
-    }
-    if (direction === 'right') {
-      return {
-        x: x + width,
-        y: y + height / 2
-      }
-    }
-    if (direction === 'bottom') {
-      return {
-        x: x + width / 2,
-        y: y + height
-      }
-    }
-    return {
-      x,
-      y: y + height / 2
-    }
+  getConnectorDirectionsForNode(node) {
+    return getFlowchartNodeAnchorPresets(node).map(anchor => anchor.handleKey)
   },
 
-  getDirectionAnchor(direction) {
-    const anchorMap = {
-      top: { xRatio: 0.5, yRatio: 0 },
-      right: { xRatio: 1, yRatio: 0.5 },
-      bottom: { xRatio: 0.5, yRatio: 1 },
-      left: { xRatio: 0, yRatio: 0.5 }
+  getNodeConnectorPoint(node, direction) {
+    return getFlowchartNodeConnectionPoint(node, direction)
+  },
+
+  getDirectionAnchor(direction, node = null) {
+    const presets = getFlowchartNodeAnchorPresets(node)
+    const presetAnchor = presets.find(anchor => anchor?.handleKey === direction)
+    if (presetAnchor) {
+      return normalizeFlowchartNodeAnchor({
+        ...presetAnchor,
+        locked: true
+      })
     }
-    return normalizeFlowchartNodeAnchor(anchorMap[direction] || anchorMap.right)
+    const anchorMap = {
+      top: { handleKey: 'top', xRatio: 0.5, yRatio: 0, direction: 'top' },
+      right: { handleKey: 'right', xRatio: 1, yRatio: 0.5, direction: 'right' },
+      bottom: { handleKey: 'bottom', xRatio: 0.5, yRatio: 1, direction: 'bottom' },
+      left: { handleKey: 'left', xRatio: 0, yRatio: 0.5, direction: 'left' }
+    }
+    return normalizeFlowchartNodeAnchor({
+      ...(anchorMap[direction] || anchorMap.right),
+      locked: true
+    })
   },
 
   getNodeConnectionAnchor(node, referencePoint) {
-    const width = Math.max(1, Number(node?.width || 0))
-    const height = Math.max(1, Number(node?.height || 0))
-    const localX = Math.max(
-      0,
-      Math.min(width, Number(referencePoint?.x || 0) - Number(node?.x || 0))
-    )
-    const localY = Math.max(
-      0,
-      Math.min(height, Number(referencePoint?.y || 0) - Number(node?.y || 0))
-    )
-    const corners = [
-      { xRatio: 0, yRatio: 0 },
-      { xRatio: 1, yRatio: 0 },
-      { xRatio: 1, yRatio: 1 },
-      { xRatio: 0, yRatio: 1 }
-    ]
-    const snappedCorner =
-      corners
-        .map(anchor => ({
-          anchor,
-          distance: Math.hypot(
-            localX - width * anchor.xRatio,
-            localY - height * anchor.yRatio
-          )
-        }))
+    const presetAnchors = getFlowchartNodeAnchorPresets(node)
+    const snappedPreset =
+      presetAnchors
+        .map(anchor => {
+          const point = this.getNodeConnectorPoint(node, anchor)
+          return {
+            anchor,
+            point,
+            distance: Math.hypot(
+              Number(referencePoint?.x || 0) - Number(point.x || 0),
+              Number(referencePoint?.y || 0) - Number(point.y || 0)
+            )
+          }
+        })
         .sort((first, second) => first.distance - second.distance)[0] || null
-    if (snappedCorner && snappedCorner.distance <= FLOWCHART_CORNER_SNAP_DISTANCE) {
-      const anchor = normalizeFlowchartNodeAnchor(snappedCorner.anchor)
+    if (snappedPreset) {
       return {
-        anchor,
-        point: this.getNodeConnectorPoint(node, anchor)
+        anchor: normalizeFlowchartNodeAnchor({
+          ...snappedPreset.anchor,
+          locked: true
+        }),
+        point: snappedPreset.point
       }
     }
-    const edgeDistances = [
-      {
-        edge: 'top',
-        distance: localY,
-        anchor: {
-          xRatio: width <= 0 ? 0.5 : localX / width,
-          yRatio: 0
-        }
-      },
-      {
-        edge: 'right',
-        distance: width - localX,
-        anchor: {
-          xRatio: 1,
-          yRatio: height <= 0 ? 0.5 : localY / height
-        }
-      },
-      {
-        edge: 'bottom',
-        distance: height - localY,
-        anchor: {
-          xRatio: width <= 0 ? 0.5 : localX / width,
-          yRatio: 1
-        }
-      },
-      {
-        edge: 'left',
-        distance: localX,
-        anchor: {
-          xRatio: 0,
-          yRatio: height <= 0 ? 0.5 : localY / height
-        }
-      }
-    ]
-    const bestEdge = edgeDistances.sort((first, second) => first.distance - second.distance)[0]
-    const anchor = normalizeFlowchartNodeAnchor(bestEdge?.anchor)
+    const fallbackAnchor = this.getDirectionAnchor('right', node)
     return {
-      anchor,
-      point: this.getNodeConnectorPoint(node, anchor)
+      anchor: fallbackAnchor,
+      point: this.getNodeConnectorPoint(node, fallbackAnchor)
     }
   },
 
@@ -166,6 +106,48 @@ export const flowchartConnectorMethods = {
       sourcePoint,
       targetPoint,
       path: `M ${sourcePoint.x} ${sourcePoint.y} L ${targetPoint.x} ${targetPoint.y}`
+    }
+  },
+
+  createFlowchartConnectionPreview({
+    sourceNode,
+    targetNode,
+    sourceAnchor = null,
+    targetAnchor = null,
+    style = {},
+    fallbackSourcePoint = null,
+    fallbackTargetPoint = null
+  }) {
+    if (!sourceNode || !targetNode) {
+      return this.createConnectorPreview(
+        fallbackSourcePoint || { x: 0, y: 0 },
+        fallbackTargetPoint || fallbackSourcePoint || { x: 0, y: 0 }
+      )
+    }
+    const layout = getFlowchartEdgeLayout(
+      {
+        id: 'flowchart-preview-edge',
+        source: sourceNode.id,
+        target: targetNode.id,
+        sourceAnchor,
+        targetAnchor,
+        style: {
+          pathType: 'orthogonal',
+          ...(style || {})
+        }
+      },
+      sourceNode,
+      targetNode,
+      {
+        theme: this.resolvedFlowchartTheme,
+        strictAlignment: !!this.flowchartConfig.strictAlignment,
+        nodes: this.flowchartData.nodes
+      }
+    )
+    return {
+      sourcePoint: layout.sourcePoint,
+      targetPoint: layout.targetPoint,
+      path: layout.path
     }
   },
 
@@ -325,6 +307,7 @@ export const flowchartConnectorMethods = {
       excludeIds: [this.connectorDragState.nodeId],
       padding: FLOWCHART_NODE_HIT_PADDING
     })
+    const sourceNode = this.getNodeById(this.connectorDragState.nodeId)
     const previewAnchor = targetNode
       ? this.getNodeConnectionAnchor(targetNode, currentPoint)
       : null
@@ -337,10 +320,23 @@ export const flowchartConnectorMethods = {
       targetNodeId: targetNode?.id || '',
       targetAnchor: previewAnchor?.anchor || null
     }
-    this.connectorPreview = this.createConnectorPreview(
-      this.connectorDragState.startPoint,
-      previewTarget
-    )
+    this.connectorPreview =
+      targetNode && sourceNode
+        ? this.createFlowchartConnectionPreview({
+            sourceNode,
+            targetNode,
+            sourceAnchor: this.getDirectionAnchor(
+              this.connectorDragState.direction,
+              sourceNode
+            ),
+            targetAnchor: previewAnchor?.anchor || null,
+            fallbackSourcePoint: this.connectorDragState.startPoint,
+            fallbackTargetPoint: previewTarget
+          })
+        : this.createConnectorPreview(
+            this.connectorDragState.startPoint,
+            previewTarget
+          )
   },
 
   async commitConnectorDrag(pointerEvent) {
@@ -372,7 +368,7 @@ export const flowchartConnectorMethods = {
     if (targetNode) {
       const targetAnchor = this.getNodeConnectionAnchor(targetNode, releasePoint).anchor
       const targetEdge = this.ensureFlowchartEdge(sourceNode.id, targetNode.id, '', {
-        sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction),
+        sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction, sourceNode),
         targetAnchor
       })
       this.selectedEdgeId = targetEdge.id
@@ -392,15 +388,8 @@ export const flowchartConnectorMethods = {
     )
     this.flowchartData.nodes.push(newNode)
     this.ensureFlowchartEdge(sourceNode.id, newNode.id, '', {
-      sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction),
-      targetAnchor: this.getDirectionAnchor(
-        {
-          top: 'bottom',
-          right: 'left',
-          bottom: 'top',
-          left: 'right'
-        }[dragSnapshot.direction] || 'left'
-      )
+      sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction, sourceNode),
+      targetAnchor: this.getNodeConnectionAnchor(newNode, getNodeCenter(sourceNode)).anchor
     })
     this.selectedNodeIds = [newNode.id]
     this.selectedEdgeId = ''

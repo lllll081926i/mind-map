@@ -280,8 +280,7 @@
   stroke-width: 10;
 }
 
-.flowchartQuickAddBar,
-.flowchartSelectionToolbar {
+.flowchartQuickAddBar {
   position: fixed;
   z-index: 25;
   display: inline-flex;
@@ -300,14 +299,7 @@
   bottom: 84px;
 }
 
-.flowchartSelectionToolbar {
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-}
-
-.flowchartQuickAddBtn,
-.flowchartSelectionTool {
+.flowchartQuickAddBtn {
   width: 34px;
   height: 32px;
   padding: 0;
@@ -467,6 +459,14 @@
   color: var(--flowchart-text);
 }
 
+.flowchartPanelEmpty {
+  margin-top: 12px;
+  padding: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--flowchart-subtle-text);
+}
+
 .flowchartPanelSection {
   margin-top: 16px;
   padding-top: 14px;
@@ -484,6 +484,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.flowchartTemplateGroup + .flowchartTemplateGroup {
+  margin-top: 18px;
+}
+
+.flowchartTemplateGroupTitle {
+  margin-bottom: 10px;
 }
 
 .flowchartThemeGrid {
@@ -629,6 +637,24 @@
   overflow: visible;
 }
 
+.flowchartEditor .edgeHandleLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.flowchartEditor .edgeArrowLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  overflow: visible;
+  pointer-events: none;
+}
+
 .flowchartEditor .edgePath {
   fill: none;
   stroke-width: 2;
@@ -653,7 +679,7 @@
 }
 
 .flowchartEditor .edgeLabel {
-  font-size: 12px;
+  font-size: 14px;
   text-anchor: middle;
   cursor: pointer;
   user-select: none;
@@ -697,6 +723,21 @@
   stroke: transparent;
   cursor: grab;
   pointer-events: all;
+}
+
+.flowchartEdgeSegmentHitArea {
+  stroke: transparent;
+  stroke-width: 18;
+  stroke-linecap: round;
+  pointer-events: stroke;
+}
+
+.flowchartEdgeSegmentHitArea.isHorizontal {
+  cursor: ns-resize;
+}
+
+.flowchartEdgeSegmentHitArea.isVertical {
+  cursor: ew-resize;
 }
 
 .flowchartEdgeHandleHitArea:hover + .flowchartEdgeBendHandle,
@@ -800,7 +841,7 @@
 }
 
 .flowchartEditor .nodeText {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   text-align: center;
   line-height: 1.35;
@@ -898,6 +939,7 @@
   color: var(--flowchart-text);
   box-shadow: 0 0 0 3px var(--flowchart-selection-ring);
   font: inherit;
+  font-size: 15px;
   outline: none;
 }
 
@@ -1015,6 +1057,144 @@
   border-radius: 6px;
 }
 
+.flowchartBackgroundOptionGrid,
+.flowchartLineStyleGrid,
+.flowchartColorSwatchGrid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.flowchartBackgroundOptionGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.flowchartBackgroundOption,
+.flowchartLineStyleOption {
+  border: 1px solid var(--flowchart-panel-border);
+  border-radius: 10px;
+  background: var(--flowchart-panel-bg);
+  color: var(--flowchart-text);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.flowchartBackgroundOption {
+  min-width: 0;
+  padding: 8px;
+}
+
+.flowchartBackgroundOption.isActive,
+.flowchartLineStyleOption.isActive {
+  border-color: var(--flowchart-selection);
+  box-shadow: 0 0 0 3px var(--flowchart-selection-ring);
+}
+
+.flowchartBackgroundOptionPreview {
+  display: block;
+  height: 48px;
+  border: 1px solid var(--flowchart-panel-border);
+  border-radius: 8px;
+  background-color: var(--flowchart-canvas-bg);
+}
+
+.flowchartBackgroundOptionPreview.is-dots {
+  background-image: radial-gradient(var(--flowchart-grid-color) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.flowchartBackgroundOptionPreview.is-grid {
+  background-image:
+    linear-gradient(var(--flowchart-grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--flowchart-grid-color) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.flowchartBackgroundOptionText,
+.flowchartLineStyleText {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--flowchart-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowchartColorSwatchGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.flowchartColorSwatch,
+.flowchartColorPickerButton {
+  position: relative;
+  height: 34px;
+  border: 1px solid var(--flowchart-panel-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.flowchartColorSwatch {
+  padding: 0;
+}
+
+.flowchartColorSwatch.isActive {
+  border-color: var(--flowchart-selection);
+  box-shadow:
+    inset 0 0 0 2px var(--flowchart-panel-bg),
+    0 0 0 3px var(--flowchart-selection-ring);
+}
+
+.flowchartColorPickerButton {
+  display: block;
+  background:
+    linear-gradient(45deg, transparent 46%, var(--flowchart-text) 48%, var(--flowchart-text) 52%, transparent 54%),
+    conic-gradient(#ef4444, #f59e0b, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ef4444);
+  overflow: hidden;
+}
+
+.flowchartColorPickerButton input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.flowchartLineStyleGrid {
+  grid-template-columns: 1fr;
+}
+
+.flowchartLineStyleOption {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.flowchartLineStyleSample {
+  display: block;
+  min-width: 0;
+}
+
+.flowchartLineStyleSample svg {
+  display: block;
+  width: 100%;
+  height: 12px;
+}
+
+.flowchartLineStyleOption .flowchartLineStyleText {
+  margin-top: 0;
+  text-align: right;
+}
+
 .flowchartStylePresetGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
@@ -1124,13 +1304,6 @@
     bottom: 72px;
   }
 
-  .flowchartSelectionToolbar {
-    left: auto;
-    right: 86px;
-    bottom: 18px;
-    transform: none;
-  }
-
   .flowchartMinimap {
     left: 12px;
     bottom: 18px;
@@ -1194,8 +1367,7 @@
     padding: 8px;
   }
 
-  .flowchartQuickAddBar,
-  .flowchartSelectionToolbar {
+  .flowchartQuickAddBar {
     gap: 4px;
     padding: 6px;
   }
@@ -1213,8 +1385,7 @@
     font-size: 12px;
   }
 
-  .flowchartQuickAddBtn,
-  .flowchartSelectionTool {
+  .flowchartQuickAddBtn {
     width: 30px;
     height: 30px;
   }

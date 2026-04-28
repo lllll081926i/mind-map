@@ -36,7 +36,7 @@
     <span class="nodeText">{{ node.text }}</span>
     <template v-if="showConnectorHandlesForNode(node.id)">
       <button
-        v-for="direction in connectorDirections"
+        v-for="direction in getConnectorDirections(node)"
         :key="direction"
         type="button"
         class="flowchartConnectorHandle"
@@ -47,7 +47,7 @@
     </template>
     <template v-else-if="connectorTargetNodeId === node.id">
       <span
-        v-for="direction in connectorDirections"
+        v-for="direction in getConnectorDirections(node)"
         :key="`preview-${direction}`"
         class="flowchartConnectorHandle isPreview"
         :class="[
@@ -73,7 +73,6 @@
 </template>
 
 <script>
-const CONNECTOR_DIRECTIONS = ['top', 'right', 'bottom', 'left']
 const RESIZE_DIRECTIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 
 export default {
@@ -102,6 +101,10 @@ export default {
       type: Function,
       required: true
     },
+    getConnectorDirectionsForNode: {
+      type: Function,
+      required: true
+    },
     showConnectorHandlesForNode: {
       type: Function,
       required: true
@@ -121,7 +124,6 @@ export default {
   },
   data() {
     return {
-      connectorDirections: CONNECTOR_DIRECTIONS,
       resizeDirections: RESIZE_DIRECTIONS
     }
   },
@@ -134,6 +136,9 @@ export default {
     },
     getInputPolygonPoints() {
       return '13,1 99,1 87,99 1,99'
+    },
+    getConnectorDirections(node) {
+      return this.getConnectorDirectionsForNode(node)
     },
     isPreviewDirectionActive(direction) {
       return this.connectorTargetDirection === direction

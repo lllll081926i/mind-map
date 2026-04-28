@@ -134,6 +134,18 @@ export const flowchartSelectionMethods = {
       this.cloneAndConnectSelectedNode(event.key)
       return
     }
+    if (event.key === 'Enter' || event.key === 'F2') {
+      if (this.selectedNodeIds.length === 1) {
+        event.preventDefault()
+        this.editNodeText(this.selectedNodeIds[0])
+        return
+      }
+      if (this.selectedEdgeId) {
+        event.preventDefault()
+        this.editEdgeLabel(this.selectedEdgeId)
+        return
+      }
+    }
     if (isMetaKey && event.key.toLowerCase() === 'c') {
       event.preventDefault()
       this.copySelectedNodes()
