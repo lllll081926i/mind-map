@@ -1,6 +1,6 @@
 {
   "name": "mind-map-app",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "private": true,
   "workspaces": [
     "simple-mind-map",
@@ -35,7 +35,6 @@
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build --bundles nsis",
     "desktop:build:windows": "tauri build --bundles nsis",
-    "desktop:build:macos": "tauri build --bundles app,dmg",
     "desktop:build:linux": "tauri build --bundles deb,appimage",
     "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "format": "prettier --write \"src/**/*.{js,ts,vue,css,less,html,json}\"",

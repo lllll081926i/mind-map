@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MindMap",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "identifier": "com.mindmap.desktop",
   "build": {
     "beforeDevCommand": "npm run frontend:dev",
@@ -35,7 +35,6 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
       "icons/icon.ico",
       "icons/icon.png"
     ],
@@ -64,7 +63,7 @@
       }
     ],
     "shortDescription": "MindMap editor",
-    "longDescription": "MindMap application for Windows, macOS, and Linux.",
+    "longDescription": "MindMap application for Windows and Linux.",
     "windows": {
       "digestAlgorithm": "sha256",
       "nsis": {
@@ -91,13 +90,6 @@
         "postInstallScript": "file-association/linux/postinstall.sh",
         "postRemoveScript": "file-association/linux/postremove.sh"
       }
-    },
-    "macOS": {
-      "minimumSystemVersion": "11.0",
-      "files": {
-        "Resources/smm-document.icns": "file-association/icons/smm-document.icns"
-      },
-      "infoPlist": "file-association/macos/Info.plist"
     }
   }
 }
