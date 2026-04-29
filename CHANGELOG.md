@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-04-29
+
+### Changed
+- Removed macOS desktop packaging from the release pipeline so tag-triggered GitHub Actions now build and publish Windows and Linux artifacts only
+- Trimmed desktop packaging metadata to match the supported platforms, including Tauri bundle descriptions and exposed build scripts
+
+### Fixed
+- Improved flowchart orthogonal routing so diagonal return paths prefer a natural single-bend shape when geometry is clear and obstacle-free
+- Hardened flowchart route scoring and regression coverage to prevent single-bend optimizations from breaking short-distance preview routing
+
 ## [0.2.13] - 2026-04-15
 
 ### Added
