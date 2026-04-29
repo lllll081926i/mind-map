@@ -1504,6 +1504,7 @@ const TEMPLATE_COLUMN_ALIGNMENT_THRESHOLD = 72
 const FLOWCHART_AXIS_ALIGNMENT_TOLERANCE = 40
 const MIN_ORTHOGONAL_TURN_SPAN = 36
 const MAX_FLOWCHART_SINGLE_CORNER_SPAN = 120
+const FLOWCHART_SINGLE_CORNER_DOMINANT_GAP = 24
 const MIN_EDGE_ARROW_LENGTH = 56
 const MAX_FLOWCHART_EDGE_ARROW_COUNT = 4
 const DEFAULT_FLOWCHART_EDGE_ARROW_COUNT = 1
@@ -2723,6 +2724,27 @@ const scoreFlowchartConnectionCandidate = ({
     score += ['left', 'right'].includes(sourceDirection) ? -28 : 44
     score += ['left', 'right'].includes(targetDirection) ? -28 : 44
   }
+  const isMixedDirection =
+    ['left', 'right'].includes(sourceDirection) !==
+    ['left', 'right'].includes(targetDirection)
+  const prefersDominantSingleCorner =
+    isMixedDirection &&
+    bendCount === 1 &&
+    !obstacleHit &&
+    !bufferedObstacleHit &&
+    !sourceEndpointBacktrack &&
+    !targetEndpointBacktrack &&
+    ((['left', 'right'].includes(sourceDirection) &&
+      endpointDeltaX > MAX_FLOWCHART_SINGLE_CORNER_SPAN) ||
+      (['top', 'bottom'].includes(sourceDirection) &&
+        endpointDeltaY > MAX_FLOWCHART_SINGLE_CORNER_SPAN)) &&
+    ((['left', 'right'].includes(sourceDirection) &&
+      endpointDeltaY >= endpointDeltaX + FLOWCHART_SINGLE_CORNER_DOMINANT_GAP) ||
+      (['top', 'bottom'].includes(sourceDirection) &&
+        endpointDeltaX >= endpointDeltaY + FLOWCHART_SINGLE_CORNER_DOMINANT_GAP))
+  if (prefersDominantSingleCorner) {
+    score -= 320
+  }
   if (pathType === 'orthogonal' && bendCount <= 0) {
     score -= 36
   }
@@ -2996,6 +3018,12 @@ const buildFlowchartOrthogonalRoute = ({
     const singleCornerTravel = sourceHorizontal
       ? Math.abs(Number(targetPoint?.x || 0) - Number(sourcePoint?.x || 0))
       : Math.abs(Number(targetPoint?.y || 0) - Number(sourcePoint?.y || 0))
+    const singleCornerDominantGap = sourceHorizontal
+      ? Math.abs(Number(targetPoint?.y || 0) - Number(sourcePoint?.y || 0))
+      : Math.abs(Number(targetPoint?.x || 0) - Number(sourcePoint?.x || 0))
+    const allowExtendedSingleCorner =
+      singleCornerDominantGap >=
+      singleCornerTravel + FLOWCHART_SINGLE_CORNER_DOMINANT_GAP
     if (sourceForward && targetForward) {
       const singleCornerRoutePoints = simplifyFlowchartOrthogonalPoints([
         sourcePoint,
@@ -3003,7 +3031,8 @@ const buildFlowchartOrthogonalRoute = ({
         targetPoint
       ])
       if (
-        singleCornerTravel <= MAX_FLOWCHART_SINGLE_CORNER_SPAN &&
+        (singleCornerTravel <= MAX_FLOWCHART_SINGLE_CORNER_SPAN ||
+          allowExtendedSingleCorner) &&
         singleCornerRoutePoints.length <= 3 &&
         !doesFlowchartPolylineIntersectObstacles(
           singleCornerRoutePoints,

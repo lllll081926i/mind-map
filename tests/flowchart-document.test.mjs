@@ -532,6 +532,46 @@ test('右出上入且拐角无障碍时会优先收敛为单拐点路径', async
   assert.match(layout.path, /^M 208 176 L 286 176 L 286 240$/)
 })
 
+test('左上节点连接右下判断节点时，无遮挡单拐点应优先于双转折', async () => {
+  const { getFlowchartEdgeLayout } = await loadFlowchartDocumentModule()
+  const sourceNode = {
+    id: 'source-node',
+    x: 20,
+    y: 20,
+    width: 252,
+    height: 104
+  }
+  const targetNode = {
+    id: 'target-node',
+    x: 340,
+    y: 330,
+    width: 188,
+    height: 92
+  }
+
+  const layout = getFlowchartEdgeLayout(
+    {
+      id: 'edge-upper-left-to-lower-right',
+      source: sourceNode.id,
+      target: targetNode.id,
+      style: {
+        pathType: 'orthogonal'
+      }
+    },
+    sourceNode,
+    targetNode,
+    {
+      nodes: [sourceNode, targetNode]
+    }
+  )
+
+  assert.equal(layout.sourceDirection, 'right')
+  assert.equal(layout.targetDirection, 'top')
+  assert.equal(layout.pathPoints.length, 3)
+  assert.equal(layout.route, null)
+  assert.match(layout.path, /^M 272 72 L 434 72 L 434 330$/)
+})
+
 test('单拐点优化会覆盖上下左右八种混合入出方向', async () => {
   const { getFlowchartEdgeLayout } = await loadFlowchartDocumentModule()
   const sourceSize = { width: 160, height: 72 }
