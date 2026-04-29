@@ -11,10 +11,6 @@ const windowsNsisSource = fs.readFileSync(
   path.resolve('src-tauri/file-association/windows/smm-file-association.nsh'),
   'utf8'
 )
-const macInfoPlistSource = fs.readFileSync(
-  path.resolve('src-tauri/file-association/macos/Info.plist'),
-  'utf8'
-)
 const linuxDesktopSource = fs.readFileSync(
   path.resolve('src-tauri/file-association/linux/mindmap-smm.desktop'),
   'utf8'
@@ -40,8 +36,9 @@ test('Linux 打包资源包含桌面入口与 MIME 绑定文件', () => {
   assert.match(linuxDesktopSource, /Exec=.*%F/)
 })
 
-test('macOS 文档类型声明仍然绑定 .smm 与专属 icns 图标', () => {
-  assert.match(macInfoPlistSource, /<string>smm<\/string>/)
-  assert.match(macInfoPlistSource, /<string>smm-document\.icns<\/string>/)
-  assert.match(macInfoPlistSource, /<string>com\.mindmap\.document\.smm<\/string>/)
+test('Tauri 打包配置已移除 macOS 文件关联声明', () => {
+  assert.doesNotMatch(tauriConfigSource, /"macOS"\s*:/)
+  assert.doesNotMatch(tauriConfigSource, /Info\.plist/)
+  assert.doesNotMatch(tauriConfigSource, /smm-document\.icns/)
+  assert.doesNotMatch(tauriConfigSource, /icon\.icns/)
 })
