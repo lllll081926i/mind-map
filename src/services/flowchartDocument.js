@@ -1859,18 +1859,8 @@ const offsetFlowchartPoint = (point, direction, distance) => {
 
 const normalizeFlowchartAxisAlignedEndpoints = ({
   sourcePoint,
-  targetPoint,
-  sourceNode = null,
-  targetNode = null,
-  sourceDirection = '',
-  targetDirection = '',
-  allowRangeAlignment = true
+  targetPoint
 }) => {
-  void sourceNode
-  void targetNode
-  void sourceDirection
-  void targetDirection
-  void allowRangeAlignment
   return {
     sourcePoint: {
       x: Number(sourcePoint?.x || 0),
@@ -2114,10 +2104,13 @@ const buildFlowchartObstacleAvoidingOrthogonalRoute = ({
     extent.minY = Math.min(extent.minY, bounds.top)
     extent.maxY = Math.max(extent.maxY, bounds.bottom)
   })
-  xValues.add(roundFlowchartRouteCoordinate(extent.minX - 72))
-  xValues.add(roundFlowchartRouteCoordinate(extent.maxX + 72))
-  yValues.add(roundFlowchartRouteCoordinate(extent.minY - 72))
-  yValues.add(roundFlowchartRouteCoordinate(extent.maxY + 72))
+  const extentSpanX = extent.maxX - extent.minX
+  const extentSpanY = extent.maxY - extent.minY
+  const boundaryMargin = Math.max(72, Math.max(extentSpanX, extentSpanY) * 0.25)
+  xValues.add(roundFlowchartRouteCoordinate(extent.minX - boundaryMargin))
+  xValues.add(roundFlowchartRouteCoordinate(extent.maxX + boundaryMargin))
+  yValues.add(roundFlowchartRouteCoordinate(extent.minY - boundaryMargin))
+  yValues.add(roundFlowchartRouteCoordinate(extent.maxY + boundaryMargin))
   const xCoordinates = [...xValues].sort((first, second) => first - second)
   const yCoordinates = [...yValues].sort((first, second) => first - second)
   const points = []
@@ -2200,8 +2193,20 @@ const buildFlowchartObstacleAvoidingOrthogonalRoute = ({
   const bestCosts = new Map([[startStateKey, 0]])
   const previousState = new Map()
   let bestEndStateKey = ''
+  const insertSorted = (item) => {
+    let low = 0
+    let high = queue.length
+    while (low < high) {
+      const mid = (low + high) >>> 1
+      if (queue[mid].cost <= item.cost) {
+        low = mid + 1
+      } else {
+        high = mid
+      }
+    }
+    queue.splice(low, 0, item)
+  }
   while (queue.length) {
-    queue.sort((first, second) => first.cost - second.cost)
     const current = queue.shift()
     const currentStateKey = `${current.pointIndex}:${current.previousDirection}`
     const currentBestCost = bestCosts.get(currentStateKey)
@@ -2219,7 +2224,7 @@ const buildFlowchartObstacleAvoidingOrthogonalRoute = ({
       )
       const bendPenalty =
         current.previousDirection !== 'start' && current.previousDirection !== nextDirection
-          ? 160
+          ? FLOWCHART_ORTHOGONAL_STUB_LENGTH * 4 + neighbor.distance * 0.5
           : 0
       const nextCost = current.cost + neighbor.distance + bendPenalty
       const nextStateKey = `${neighbor.index}:${nextDirection}`
@@ -2228,7 +2233,7 @@ const buildFlowchartObstacleAvoidingOrthogonalRoute = ({
       }
       bestCosts.set(nextStateKey, nextCost)
       previousState.set(nextStateKey, currentStateKey)
-      queue.push({
+      insertSorted({
         pointIndex: neighbor.index,
         previousDirection: nextDirection,
         cost: nextCost
@@ -2373,6 +2378,74 @@ const collectFlowchartLaneCandidateValues = ({
   })
 }
 
+const getFlowchartLaneDirectionSign = (axis, direction) => {
+  if (axis === 'x') {
+    if (direction === 'right') {
+      return 1
+    }
+    if (direction === 'left') {
+      return -1
+    }
+    return 0
+  }
+  if (direction === 'bottom') {
+    return 1
+  }
+  if (direction === 'top') {
+    return -1
+  }
+  return 0
+}
+
+const pushFlowchartLaneValueAwayFromEndpoint = ({
+  axis,
+  laneValue,
+  pointValue,
+  direction
+}) => {
+  const directionSign = getFlowchartLaneDirectionSign(axis, direction)
+  if (!directionSign) {
+    return laneValue
+  }
+  if (Math.abs(laneValue - pointValue) >= FLOWCHART_ORTHOGONAL_LANE_GAP) {
+    return laneValue
+  }
+  return pointValue + directionSign * FLOWCHART_ORTHOGONAL_LANE_GAP
+}
+
+const isFlowchartLaneValueForwardFromStubs = ({
+  axis,
+  laneValue,
+  sourceStub,
+  targetStub,
+  sourceDirection,
+  targetDirection
+}) => {
+  if (
+    axis === 'x' &&
+    ['left', 'right'].includes(sourceDirection) &&
+    sourceDirection === targetDirection
+  ) {
+    const directionSign = sourceDirection === 'right' ? 1 : -1
+    return (
+      (laneValue - Number(sourceStub?.x || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP &&
+      (laneValue - Number(targetStub?.x || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP
+    )
+  }
+  if (
+    axis === 'y' &&
+    ['top', 'bottom'].includes(sourceDirection) &&
+    sourceDirection === targetDirection
+  ) {
+    const directionSign = sourceDirection === 'bottom' ? 1 : -1
+    return (
+      (laneValue - Number(sourceStub?.y || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP &&
+      (laneValue - Number(targetStub?.y || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP
+    )
+  }
+  return true
+}
+
 const resolveFlowchartOrthogonalLaneValue = ({
   axis,
   sourcePoint,
@@ -2412,6 +2485,18 @@ const resolveFlowchartOrthogonalLaneValue = ({
       return positiveDirection ? extentMax + 72 : extentMin - 72
     })()
   laneValue = Math.max(minLane, Math.min(maxLane, laneValue))
+  laneValue = pushFlowchartLaneValueAwayFromEndpoint({
+    axis,
+    laneValue,
+    pointValue: axis === 'x' ? sourcePoint.x : sourcePoint.y,
+    direction: sourceDirection
+  })
+  laneValue = pushFlowchartLaneValueAwayFromEndpoint({
+    axis,
+    laneValue,
+    pointValue: axis === 'x' ? targetPoint.x : targetPoint.y,
+    direction: targetDirection
+  })
   if (Math.abs(laneValue - sourceValue) < FLOWCHART_ORTHOGONAL_LANE_GAP) {
     laneValue =
       sourceValue +
@@ -2482,6 +2567,38 @@ const getFlowchartDirectionAlignmentScore = (direction, deltaX, deltaY) => {
   return deltaX * vector.x + deltaY * vector.y
 }
 
+const doesFlowchartPathBacktrackNearEndpoint = (
+  pathPoints,
+  direction,
+  endpoint = 'source'
+) => {
+  const points = endpoint === 'target' ? [...(pathPoints || [])].reverse() : [...(pathPoints || [])]
+  if (points.length < 3) {
+    return false
+  }
+  const axis = direction === 'left' || direction === 'right' ? 'x' : 'y'
+  const sign = direction === 'right' || direction === 'bottom' ? 1 : -1
+  for (let index = 1; index < points.length; index += 1) {
+    const previousPoint = points[index - 1]
+    const currentPoint = points[index]
+    const deltaAxis = Number(currentPoint?.[axis] || 0) - Number(previousPoint?.[axis] || 0)
+    const deltaCross =
+      axis === 'x'
+        ? Number(currentPoint?.y || 0) - Number(previousPoint?.y || 0)
+        : Number(currentPoint?.x || 0) - Number(previousPoint?.x || 0)
+    if (Math.abs(deltaAxis) <= 0.001 && Math.abs(deltaCross) <= 0.001) {
+      continue
+    }
+    if (Math.abs(deltaAxis) <= 0.001) {
+      break
+    }
+    if (deltaAxis * sign < -0.001) {
+      return true
+    }
+  }
+  return false
+}
+
 const scoreFlowchartConnectionCandidate = ({
   sourceDirection,
   targetDirection,
@@ -2545,9 +2662,21 @@ const scoreFlowchartConnectionCandidate = ({
     nodes,
     ignoredNodeIds
   )
+  const sourceEndpointBacktrack = doesFlowchartPathBacktrackNearEndpoint(
+    pathPoints,
+    sourceDirection,
+    'source'
+  )
+  const targetEndpointBacktrack = doesFlowchartPathBacktrackNearEndpoint(
+    pathPoints,
+    targetDirection,
+    'target'
+  )
   let score = 0
   score += obstacleHit ? 1000000 : 0
   score += !obstacleHit && bufferedObstacleHit ? 2200 : 0
+  score += sourceEndpointBacktrack ? 2800 : 0
+  score += targetEndpointBacktrack ? 2800 : 0
   score += bendCount * 180
   score += pathLength * 0.08
   score += routeWaste * 1.8
@@ -2930,25 +3059,37 @@ const buildFlowchartOrthogonalRoute = ({
         targetPoint
       ])
     }
-    const resolvedLaneValue =
-      route?.orthogonalLane?.axis === laneAxis &&
-      Number.isFinite(Number(route?.orthogonalLane?.value))
-        ? Number(route.orthogonalLane.value)
-        : collectFlowchartLaneCandidateValues({
+  const resolvedLaneValue =
+    route?.orthogonalLane?.axis === laneAxis &&
+    Number.isFinite(Number(route?.orthogonalLane?.value))
+      ? Number(route.orthogonalLane.value)
+      : collectFlowchartLaneCandidateValues({
             axis: laneAxis,
             sourcePoint,
             targetPoint,
             sourceStub: sourcePoint,
             targetStub: targetPoint,
-            desiredLane,
+          desiredLane,
+          obstacles,
+          ignoredNodeIds
+        }).find(candidateLaneValue => {
+          if (
+            !isFlowchartLaneValueForwardFromStubs({
+              axis: laneAxis,
+              laneValue: candidateLaneValue,
+              sourceStub: sourcePoint,
+              targetStub: targetPoint,
+              sourceDirection,
+              targetDirection
+            })
+          ) {
+            return false
+          }
+          return !doesFlowchartPolylineIntersectObstacles(
+            buildOppositeRoutePointsForLaneValue(candidateLaneValue),
             obstacles,
-            ignoredNodeIds
-          }).find(candidateLaneValue => {
-            return !doesFlowchartPolylineIntersectObstacles(
-              buildOppositeRoutePointsForLaneValue(candidateLaneValue),
-              obstacles,
-              ignoredNodeIds,
-              0
+            ignoredNodeIds,
+            0
             )
           }) ?? desiredLane
     const firstLanePoint =
@@ -3140,6 +3281,18 @@ const buildFlowchartOrthogonalRoute = ({
           obstacles,
           ignoredNodeIds
         }).find(candidateLaneValue => {
+          if (
+            !isFlowchartLaneValueForwardFromStubs({
+              axis: laneAxis,
+              laneValue: candidateLaneValue,
+              sourceStub,
+              targetStub,
+              sourceDirection,
+              targetDirection
+            })
+          ) {
+            return false
+          }
           return !doesFlowchartPolylineIntersectObstacles(
             buildRoutePointsForLaneValue(candidateLaneValue),
             obstacles,
@@ -3876,33 +4029,35 @@ export const resolveFlowchartAnchorDirection = (
   return getFlowchartAnchorDirection(anchor, fallbackDirection)
 }
 
+const CACHED_FLOWCHART_NODE_ANCHOR_PRESETS = [
+  {
+    handleKey: 'top',
+    xRatio: 0.5,
+    yRatio: 0,
+    direction: 'top'
+  },
+  {
+    handleKey: 'right',
+    xRatio: 1,
+    yRatio: 0.5,
+    direction: 'right'
+  },
+  {
+    handleKey: 'bottom',
+    xRatio: 0.5,
+    yRatio: 1,
+    direction: 'bottom'
+  },
+  {
+    handleKey: 'left',
+    xRatio: 0,
+    yRatio: 0.5,
+    direction: 'left'
+  }
+].map(normalizeFlowchartNodeAnchor)
+
 export const getFlowchartNodeAnchorPresets = _node => {
-  return [
-    {
-      handleKey: 'top',
-      xRatio: 0.5,
-      yRatio: 0,
-      direction: 'top'
-    },
-    {
-      handleKey: 'right',
-      xRatio: 1,
-      yRatio: 0.5,
-      direction: 'right'
-    },
-    {
-      handleKey: 'bottom',
-      xRatio: 0.5,
-      yRatio: 1,
-      direction: 'bottom'
-    },
-    {
-      handleKey: 'left',
-      xRatio: 0,
-      yRatio: 0.5,
-      direction: 'left'
-    }
-  ].map(normalizeFlowchartNodeAnchor)
+  return CACHED_FLOWCHART_NODE_ANCHOR_PRESETS
 }
 
 const getFlowchartPresetAnchorByDirection = (node, direction, referencePoint = null) => {
@@ -4221,15 +4376,19 @@ export const getFlowchartEdgeLayout = (edge, sourceNode, targetNode, options = {
   }
 }
 
+const LABEL_TEXT_REGEX_WHITESPACE = /\s/
+const LABEL_TEXT_REGEX_CJK = /[\u1100-\u9fff\u3040-\u30ff\uac00-\ud7af]/
+const LABEL_TEXT_REGEX_WIDE = /[MW@#%&]/
+
 export const getFlowchartLabelTextUnits = label => {
   return Array.from(String(label || '')).reduce((total, char) => {
-    if (/\s/.test(char)) {
+    if (LABEL_TEXT_REGEX_WHITESPACE.test(char)) {
       return total + 0.45
     }
-    if (/[\u1100-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(char)) {
+    if (LABEL_TEXT_REGEX_CJK.test(char)) {
       return total + 1.7
     }
-    if (/[MW@#%&]/.test(char)) {
+    if (LABEL_TEXT_REGEX_WIDE.test(char)) {
       return total + 1
     }
     return total + 0.72

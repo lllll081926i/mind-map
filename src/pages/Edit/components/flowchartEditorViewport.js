@@ -335,12 +335,31 @@ export const flowchartViewportMethods = {
     }
     this.selectedEdgeId = ''
     this.edgeToolbarState = null
+    this.pendingAreaSelectionEvent = null
+    this.areaSelectionFrameId = 0
     window.addEventListener('mousemove', this.onAreaSelection)
     window.addEventListener('mouseup', this.stopAreaSelection)
+    this.startAutoScroll(event.clientX, event.clientY)
   },
 
   onAreaSelection(event) {
     if (!this.selectionState) return
+    this.updateAutoScroll(event.clientX, event.clientY)
+    this.pendingAreaSelectionEvent = event
+    if (this.areaSelectionFrameId) {
+      return
+    }
+    this.areaSelectionFrameId = window.requestAnimationFrame(() => {
+      this.areaSelectionFrameId = 0
+      this.flushAreaSelectionFrame()
+    })
+  },
+
+  flushAreaSelectionFrame() {
+    if (!this.selectionState) return
+    const event = this.pendingAreaSelectionEvent
+    this.pendingAreaSelectionEvent = null
+    if (!event) return
     const current = this.getWorldPointFromEvent(event)
     this.selectionState = {
       ...this.selectionState,
@@ -352,6 +371,12 @@ export const flowchartViewportMethods = {
 
   stopAreaSelection() {
     if (!this.selectionState) return
+    this.stopAutoScroll()
+    if (this.areaSelectionFrameId) {
+      window.cancelAnimationFrame(this.areaSelectionFrameId)
+      this.areaSelectionFrameId = 0
+    }
+    this.flushAreaSelectionFrame()
     const bounds = this.getSelectionBounds()
     const nextSelectedNodeIds = this.findNodesInSelectionBox()
     if (

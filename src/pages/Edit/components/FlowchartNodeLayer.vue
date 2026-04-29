@@ -7,7 +7,8 @@
       `nodeType-${node.type}`,
       {
         isSelected: selectedNodeIds.includes(node.id),
-        isConnectorTarget: connectorTargetNodeId === node.id
+        isConnectorTarget: connectorTargetNodeId === node.id,
+        isNew: newNodeIds && newNodeIds.has(node.id)
       }
     ]"
     :style="getNodeStyle(node)"
@@ -120,6 +121,10 @@ export default {
     connectorTargetDirection: {
       type: String,
       default: ''
+    },
+    newNodeIds: {
+      type: Object,
+      default: null
     }
   },
   data() {

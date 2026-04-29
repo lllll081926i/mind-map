@@ -73,6 +73,7 @@ export const flowchartReconnectMethods = {
     window.addEventListener('mousemove', this.updateEdgeReconnect)
     window.addEventListener('mouseup', this.commitEdgeReconnect)
     this.pendingEdgeReconnectPoint = null
+    this.startAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     pointerEvent?.preventDefault?.()
   },
 
@@ -80,6 +81,7 @@ export const flowchartReconnectMethods = {
     if (!this.edgeReconnectState) {
       return
     }
+    this.updateAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     this.pendingEdgeReconnectPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.edgeReconnectFrameId) {
       return
@@ -101,7 +103,8 @@ export const flowchartReconnectMethods = {
     }
     const targetNode = this.findNodeAtWorldPoint(currentPoint, {
       excludeIds: [this.edgeReconnectState.fixedNodeId],
-      padding: FLOWCHART_NODE_HIT_PADDING
+      padding: FLOWCHART_NODE_HIT_PADDING,
+      preferredNodeId: this.edgeReconnectState.targetNodeId
     })
     const edge = this.getEdgeById(this.edgeReconnectState.edgeId)
     const fixedNode = this.getNodeById(this.edgeReconnectState.fixedNodeId)
@@ -144,10 +147,11 @@ export const flowchartReconnectMethods = {
         : this.createConnectorPreview(this.edgeReconnectState.fixedPoint, previewPoint)
   },
 
-  commitEdgeReconnect(pointerEvent) {
+  async commitEdgeReconnect(pointerEvent) {
     if (!this.edgeReconnectState) {
       return
     }
+    this.stopAutoScroll()
     const reconnectState = {
       ...this.edgeReconnectState
     }
@@ -160,7 +164,8 @@ export const flowchartReconnectMethods = {
     this.flushEdgeReconnectFrame()
     const targetNode = this.findNodeAtWorldPoint(releasePoint, {
       excludeIds: [reconnectState.fixedNodeId],
-      padding: FLOWCHART_NODE_HIT_PADDING
+      padding: FLOWCHART_NODE_HIT_PADDING,
+      preferredNodeId: reconnectState.targetNodeId
     })
     this.cancelEdgeReconnect()
     if (!targetNode) {
@@ -202,10 +207,11 @@ export const flowchartReconnectMethods = {
     this.selectedEdgeId = edge.id
     this.syncEdgeToolbarState(edge.id)
     this.suppressPointerClick()
-    void this.persistFlowchartState()
+    await this.persistFlowchartState()
   },
 
   cancelEdgeReconnect() {
+    this.stopAutoScroll()
     this.edgeReconnectState = null
     this.connectorPreview = null
     this.pendingEdgeReconnectPoint = null
@@ -330,7 +336,7 @@ export const flowchartReconnectMethods = {
     }
   },
 
-  commitEdgeBendDrag(pointerEvent) {
+  async commitEdgeBendDrag(pointerEvent) {
     if (!this.edgeBendDragState) {
       return
     }
@@ -344,7 +350,7 @@ export const flowchartReconnectMethods = {
     this.cancelEdgeBendDrag()
     this.syncEdgeToolbarState(edgeId)
     this.suppressPointerClick()
-    void this.persistFlowchartState()
+    await this.persistFlowchartState()
   },
 
   cancelEdgeBendDrag() {
@@ -444,7 +450,7 @@ export const flowchartReconnectMethods = {
     }
   },
 
-  commitEdgeLabelDrag(pointerEvent) {
+  async commitEdgeLabelDrag(pointerEvent) {
     if (!this.edgeLabelDragState) {
       return
     }
@@ -458,7 +464,7 @@ export const flowchartReconnectMethods = {
     this.cancelEdgeLabelDrag()
     if (shouldPersist) {
       this.suppressPointerClick()
-      void this.persistFlowchartState()
+      await this.persistFlowchartState()
     }
   },
 

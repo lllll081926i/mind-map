@@ -34,6 +34,8 @@ export const flowchartResizeMethods = {
       },
       moved: false
     }
+    this.pendingResizeEvent = null
+    this.resizeFrameId = 0
     window.addEventListener('mousemove', this.onNodeResize)
     window.addEventListener('mouseup', this.stopNodeResize)
     event.preventDefault?.()
@@ -41,6 +43,25 @@ export const flowchartResizeMethods = {
 
   onNodeResize(event) {
     if (!this.resizeState) {
+      return
+    }
+    this.pendingResizeEvent = event
+    if (this.resizeFrameId) {
+      return
+    }
+    this.resizeFrameId = window.requestAnimationFrame(() => {
+      this.resizeFrameId = 0
+      this.flushNodeResizeFrame()
+    })
+  },
+
+  flushNodeResizeFrame() {
+    if (!this.resizeState) {
+      return
+    }
+    const event = this.pendingResizeEvent
+    this.pendingResizeEvent = null
+    if (!event) {
       return
     }
     const node = this.getNodeById(this.resizeState.nodeId)
@@ -85,14 +106,23 @@ export const flowchartResizeMethods = {
     }
   },
 
-  stopNodeResize() {
+  stopNodeResize(event) {
     if (!this.resizeState) {
       return
     }
+    if (this.resizeFrameId) {
+      window.cancelAnimationFrame(this.resizeFrameId)
+      this.resizeFrameId = 0
+    }
+    this.pendingResizeEvent = event || null
+    this.flushNodeResizeFrame()
     const shouldPersist = this.resizeState.moved
+    const movedNodeId = this.resizeState.nodeId
     this.resizeState = null
+    this.pendingResizeEvent = null
     this.removeNodeResizeListeners()
     if (shouldPersist) {
+      this.relaxConnectedOrthogonalEdgeRoutes([movedNodeId])
       this.suppressPointerClick()
     }
     if (shouldPersist) {

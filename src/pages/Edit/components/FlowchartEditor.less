@@ -765,6 +765,17 @@
   pointer-events: none;
 }
 
+@keyframes flowchartNodeAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .flowchartNode {
   position: absolute;
   z-index: 2;
@@ -782,6 +793,10 @@
     border-color 0.16s ease,
     box-shadow 0.16s ease,
     transform 0.16s ease;
+}
+
+.flowchartNode.isNew {
+  animation: flowchartNodeAppear 0.2s ease-out;
 }
 
 .flowchartNode.isSelected {

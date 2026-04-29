@@ -61,6 +61,7 @@
             :show-resize-handles-for-node="showResizeHandlesForNode"
             :connector-target-node-id="connectorDragState?.targetNodeId || edgeReconnectState?.targetNodeId || ''"
             :connector-target-direction="connectorTargetDirection"
+            :new-node-ids="newNodeIds"
             @start-node-drag="startNodeDrag"
             @select-node="selectNode"
             @edit-node-text="editNodeText"
@@ -187,6 +188,7 @@ import { flowchartNodeMethods } from './flowchartEditorNode'
 import { flowchartSelectionMethods } from './flowchartEditorSelection'
 import { flowchartInlineEditMethods } from './flowchartEditorInlineEdit'
 import { flowchartResizeMethods } from './flowchartEditorResize'
+import { flowchartAutoScrollMethods } from './flowchartEditorAutoScroll'
 import { flowchartStyleMethods } from './flowchartEditorStyle'
 import { flowchartDocumentMethods } from './flowchartEditorDocument'
 import { flowchartAiMethods } from './flowchartEditorAi'
@@ -256,6 +258,9 @@ export default {
       canvasPanState: null,
       canvasPanFrameId: 0,
       pendingCanvasPanPoint: null,
+      autoScrollState: null,
+      autoScrollFrameId: 0,
+      newNodeIds: null,
       canvasViewportSize: {
         width: 0,
         height: 0
@@ -312,27 +317,38 @@ export default {
         this.connectorDragState ||
         this.edgeReconnectState ||
         this.edgeBendDragState ||
+        this.edgeLabelDragState ||
         this.resizeState
       )
     },
     edgesWithLayout() {
-      return this.flowchartData.edges
+      const interactiveEdgeIds = this.getInteractiveEdgeLayoutEdgeIds()
+      const nextEdgeLayoutCache = new Map()
+      const edgesWithLayout = this.flowchartData.edges
         .map(edge => {
           const sourceNode = this.flowchartNodeLookup.get(edge.source)
           const targetNode = this.flowchartNodeLookup.get(edge.target)
           if (!sourceNode || !targetNode) return null
+          const cacheKey = this.createEdgeLayoutCacheKey(edge, sourceNode, targetNode)
+          const cachedLayoutEntry = this._edgeLayoutCache?.get(edge.id) || null
+          const layout =
+            this.isInteractiveEdgeRouting && !interactiveEdgeIds.has(edge.id)
+              ? cachedLayoutEntry?.cacheKey === cacheKey
+                ? cachedLayoutEntry.layout
+                : this.resolveEdgeLayoutForRender(edge, sourceNode, targetNode)
+              : this.resolveEdgeLayoutForRender(edge, sourceNode, targetNode)
+          nextEdgeLayoutCache.set(edge.id, {
+            cacheKey,
+            layout
+          })
           return {
             ...edge,
-            ...getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
-              theme: this.resolvedFlowchartTheme,
-              strictAlignment: !!this.flowchartConfig.strictAlignment,
-              lockedDirections: this.edgeDirectionLockMap?.[edge.id] || null,
-              nodes: this.flowchartData.nodes,
-              interactive: this.isInteractiveEdgeRouting
-            })
+            ...layout
           }
         })
         .filter(Boolean)
+      this._edgeLayoutCache = nextEdgeLayoutCache
+      return edgesWithLayout
     },
     minimapEdges() {
       return this.isInteractiveEdgeRouting ? [] : this.edgesWithLayout
@@ -571,6 +587,10 @@ export default {
       )
     }
   },
+  created() {
+    this._edgeLayoutCache = new Map()
+    this.autoScrollTick = this.autoScrollTick.bind(this)
+  },
   async mounted() {
     await ensureBootstrapDocumentState()
     this.loadFlowchartState()
@@ -588,6 +608,7 @@ export default {
   },
   beforeUnmount() {
     this.isFlowchartUnmounted = true
+    this.stopAutoScroll()
     this.cancelFlowchartAiRequest({
       resetGenerating: true
     })
@@ -627,6 +648,15 @@ export default {
     this.pendingCanvasPanPoint = null
   },
   methods: {
+    markNodesAsNew(nodeIds) {
+      if (!nodeIds?.length) return
+      this.newNodeIds = new Set(nodeIds)
+      setTimeout(() => {
+        if (this.newNodeIds) {
+          this.newNodeIds = null
+        }
+      }, 250)
+    },
     toggleInspectorSection(section = 'templates') {
       const nextSection = ['templates', 'settings', 'inspector'].includes(section)
         ? section
@@ -654,6 +684,7 @@ export default {
     },
     loadFlowchartState() {
       const bootstrapState = getBootstrapState()
+      this._edgeLayoutCache = new Map()
       this.flowchartData = cloneJson(
         bootstrapState.flowchartData || createDefaultFlowchartData()
       )
@@ -675,6 +706,78 @@ export default {
       this.initializeFlowchartHistory()
     },
     ...flowchartHistoryMethods,
+
+    createEdgeLayoutCacheKey(edge, sourceNode, targetNode) {
+      const sa = edge.sourceAnchor
+      const ta = edge.targetAnchor
+      const r = edge.route
+      const lp = edge.labelPosition
+      const s = edge.style
+      const ld = this.edgeDirectionLockMap?.[edge.id]
+      const routeStr = r
+        ? `${r.orthogonalLane?.axis || ''}:${r.orthogonalLane?.value ?? ''}`
+        : ''
+      const ldStr = ld
+        ? `${ld.sourceDirection || ''}:${ld.targetDirection || ''}`
+        : ''
+      return [
+        edge.id,
+        sourceNode.id, Number(sourceNode.x || 0), Number(sourceNode.y || 0),
+        Number(sourceNode.width || 0), Number(sourceNode.height || 0),
+        targetNode.id, Number(targetNode.x || 0), Number(targetNode.y || 0),
+        Number(targetNode.width || 0), Number(targetNode.height || 0),
+        sa ? `${sa.handleKey || ''}${sa.xRatio ?? ''}${sa.yRatio ?? ''}` : '',
+        ta ? `${ta.handleKey || ''}${ta.xRatio ?? ''}${ta.yRatio ?? ''}` : '',
+        routeStr,
+        edge.label || '',
+        lp ? `${lp.ratio ?? ''}${lp.offsetX ?? ''}${lp.offsetY ?? ''}` : '',
+        s ? `${s.pathType || ''}${s.strokeColor || ''}${s.strokeWidth ?? ''}` : '',
+        this.flowchartConfig.themeId || '',
+        this.isDark ? 1 : 0,
+        this.flowchartConfig.strictAlignment ? 1 : 0,
+        ldStr
+      ].join('|')
+    },
+
+    resolveEdgeLayoutForRender(edge, sourceNode, targetNode) {
+      return getFlowchartEdgeLayout(edge, sourceNode, targetNode, {
+        theme: this.resolvedFlowchartTheme,
+        strictAlignment: !!this.flowchartConfig.strictAlignment,
+        lockedDirections: this.edgeDirectionLockMap?.[edge.id] || null,
+        nodes: this.flowchartData.nodes,
+        interactive: this.isInteractiveEdgeRouting
+      })
+    },
+
+    getInteractiveEdgeLayoutEdgeIds() {
+      const interactiveEdgeIds = new Set()
+      const addNodeEdges = nodeIds => {
+        if (!nodeIds?.size) {
+          return
+        }
+        this.flowchartData.edges.forEach(edge => {
+          if (nodeIds.has(edge.source) || nodeIds.has(edge.target)) {
+            interactiveEdgeIds.add(edge.id)
+          }
+        })
+      }
+      if (this.dragState?.nodes?.length) {
+        addNodeEdges(new Set(this.dragState.nodes.map(item => item.id)))
+      }
+      if (this.resizeState?.nodeId) {
+        addNodeEdges(new Set([this.resizeState.nodeId]))
+      }
+      if (this.edgeReconnectState?.edgeId) {
+        interactiveEdgeIds.add(this.edgeReconnectState.edgeId)
+      }
+      if (this.edgeBendDragState?.edgeId) {
+        interactiveEdgeIds.add(this.edgeBendDragState.edgeId)
+      }
+      if (this.edgeLabelDragState?.edgeId) {
+        interactiveEdgeIds.add(this.edgeLabelDragState.edgeId)
+      }
+      return interactiveEdgeIds
+    },
 
     getNodeStyle(node) {
       const visualStyle = getFlowchartNodeVisualStyle(node, {
@@ -703,9 +806,47 @@ export default {
     ...flowchartInlineEditMethods,
     ...flowchartNodeMethods,
     ...flowchartResizeMethods,
+    ...flowchartAutoScrollMethods,
     ...flowchartStyleMethods,
     ...flowchartDocumentMethods,
     ...flowchartAiMethods,
+
+    relaxConnectedOrthogonalEdgeRoutes(nodeIds = []) {
+      const movedNodeIds = new Set(nodeIds.filter(Boolean))
+      if (!movedNodeIds.size) {
+        return
+      }
+      this.flowchartData.edges.forEach(edge => {
+        if (
+          !edge?.route ||
+          !movedNodeIds.has(edge.source) &&
+            !movedNodeIds.has(edge.target)
+        ) {
+          return
+        }
+        const sourceNode = this.flowchartNodeLookup.get(edge.source)
+        const targetNode = this.flowchartNodeLookup.get(edge.target)
+        if (!sourceNode || !targetNode) {
+          return
+        }
+        const relaxedLayout = getFlowchartEdgeLayout(
+          {
+            ...edge,
+            route: null
+          },
+          sourceNode,
+          targetNode,
+          {
+            theme: this.resolvedFlowchartTheme,
+            strictAlignment: !!this.flowchartConfig.strictAlignment,
+            nodes: this.flowchartData.nodes
+          }
+        )
+        if (Array.isArray(relaxedLayout?.pathPoints) && relaxedLayout.pathPoints.length === 2) {
+          edge.route = null
+        }
+      })
+    },
 
     snapPositionToGrid(position) {
       return position

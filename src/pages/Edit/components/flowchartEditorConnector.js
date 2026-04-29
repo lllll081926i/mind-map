@@ -151,26 +151,63 @@ export const flowchartConnectorMethods = {
     }
   },
 
-  findNodeAtWorldPoint(point, { excludeIds = [], padding = 0 } = {}) {
+  findNodeAtWorldPoint(point, { excludeIds = [], padding = 0, preferredNodeId = '' } = {}) {
     const excluded = new Set(excludeIds)
-    return (
-      [...this.flowchartData.nodes].reverse().find(node => {
-        if (excluded.has(node.id)) {
-          return false
+    const hitPadding = Math.max(0, Number(padding || 0))
+    const nodeCandidates = this.flowchartData.nodes
+      .map((node, index) => ({
+        node,
+        index
+      }))
+      .filter(({ node }) => !excluded.has(node.id))
+      .map(({ node, index }) => {
+        const left = Number(node.x || 0) - hitPadding
+        const top = Number(node.y || 0) - hitPadding
+        const right = Number(node.x || 0) + Number(node.width || 0) + hitPadding
+        const bottom = Number(node.y || 0) + Number(node.height || 0) + hitPadding
+        if (
+          point.x < left ||
+          point.x > right ||
+          point.y < top ||
+          point.y > bottom
+        ) {
+          return null
         }
-        const hitPadding = Math.max(0, Number(padding || 0))
-        const left = Number(node.x || 0)
-        const top = Number(node.y || 0)
-        const right = left + Number(node.width || 0)
-        const bottom = top + Number(node.height || 0)
-        return (
-          point.x >= left - hitPadding &&
-          point.x <= right + hitPadding &&
-          point.y >= top - hitPadding &&
-          point.y <= bottom + hitPadding
-        )
-      }) || null
-    )
+        return {
+          node,
+          index,
+          score: this.getNodeTargetDistanceScore(node, point, hitPadding)
+        }
+      })
+      .filter(Boolean)
+      .sort((first, second) => {
+        const firstPreferred = first.node.id === preferredNodeId
+        const secondPreferred = second.node.id === preferredNodeId
+        if (firstPreferred !== secondPreferred) {
+          return firstPreferred ? -1 : 1
+        }
+        if (Math.abs(first.score - second.score) > 0.001) {
+          return first.score - second.score
+        }
+        return second.index - first.index
+      })
+    return nodeCandidates[0]?.node || null
+  },
+
+  getNodeTargetDistanceScore(node, point, padding = 0) {
+    const left = Number(node.x || 0) - padding
+    const top = Number(node.y || 0) - padding
+    const right = Number(node.x || 0) + Number(node.width || 0) + padding
+    const bottom = Number(node.y || 0) + Number(node.height || 0) + padding
+    const deltaX =
+      point.x < left ? left - point.x : point.x > right ? point.x - right : 0
+    const deltaY =
+      point.y < top ? top - point.y : point.y > bottom ? point.y - bottom : 0
+    const edgeDistance = Math.hypot(deltaX, deltaY)
+    const centerX = Number(node.x || 0) + Number(node.width || 0) / 2
+    const centerY = Number(node.y || 0) + Number(node.height || 0) / 2
+    const centerDistance = Math.hypot(point.x - centerX, point.y - centerY)
+    return edgeDistance * 10000 + centerDistance
   },
 
   getClosestConnectorPoint(node, referencePoint) {
@@ -178,6 +215,9 @@ export const flowchartConnectorMethods = {
   },
 
   ensureFlowchartEdge(source, target, label = '', edgePatch = {}) {
+    if (!source || !target || source === target) {
+      return null
+    }
     const existingEdge = this.flowchartData.edges.find(edge => {
       return edge.source === source && edge.target === target
     })
@@ -277,6 +317,7 @@ export const flowchartConnectorMethods = {
     this.edgeToolbarState = null
     window.addEventListener('mousemove', this.updateConnectorDrag)
     window.addEventListener('mouseup', this.commitConnectorDrag)
+    this.startAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     pointerEvent?.preventDefault?.()
   },
 
@@ -284,6 +325,7 @@ export const flowchartConnectorMethods = {
     if (!this.connectorDragState) {
       return
     }
+    this.updateAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     this.pendingConnectorPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.connectorDragFrameId) {
       return
@@ -305,7 +347,8 @@ export const flowchartConnectorMethods = {
     }
     const targetNode = this.findNodeAtWorldPoint(currentPoint, {
       excludeIds: [this.connectorDragState.nodeId],
-      padding: FLOWCHART_NODE_HIT_PADDING
+      padding: FLOWCHART_NODE_HIT_PADDING,
+      preferredNodeId: this.connectorDragState.targetNodeId
     })
     const sourceNode = this.getNodeById(this.connectorDragState.nodeId)
     const previewAnchor = targetNode
@@ -343,6 +386,7 @@ export const flowchartConnectorMethods = {
     if (!this.connectorDragState) {
       return
     }
+    this.stopAutoScroll()
     const dragSnapshot = {
       ...this.connectorDragState
     }
@@ -356,7 +400,8 @@ export const flowchartConnectorMethods = {
     const sourceNode = this.getNodeById(dragSnapshot.nodeId)
     const targetNode = this.findNodeAtWorldPoint(releasePoint, {
       excludeIds: [dragSnapshot.nodeId],
-      padding: FLOWCHART_NODE_HIT_PADDING
+      padding: FLOWCHART_NODE_HIT_PADDING,
+      preferredNodeId: dragSnapshot.targetNodeId
     })
     this.cancelConnectorDrag()
     if (!sourceNode) {
@@ -371,11 +416,14 @@ export const flowchartConnectorMethods = {
         sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction, sourceNode),
         targetAnchor
       })
+      if (!targetEdge) {
+        return
+      }
       this.selectedEdgeId = targetEdge.id
       this.selectedNodeIds = []
       this.syncEdgeToolbarState(targetEdge.id)
       this.suppressPointerClick()
-      void this.persistFlowchartState()
+      await this.persistFlowchartState()
       return
     }
     if (delta < 24) {
@@ -387,6 +435,7 @@ export const flowchartConnectorMethods = {
       releasePoint
     )
     this.flowchartData.nodes.push(newNode)
+    this.markNodesAsNew([newNode.id])
     this.ensureFlowchartEdge(sourceNode.id, newNode.id, '', {
       sourceAnchor: this.getDirectionAnchor(dragSnapshot.direction, sourceNode),
       targetAnchor: this.getNodeConnectionAnchor(newNode, getNodeCenter(sourceNode)).anchor
@@ -399,6 +448,7 @@ export const flowchartConnectorMethods = {
   },
 
   cancelConnectorDrag() {
+    this.stopAutoScroll()
     this.connectorDragState = null
     this.connectorPreview = null
     this.pendingConnectorPoint = null

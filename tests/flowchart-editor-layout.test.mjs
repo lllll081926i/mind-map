@@ -96,6 +96,10 @@ const flowchartStyleLogicSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/flowchartEditorStyle.js'),
   'utf8'
 )
+const flowchartAutoScrollSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/flowchartEditorAutoScroll.js'),
+  'utf8'
+)
 const flowchartLogicSource = [
   flowchartEditorSource,
   flowchartSharedSource,
@@ -109,7 +113,8 @@ const flowchartLogicSource = [
   flowchartDocumentLogicSource,
   flowchartAiLogicSource,
   flowchartResizeSource,
-  flowchartStyleLogicSource
+  flowchartStyleLogicSource,
+  flowchartAutoScrollSource
 ].join('\n')
 
 const loadFlowchartNodeMethods = async () => {
@@ -121,6 +126,51 @@ const loadFlowchartNodeMethods = async () => {
     .replace(
       "import { cloneJson, createNodeId } from './flowchartEditorShared'",
       "const cloneJson = value => JSON.parse(JSON.stringify(value)); const createNodeId = (prefix = 'node') => `${prefix}-test-id`"
+    )
+  return import(
+    `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`
+  )
+}
+
+const loadFlowchartConnectorMethods = async () => {
+  const source = flowchartEdgeLogicSource
+    .replace(
+      /import\s*\{[\s\S]*?\}\s*from\s*'@\/services\/flowchartDocument'/,
+      `const getFlowchartEdgeLayout = () => ({
+        path: 'M 0 0 L 0 0',
+        sourcePoint: { x: 0, y: 0 },
+        targetPoint: { x: 0, y: 0 }
+      });
+      const getFlowchartNodeConnectionPoint = (node, anchor) => {
+        const direction = typeof anchor === 'string' ? anchor : anchor?.handleKey || anchor?.direction || 'right'
+        const left = Number(node.x || 0)
+        const top = Number(node.y || 0)
+        const width = Number(node.width || 0)
+        const height = Number(node.height || 0)
+        const map = {
+          top: { x: left + width / 2, y: top },
+          right: { x: left + width, y: top + height / 2 },
+          bottom: { x: left + width / 2, y: top + height },
+          left: { x: left, y: top + height / 2 }
+        }
+        return map[direction] || map.right
+      };
+      const getFlowchartNodeAnchorPresets = () => ([
+        { handleKey: 'top', direction: 'top' },
+        { handleKey: 'right', direction: 'right' },
+        { handleKey: 'bottom', direction: 'bottom' },
+        { handleKey: 'left', direction: 'left' }
+      ]);
+      const normalizeFlowchartNodeAnchor = value => value;`
+    )
+    .replace(
+      /import\s*\{[\s\S]*?\}\s*from\s*'\.\/flowchartEditorShared'/,
+      `const FLOWCHART_NODE_HIT_PADDING = 28;
+      const createNodeId = (prefix = 'node') => \`\${prefix}-test-id\`;
+      const getNodeCenter = node => ({
+        x: Number(node.x || 0) + Number(node.width || 0) / 2,
+        y: Number(node.y || 0) + Number(node.height || 0) / 2
+      });`
     )
   return import(
     `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`
@@ -193,10 +243,10 @@ test('流程图编辑器进入页面前会等待桌面文档状态加载完成�
   const source = fs.readFileSync(flowchartEditorPath, 'utf8')
 
   assert.match(source, /ensureBootstrapDocumentState/)
+  assert.match(source, /created\(\)\s*\{[\s\S]*?this\._edgeLayoutCache = new Map\(\)/)
   assert.match(source, /async mounted\(\)/)
   assert.match(source, /await ensureBootstrapDocumentState\(\)/)
   assert.match(source, /await ensureBootstrapDocumentState\(\)[\s\S]*?this\.loadFlowchartState\(\)/)
-  assert.doesNotMatch(source, /created\(\) \{[\s\S]*?this\.loadFlowchartState\(\)/)
 })
 
 test('流程图返回首页前会处理未保存风险，不直接跳转丢失待保存修改', () => {
@@ -960,6 +1010,16 @@ test('流程图边布局与节点查询使用索引映射，减少重复 find �
   )
 })
 
+test('流程图交互态会缓存未受影响的连线布局，并把标签拖拽纳入轻量重算范围', () => {
+  assert.match(flowchartEditorSource, /getInteractiveEdgeLayoutEdgeIds\(\)/)
+  assert.match(flowchartEditorSource, /this\._edgeLayoutCache/)
+  assert.match(flowchartEditorSource, /this\.edgeLabelDragState/)
+  assert.match(
+    flowchartEditorSource,
+    /this\.isInteractiveEdgeRouting && !interactiveEdgeIds\.has\(edge\.id\)/
+  )
+})
+
 test('流程图多选手势不会在 mousedown 阶段覆盖已选节点', () => {
   const source = flowchartLogicSource
 
@@ -1083,7 +1143,8 @@ test('流程图白板模式提供连接手柄、精简属性面板与行内编�
   assert.match(source, /updateConnectorDrag\(/)
   assert.match(source, /commitConnectorDrag\(/)
   assert.match(flowchartEdgeLogicSource, /FLOWCHART_NODE_HIT_PADDING/)
-  assert.match(flowchartEdgeLogicSource, /\[\.\.\.this\.flowchartData\.nodes\]\.reverse\(\)/)
+  assert.match(flowchartEdgeLogicSource, /getNodeTargetDistanceScore\(/)
+  assert.match(flowchartEdgeLogicSource, /preferredNodeId/)
   assert.match(flowchartNodeLayerSource, /connectorTargetDirection/)
   assert.match(flowchartNodeLayerSource, /isPreviewDirectionActive\(/)
   assert.match(flowchartEditorSource, /connectorTargetDirection\(\)/)
@@ -1108,6 +1169,34 @@ test('流程图白板模式提供连接手柄、精简属性面板与行内编�
   assert.doesNotMatch(flowchartViewportSource, /flowchartEdgeToolbar/)
   assert.doesNotMatch(flowchartSelectionSource, /getEdgeLabelToolbarPlacement = edge =>/)
   assert.match(flowchartNodeLayerSource, /flowchartConnectorHandle/)
+})
+
+test('流程图连接命中会优先保持当前目标节点，避免重叠命中区在拖拽时抖动', async () => {
+  const { flowchartConnectorMethods } = await loadFlowchartConnectorMethods()
+  const context = {
+    ...flowchartConnectorMethods,
+    flowchartData: {
+      nodes: [
+        { id: 'left-node', x: 0, y: 0, width: 100, height: 100 },
+        { id: 'right-node', x: 120, y: 0, width: 100, height: 100 }
+      ]
+    }
+  }
+
+  const neutralHit = context.findNodeAtWorldPoint(
+    { x: 104, y: 50 },
+    { padding: 28 }
+  )
+  const stickyHit = context.findNodeAtWorldPoint(
+    { x: 104, y: 50 },
+    { padding: 28, preferredNodeId: 'right-node' }
+  )
+
+  assert.equal(neutralHit?.id, 'left-node')
+  assert.equal(stickyHit?.id, 'right-node')
+  assert.match(flowchartEdgeLogicSource, /preferredNodeId/)
+  assert.match(flowchartReconnectSource, /preferredNodeId:\s*this\.edgeReconnectState\.targetNodeId/)
+  assert.match(flowchartEdgeLogicSource, /preferredNodeId:\s*this\.connectorDragState\.targetNodeId/)
 })
 
 test('流程图行内编辑提交会优先读取输入框实时值，并在切换交互时主动提交', () => {
@@ -1182,6 +1271,12 @@ test('流程图支持拖拽重连已有连线端点，并把逻辑拆到独立�
   assert.match(flowchartStyleSource, /\.flowchartEdgeSegmentHitArea/)
   assert.match(flowchartStyleSource, /\.flowchartEdgeHandleHitArea/)
   assert.match(flowchartStyleSource, /pointer-events:\s*all/)
+})
+
+test('流程图节点拖动结束会自动释放已经可直连的手工折线路由', () => {
+  assert.match(flowchartEditorSource, /relaxConnectedOrthogonalEdgeRoutes\(/)
+  assert.match(flowchartNodeSource, /const movedNodeIds = this\.dragState\.nodes\.map\(item => item\.id\)/)
+  assert.match(flowchartNodeSource, /this\.relaxConnectedOrthogonalEdgeRoutes\(movedNodeIds\)/)
 })
 
 test('流程图节点连接点统一收敛为四个固定锚点，不再允许沿边自由改变链接位置', () => {
@@ -1293,4 +1388,59 @@ test('流程图生成或导入后会适配视口并只提交最终状态', () =>
 
   assert.match(source, /applyGeneratedFlowchart\(result\) \{[\s\S]*?\$nextTick\(\(\) => \{[\s\S]*?fitCanvasToView\(\{\s*persist:\s*false\s*\}\)/)
   assert.match(source, /applyGeneratedFlowchart\(result\) \{[\s\S]*?\$nextTick\(\(\) => \{[\s\S]*?persistFlowchartState\(\)/)
+})
+
+test('流程图节点缩放使用 requestAnimationFrame 节流，与其他拖拽处理器一致', () => {
+  const source = flowchartResizeSource
+
+  // 应有 pending 点和 frame ID 的 rAF 模式
+  assert.match(source, /pendingResize(Point|Event|X|Y)/, '应有 pending resize 点变量')
+  assert.match(source, /resizeFrame(Id|Frame)/, '应有 resize frame ID 变量')
+  assert.match(source, /requestAnimationFrame/, '应使用 requestAnimationFrame 节流')
+  assert.match(source, /flushNodeResize|applyResize/, '应有 flush/apply 方法')
+})
+
+test('流程图框选使用 requestAnimationFrame 节流', () => {
+  const source = flowchartViewportSource
+
+  // onAreaSelection 应使用 rAF 而非直接处理
+  const areaSelectionMatch = source.match(
+    /onAreaSelection\(event\)\s*\{[\s\S]*?\n\s*\}/
+  )
+  assert.ok(areaSelectionMatch, '应找到 onAreaSelection 方法')
+  const areaSelectionBody = areaSelectionMatch[0]
+  assert.match(areaSelectionBody, /pending|Frame|requestAnimationFrame/, '框选应使用 rAF 节流')
+})
+
+test('流程图拖拽到画布边缘时自动滚动视口', () => {
+  const source = flowchartLogicSource
+
+  // 应存在自动滚动相关代码
+  assert.match(source, /autoScroll|AUTO_SCROLL/, '应存在自动滚动逻辑或常量')
+  assert.match(source, /FLOWCHART_AUTO_SCROLL_MARGIN/, '应有自动滚动边距常量')
+})
+
+test('流程图 createEdgeLayoutCacheKey 不使用 JSON.stringify', () => {
+  const source = flowchartEditorSource
+
+  // createEdgeLayoutCacheKey 函数体内不应使用 JSON.stringify
+  const fnMatch = source.match(
+    /createEdgeLayoutCacheKey\(edge, sourceNode, targetNode\)\s*\{[\s\S]*?\n\s*\}/
+  )
+  assert.ok(fnMatch, '应找到 createEdgeLayoutCacheKey 函数')
+  const fnBody = fnMatch[0]
+  assert.doesNotMatch(fnBody, /JSON\.stringify/, '缓存键生成不应使用 JSON.stringify')
+  // 应使用字符串拼接
+  assert.match(fnBody, /`|\+|\.join|concat/, '应使用字符串模板或拼接')
+})
+
+test('流程图新增节点有出现动画', () => {
+  const source = flowchartStyleSource
+
+  // 应有节点出现动画的 keyframes 或 animation 定义
+  assert.match(
+    source,
+    /flowchartNodeAppear|nodeAppear|@keyframes.*[Aa]ppear/,
+    '应有节点出现动画定义'
+  )
 })

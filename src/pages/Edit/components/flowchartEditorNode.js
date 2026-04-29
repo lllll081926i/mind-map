@@ -77,6 +77,7 @@ export const flowchartNodeMethods = {
       style: {}
     }
     this.flowchartData.nodes.push(nextNode)
+    this.markNodesAsNew([nextNode.id])
     if (sourceNode) {
       this.ensureFlowchartEdge(sourceNode.id, nextNode.id)
     }
@@ -199,6 +200,7 @@ export const flowchartNodeMethods = {
       .filter(Boolean)
     this.flowchartData.nodes.push(...pastedNodes)
     this.flowchartData.edges.push(...pastedEdges)
+    this.markNodesAsNew(pastedNodes.map(node => node.id))
     this.selectedNodeIds = pastedNodes.map(node => node.id)
     this.selectedEdgeId = ''
     void this.persistFlowchartState()
@@ -234,6 +236,7 @@ export const flowchartNodeMethods = {
       .filter(edge => edge.source && edge.target)
     this.flowchartData.nodes.push(...duplicatedNodes)
     this.flowchartData.edges.push(...duplicatedEdges)
+    this.markNodesAsNew(duplicatedNodes.map(node => node.id))
     this.selectedNodeIds = duplicatedNodes.map(node => node.id)
     this.selectedEdgeId = ''
     void this.persistFlowchartState()
@@ -281,6 +284,7 @@ export const flowchartNodeMethods = {
       x: position.x,
       y: position.y
     })
+    this.markNodesAsNew([nextId])
     this.flowchartData.edges.push({
       id: createNodeId('edge'),
       source: sourceNode.id,
@@ -521,10 +525,12 @@ export const flowchartNodeMethods = {
       ? [...seedNodeIds]
       : sortNodeIds(componentNodes.map(node => node.id).slice(0, 1))
     const enqueued = new Set(pendingNodeIds)
+    const topoOrderSet = new Set()
     const topoOrder = []
     while (pendingNodeIds.length) {
       const currentId = pendingNodeIds.shift()
       topoOrder.push(currentId)
+      topoOrderSet.add(currentId)
       ;(maps.outgoingMap.get(currentId) || []).forEach(targetId => {
         if (!componentNodeIds.has(targetId)) {
           return
@@ -551,7 +557,7 @@ export const flowchartNodeMethods = {
     }
     const remainingIds = sortNodeIds(
       componentNodes
-        .filter(node => !topoOrder.includes(node.id))
+        .filter(node => !topoOrderSet.has(node.id))
         .map(node => node.id)
     )
     topoOrder.push(...remainingIds)
@@ -1047,6 +1053,10 @@ export const flowchartNodeMethods = {
   },
 
   getFlowchartTidyOrientation() {
+    const nodes = this.flowchartData.nodes
+    if (!nodes.length) {
+      return 'horizontal'
+    }
     const edgeDirectionVotes = this.flowchartData.edges.reduce(
       (result, edge) => {
         const sourceNode = this.getNodeById(edge.source)
@@ -1073,12 +1083,19 @@ export const flowchartNodeMethods = {
         ? 'horizontal'
         : 'vertical'
     }
-    const xPositions = this.flowchartData.nodes.map(node => Number(node.x || 0))
-    const yPositions = this.flowchartData.nodes.map(node => Number(node.y || 0))
-    return Math.max(...xPositions) - Math.min(...xPositions) >=
-      Math.max(...yPositions) - Math.min(...yPositions)
-      ? 'horizontal'
-      : 'vertical'
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const node of nodes) {
+      const x = Number(node.x || 0)
+      const y = Number(node.y || 0)
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    return maxX - minX >= maxY - minY ? 'horizontal' : 'vertical'
   },
 
   async tidyFlowchartLayout(options = {}) {
@@ -1391,10 +1408,12 @@ export const flowchartNodeMethods = {
     }
     window.addEventListener('mousemove', this.onNodeDrag)
     window.addEventListener('mouseup', this.stopNodeDrag)
+    this.startAutoScroll(event.clientX, event.clientY)
   },
 
   onNodeDrag(event) {
     if (!this.dragState) return
+    this.updateAutoScroll(event.clientX, event.clientY)
     this.pendingDragPoint = {
       clientX: event.clientX,
       clientY: event.clientY
@@ -1452,12 +1471,14 @@ export const flowchartNodeMethods = {
 
   stopNodeDrag() {
     if (!this.dragState) return
+    this.stopAutoScroll()
     if (this.dragFrameId) {
       cancelAnimationFrame(this.dragFrameId)
       this.dragFrameId = 0
     }
     this.flushNodeDragFrame()
     const shouldPersist = this.dragState.moved
+    const movedNodeIds = this.dragState.nodes.map(item => item.id)
     this.dragState = null
     this.pendingDragPoint = null
     this.edgeDirectionLockMap = null
@@ -1465,6 +1486,7 @@ export const flowchartNodeMethods = {
     this.removeDragListeners()
     this.syncEdgeToolbarState()
     if (shouldPersist) {
+      this.relaxConnectedOrthogonalEdgeRoutes(movedNodeIds)
       this.suppressPointerClick()
     }
     if (shouldPersist) {

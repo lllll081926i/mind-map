@@ -195,6 +195,7 @@ export const flowchartInlineEditMethods = {
       style: {}
     }
     this.flowchartData.nodes.push(newNode)
+    this.markNodesAsNew([newNode.id])
     this.flowchartData.edges = this.flowchartData.edges.filter(edge => edge.id !== edgeId)
     this.ensureFlowchartEdge(targetEdge.source, newNode.id)
     this.ensureFlowchartEdge(newNode.id, targetEdge.target)
