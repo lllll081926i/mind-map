@@ -1420,6 +1420,28 @@ test('流程图拖拽到画布边缘时自动滚动视口', () => {
   assert.match(source, /FLOWCHART_AUTO_SCROLL_MARGIN/, '应有自动滚动边距常量')
 })
 
+test('流程图自动滚动画布时不会每帧持久化视口状态', () => {
+  assert.match(
+    flowchartAutoScrollSource,
+    /this\.setViewportPatch\?\.\(\s*\{[\s\S]*?x:\s*viewport\.x \+ dx,[\s\S]*?y:\s*viewport\.y \+ dy[\s\S]*?\},\s*\{\s*persist:\s*false\s*\}\s*\)/
+  )
+})
+
+test('流程图节点缩放在接近画布边缘时也会接入自动滚动', () => {
+  assert.match(flowchartResizeSource, /this\.startAutoScroll\(event\.clientX,\s*event\.clientY\)/)
+  assert.match(flowchartResizeSource, /this\.updateAutoScroll\(event\.clientX,\s*event\.clientY\)/)
+  assert.match(flowchartResizeSource, /this\.stopAutoScroll\(\)/)
+})
+
+test('流程图自动滚动时会同步刷新当前交互态，避免拖拽和连线预览发飘', () => {
+  assert.match(flowchartAutoScrollSource, /syncInteractionAfterAutoScroll\(/)
+  assert.match(flowchartAutoScrollSource, /this\.flushAreaSelectionFrame\(\)/)
+  assert.match(flowchartAutoScrollSource, /this\.flushConnectorDragFrame\(\)/)
+  assert.match(flowchartAutoScrollSource, /this\.flushEdgeReconnectFrame\(\)/)
+  assert.match(flowchartAutoScrollSource, /this\.flushNodeDragFrame\(\)/)
+  assert.match(flowchartAutoScrollSource, /this\.flushNodeResizeFrame\(\)/)
+})
+
 test('流程图 createEdgeLayoutCacheKey 不使用 JSON.stringify', () => {
   const source = flowchartEditorSource
 
