@@ -84,44 +84,23 @@ test('lint 入口已统一到 root flat config', () => {
   assert.equal(fs.existsSync(path.resolve('simple-mind-map/.eslintrc.js')), false)
 })
 
-test('发布流程已接入代码签名配置入口', () => {
+test('发布流程仅保留 Windows 签名与 Windows/Linux 产物矩阵', () => {
   assert.match(releaseWorkflowSource, /Import Windows code signing certificate/)
   assert.match(releaseWorkflowSource, /Apply Windows signing config/)
-  assert.match(releaseWorkflowSource, /id: macos_signing/)
-  assert.match(releaseWorkflowSource, /echo "enabled=false" >> "\$GITHUB_OUTPUT"/)
-  assert.match(releaseWorkflowSource, /echo "enabled=true" >> "\$GITHUB_OUTPUT"/)
-  assert.match(
-    releaseWorkflowSource,
-    /Build desktop bundles for release with macOS codesigning/
-  )
-  assert.match(
-    releaseWorkflowSource,
-    /Build desktop bundles for release without macOS codesigning/
-  )
-  assert.match(
-    releaseWorkflowSource,
-    /Build desktop bundles for workflow artifacts with macOS codesigning/
-  )
-  assert.match(
-    releaseWorkflowSource,
-    /Build desktop bundles for workflow artifacts without macOS codesigning/
-  )
-  assert.match(
-    releaseWorkflowSource,
-    /matrix\.os == 'macos-latest' && steps\.macos_signing\.outputs\.enabled == 'true'/
-  )
-  assert.match(
-    releaseWorkflowSource,
-    /\(matrix\.os != 'macos-latest' \|\| steps\.macos_signing\.outputs\.enabled != 'true'\)/
-  )
-  assert.match(releaseWorkflowSource, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/)
-  assert.match(
-    releaseWorkflowSource,
-    /APPLE_SIGNING_IDENTITY: \$\{\{ secrets\.APPLE_SIGNING_IDENTITY \}\}/
-  )
-  assert.match(releaseWorkflowSource, /security create-keychain/)
-  assert.match(releaseWorkflowSource, /security import/)
-  assert.match(releaseWorkflowSource, /security find-identity/)
+  assert.match(releaseWorkflowSource, /Build desktop bundles for release/)
+  assert.match(releaseWorkflowSource, /Build desktop bundles for workflow artifacts/)
+  assert.match(releaseWorkflowSource, /Windows Installer/)
+  assert.match(releaseWorkflowSource, /Windows Portable/)
+  assert.match(releaseWorkflowSource, /Windows ARM64 Installer/)
+  assert.match(releaseWorkflowSource, /Windows ARM64 Portable/)
+  assert.match(releaseWorkflowSource, /Linux Bundle/)
+  assert.doesNotMatch(releaseWorkflowSource, /macOS Bundle/)
+  assert.doesNotMatch(releaseWorkflowSource, /id: macos_signing/)
+  assert.doesNotMatch(releaseWorkflowSource, /APPLE_CERTIFICATE/)
+  assert.doesNotMatch(releaseWorkflowSource, /APPLE_SIGNING_IDENTITY/)
+  assert.doesNotMatch(releaseWorkflowSource, /security create-keychain/)
+  assert.doesNotMatch(releaseWorkflowSource, /security import/)
+  assert.doesNotMatch(releaseWorkflowSource, /security find-identity/)
   assert.match(releaseWorkflowSource, /artifact_name_regex:/)
   assert.match(releaseWorkflowSource, /Verify packaged desktop artifacts/)
   assert.match(releaseWorkflowSource, /ARTIFACT_NAME_REGEX:/)

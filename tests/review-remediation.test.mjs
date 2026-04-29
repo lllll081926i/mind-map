@@ -433,7 +433,7 @@ test('桌面入口模板不再保留旧接管脚本，并使用 MindMap 作为�
   assert.match(tauriConfigSource, /"shortDescription": "MindMap editor"/)
   assert.match(
     tauriConfigSource,
-    /"longDescription": "MindMap application for Windows, macOS, and Linux\."/
+    /"longDescription": "MindMap application for Windows and Linux\."/
   )
   assert.match(tauriCargoSource, /description = "MindMap"/)
 })

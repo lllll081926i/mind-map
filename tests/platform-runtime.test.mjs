@@ -346,10 +346,7 @@ test('.smm 文件关联配置已接入 Tauri 打包配置', () => {
     tauriConfig.bundle.windows.nsis.installerHooks,
     'file-association/windows/smm-file-association.nsh'
   )
-  assert.equal(
-    tauriConfig.bundle.macOS.infoPlist,
-    'file-association/macos/Info.plist'
-  )
+  assert.equal('macOS' in tauriConfig.bundle, false)
   assert.equal(
     tauriConfig.bundle.linux.deb.postInstallScript,
     'file-association/linux/postinstall.sh'
@@ -360,11 +357,9 @@ test('.smm 文件关联资源文件存在', () => {
   const resourceFiles = [
     'src-tauri/file-association/smm-document.svg',
     'src-tauri/file-association/icons/smm-document.ico',
-    'src-tauri/file-association/icons/smm-document.icns',
     'src-tauri/file-association/icons/application-x-mindmap-smm.svg',
     'src-tauri/file-association/icons/application-x-mindmap-smm.png',
     'src-tauri/file-association/windows/smm-file-association.nsh',
-    'src-tauri/file-association/macos/Info.plist',
     'src-tauri/file-association/linux/application-x-mindmap-smm.xml',
     'src-tauri/file-association/linux/postinstall.sh',
     'src-tauri/file-association/linux/postremove.sh'
