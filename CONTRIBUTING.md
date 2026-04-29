@@ -39,7 +39,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 - Do not revert unrelated user changes in the worktree
 - Prefer editing existing files over creating new ones
-- Keep Windows/macOS/Linux behavior aligned when touching file associations or packaging
+- Keep Windows/Linux behavior aligned when touching file associations or packaging
 - Add or update tests for every behavior change or bug fix
 - When changing release or installer behavior, update the corresponding workflow or packaging docs
 
