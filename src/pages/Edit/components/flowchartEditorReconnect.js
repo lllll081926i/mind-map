@@ -259,6 +259,7 @@ export const flowchartReconnectMethods = {
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
     window.addEventListener('mousemove', this.updateEdgeBendDrag)
     window.addEventListener('mouseup', this.commitEdgeBendDrag)
+    this.startAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     pointerEvent?.preventDefault?.()
   },
 
@@ -286,6 +287,7 @@ export const flowchartReconnectMethods = {
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
     window.addEventListener('mousemove', this.updateEdgeBendDrag)
     window.addEventListener('mouseup', this.commitEdgeBendDrag)
+    this.startAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     pointerEvent?.preventDefault?.()
   },
 
@@ -293,6 +295,7 @@ export const flowchartReconnectMethods = {
     if (!this.edgeBendDragState) {
       return
     }
+    this.updateAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.edgeBendDragFrameId) {
       return
@@ -340,6 +343,7 @@ export const flowchartReconnectMethods = {
     if (!this.edgeBendDragState) {
       return
     }
+    this.stopAutoScroll()
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.edgeBendDragFrameId) {
       window.cancelAnimationFrame(this.edgeBendDragFrameId)
@@ -354,6 +358,7 @@ export const flowchartReconnectMethods = {
   },
 
   cancelEdgeBendDrag() {
+    this.stopAutoScroll()
     this.edgeBendDragState = null
     this.pendingEdgeBendPoint = null
     if (this.edgeBendDragFrameId) {
@@ -395,6 +400,7 @@ export const flowchartReconnectMethods = {
     this.pendingEdgeLabelDragPoint = startPoint
     window.addEventListener('mousemove', this.updateEdgeLabelDrag)
     window.addEventListener('mouseup', this.commitEdgeLabelDrag)
+    this.startAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     pointerEvent?.preventDefault?.()
   },
 
@@ -402,6 +408,7 @@ export const flowchartReconnectMethods = {
     if (!this.edgeLabelDragState) {
       return
     }
+    this.updateAutoScroll(pointerEvent?.clientX, pointerEvent?.clientY)
     this.pendingEdgeLabelDragPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.edgeLabelDragFrameId) {
       return
@@ -454,6 +461,7 @@ export const flowchartReconnectMethods = {
     if (!this.edgeLabelDragState) {
       return
     }
+    this.stopAutoScroll()
     this.pendingEdgeLabelDragPoint = this.getWorldPointFromEvent(pointerEvent)
     if (this.edgeLabelDragFrameId) {
       window.cancelAnimationFrame(this.edgeLabelDragFrameId)
@@ -469,6 +477,7 @@ export const flowchartReconnectMethods = {
   },
 
   cancelEdgeLabelDrag() {
+    this.stopAutoScroll()
     this.edgeLabelDragState = null
     this.pendingEdgeLabelDragPoint = null
     if (this.edgeLabelDragFrameId) {

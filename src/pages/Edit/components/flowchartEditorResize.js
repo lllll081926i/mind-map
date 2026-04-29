@@ -38,6 +38,7 @@ export const flowchartResizeMethods = {
     this.resizeFrameId = 0
     window.addEventListener('mousemove', this.onNodeResize)
     window.addEventListener('mouseup', this.stopNodeResize)
+    this.startAutoScroll(event.clientX, event.clientY)
     event.preventDefault?.()
   },
 
@@ -45,6 +46,7 @@ export const flowchartResizeMethods = {
     if (!this.resizeState) {
       return
     }
+    this.updateAutoScroll(event.clientX, event.clientY)
     this.pendingResizeEvent = event
     if (this.resizeFrameId) {
       return
@@ -110,6 +112,7 @@ export const flowchartResizeMethods = {
     if (!this.resizeState) {
       return
     }
+    this.stopAutoScroll()
     if (this.resizeFrameId) {
       window.cancelAnimationFrame(this.resizeFrameId)
       this.resizeFrameId = 0
@@ -131,6 +134,7 @@ export const flowchartResizeMethods = {
   },
 
   removeNodeResizeListeners() {
+    this.stopAutoScroll()
     window.removeEventListener('mousemove', this.onNodeResize)
     window.removeEventListener('mouseup', this.stopNodeResize)
   }

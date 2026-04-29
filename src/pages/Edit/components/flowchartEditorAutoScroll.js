@@ -38,6 +38,62 @@ export const flowchartAutoScrollMethods = {
     }
   },
 
+  createAutoScrollPointerEvent() {
+    if (!this.autoScrollState) {
+      return null
+    }
+    return {
+      clientX: Number(this.autoScrollState.clientX || 0),
+      clientY: Number(this.autoScrollState.clientY || 0)
+    }
+  },
+
+  syncInteractionAfterAutoScroll(dx, dy) {
+    const pointerEvent = this.createAutoScrollPointerEvent()
+    if (!pointerEvent) {
+      return
+    }
+
+    if (this.selectionState) {
+      this.pendingAreaSelectionEvent = pointerEvent
+      this.flushAreaSelectionFrame()
+    }
+
+    if (this.connectorDragState) {
+      this.pendingConnectorPoint = this.getWorldPointFromEvent(pointerEvent)
+      this.flushConnectorDragFrame()
+    }
+
+    if (this.edgeReconnectState) {
+      this.pendingEdgeReconnectPoint = this.getWorldPointFromEvent(pointerEvent)
+      this.flushEdgeReconnectFrame()
+    }
+
+    if (this.edgeBendDragState) {
+      this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
+      this.flushEdgeBendDragFrame()
+    }
+
+    if (this.edgeLabelDragState) {
+      this.pendingEdgeLabelDragPoint = this.getWorldPointFromEvent(pointerEvent)
+      this.flushEdgeLabelDragFrame()
+    }
+
+    if (this.dragState) {
+      this.dragState.startX += dx
+      this.dragState.startY += dy
+      this.pendingDragPoint = pointerEvent
+      this.flushNodeDragFrame()
+    }
+
+    if (this.resizeState) {
+      this.resizeState.startX += dx
+      this.resizeState.startY += dy
+      this.pendingResizeEvent = pointerEvent
+      this.flushNodeResizeFrame()
+    }
+  },
+
   autoScrollTick() {
     this.autoScrollFrameId = 0
     if (!this.autoScrollState) {
@@ -90,7 +146,10 @@ export const flowchartAutoScrollMethods = {
       this.setViewportPatch?.({
         x: viewport.x + dx,
         y: viewport.y + dy
+      }, {
+        persist: false
       })
+      this.syncInteractionAfterAutoScroll(dx, dy)
     }
 
     if (this.autoScrollState) {
