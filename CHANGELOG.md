@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-04-29
+
+### Added
+- Added the shipping desktop flowchart workspace with business-oriented node templates, canvas backgrounds, minimap navigation, reconnect handles, edge labels, resize controls, and inspector-driven editing on the main application path
+- Added direct orthogonal route editing for flowchart edges, including bend dragging, segment dragging, single-bend preference, and automatic collapse of redundant bends when users pull routes back onto a straight lane
+- Added broader flowchart regression coverage around template previews, orthogonal routing, export bounds, anchor placement, and manual route cleanup so the editor can keep evolving without reintroducing the same pathing failures
+
+### Changed
+- Refined flowchart routing and layout behavior across editing, preview, and export so arrows stay pointed at the target block, labels remain readable, minimap coverage matches the real canvas, and large business diagrams keep a cleaner overall shape
+- Reworked flowchart export-bound calculation to include labels, arrows, and long detours instead of sizing only from nodes, which makes complex SVG and image export results much less likely to clip content
+- Improved template preview arrangement and node overlap handling so denser flowchart templates remain legible before insertion and better match the structured layout users expect in commercial diagram tools
+- Hardened the desktop release pipeline so Windows and Linux bundle builds now reuse the intended release config, publish curated changelog text as the release body, and validate local bundle artifacts with rules that match real runner outputs
+
+### Fixed
+- Fixed several flowchart edge-editing cases where repeated drag adjustments could leave unnecessary double bends, unstable return paths, or misaligned route recovery after moving nodes
+- Fixed minimap range calculation so connector paths and arrow markers participate in overview bounds instead of disappearing near the edges of larger diagrams
+- Fixed flowchart edge-label alignment so centered labels render more consistently on the canvas and in exported output
+- Fixed the release workflow bug that turned wildcard bundle paths such as `*.exe`, `*.deb`, and `*.AppImage` into invalid regular expressions during post-build verification, which was the remaining cause of the failed Windows and Linux release jobs
+
 ## [0.2.15] - 2026-04-29
 
 ### Added

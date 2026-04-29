@@ -565,7 +565,7 @@ jobs:
             }
 
             const fileNameMatcher = new RegExp(
-              '^' + escapeRegex(basePattern).replace(/\\\*/g, '.*') + '$'
+              '^' + escapeRegex(basePattern).replace(/\*/g, '.*') + '$'
             )
 
             return fs.readdirSync(dirPath).filter(name => {
