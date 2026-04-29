@@ -385,19 +385,19 @@
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">运行时</span>
-          <span class="value">{{ appRuntimeLabel }}</span>
+          <span class="value sidebarReadonlyMetric">{{ appRuntimeLabel }}</span>
         </div>
       </div>
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">平台</span>
-          <span class="value">{{ appPlatformLabel }}</span>
+          <span class="value sidebarReadonlyMetric">{{ appPlatformLabel }}</span>
         </div>
       </div>
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">版本</span>
-          <span class="value">v{{ appVersion }}</span>
+          <span class="value sidebarReadonlyMetric">v{{ appVersion }}</span>
         </div>
       </div>
       <div class="row">
@@ -425,7 +425,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocalConfigPatch } from '@/stores/runtime'
 import {
-  checkForUpdates as runUpdateCheck
+  checkForUpdates as runUpdateCheck,
+  createUpdateDialogMessage
 } from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
 
@@ -524,6 +525,7 @@ export default {
   },
   beforeUnmount() {
     this.$bus.$off('toggleOpenNodeRichText', this.onToggleOpenNodeRichText)
+    clearTimeout(this.storeConfigTimer)
   },
   methods: {
     setLocalConfig(data) {
@@ -571,7 +573,10 @@ export default {
         [key]: value
       })
       this.configData[key] = value
-      storeConfig(this.configData)
+      clearTimeout(this.storeConfigTimer)
+      this.storeConfigTimer = setTimeout(() => {
+        storeConfig(this.configData)
+      }, 300)
       if (
         [
           'alwaysShowExpandBtn',
@@ -655,23 +660,26 @@ export default {
       try {
         const result = await runUpdateCheck(this.appVersion)
         if (result.status === 'update-available') {
-          const notes = result.notes ? `\n\n${result.notes}` : ''
           if (result.url) {
-            this.$confirm(
-              `${this.$t('setting.updateAvailableMessage', {
-                version: result.latestVersion
-              })}\n\n${this.$t('setting.updateOpenReleasePageTip')}${notes}`,
+            const action = await this.$confirm(
+              createUpdateDialogMessage(result, this.$t),
               this.$t('setting.updateAvailableTitle'),
               {
                 confirmButtonText: this.$t('setting.openReleasePage'),
                 cancelButtonText: this.$t('setting.updateLater'),
                 type: 'info'
               }
-            )
-              .then(() => {
-                return openExternalUrl(result.url)
-              })
-              .catch(() => {})
+            ).catch(action => action)
+            if (action !== 'confirm') {
+              return
+            }
+            try {
+              await openExternalUrl(result.url)
+            } catch (error) {
+              this.$message.error(
+                error?.message || this.$t('setting.updateOpenReleasePageFailed')
+              )
+            }
             return
           }
           this.$message.info(
@@ -761,6 +769,11 @@ export default {
       .value {
         color: inherit;
         opacity: 0.8;
+      }
+
+      .sidebarReadonlyMetric {
+        user-select: none;
+        -webkit-user-select: none;
       }
 
       .block {

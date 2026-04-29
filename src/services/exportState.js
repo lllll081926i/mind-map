@@ -7,6 +7,7 @@ const PERSISTED_EXPORT_FIELDS = [
   'exportType',
   'withConfig',
   'isTransparent',
+  'withBackground',
   'paddingX',
   'paddingY',
   'extraText',
@@ -35,9 +36,26 @@ const baseFormats = [
   }
 ]
 
-export const getDesktopExportFormats = () => {
+const flowchartFormats = [
+  {
+    name: 'SVG',
+    type: 'svg',
+    desc: '导出矢量流程图'
+  },
+  {
+    name: 'PNG',
+    type: 'png',
+    desc: '导出流程图图片'
+  }
+]
+
+export const getDesktopExportFormats = (documentMode = 'mindmap') => {
+  const sourceFormats =
+    String(documentMode || '').trim() === 'flowchart'
+      ? flowchartFormats
+      : baseFormats
   const seen = new Set()
-  return baseFormats.filter(item => {
+  return sourceFormats.filter(item => {
     if (seen.has(item.type)) {
       return false
     }
@@ -46,13 +64,18 @@ export const getDesktopExportFormats = () => {
   })
 }
 
-export const createDefaultExportState = fileName => ({
-  exportType: 'smm',
+export const createDefaultExportState = (
+  fileName,
+  documentMode = 'mindmap'
+) => ({
+  exportType:
+    String(documentMode || '').trim() === 'flowchart' ? 'svg' : 'smm',
   fileName: fileName || '思维导图',
   withConfig: true,
   isTransparent: false,
-  paddingX: 10,
-  paddingY: 10,
+  withBackground: String(documentMode || '').trim() === 'flowchart' ? false : true,
+  paddingX: String(documentMode || '').trim() === 'flowchart' ? 120 : 10,
+  paddingY: String(documentMode || '').trim() === 'flowchart' ? 120 : 10,
   extraText: '',
   isFitBg: true,
   imageFormat: 'png'
@@ -60,7 +83,10 @@ export const createDefaultExportState = fileName => ({
 
 export const createExportStateFromFileRef = fileRef => {
   const exportContext = createExportContext(fileRef)
-  return createDefaultExportState(exportContext.fileName)
+  return createDefaultExportState(
+    exportContext.fileName,
+    exportContext.fileRef?.documentMode || 'mindmap'
+  )
 }
 
 const getPersistedExportMap = () => {
@@ -107,16 +133,27 @@ const pickPersistedExportState = state => {
 
 export const restorePersistedExportState = fileRef => {
   const exportContext = createExportContext(fileRef)
-  const fallbackState = createDefaultExportState(exportContext.fileName)
+  const documentMode = exportContext.fileRef?.documentMode || 'mindmap'
+  const fallbackState = createDefaultExportState(
+    exportContext.fileName,
+    documentMode
+  )
   const stateMap = getPersistedExportMap()
   const persistedState = stateMap[createExportStateStorageKey(fileRef)]
   if (!persistedState || typeof persistedState !== 'object') {
     return fallbackState
   }
-  return {
+  const restoredState = {
     ...fallbackState,
     ...pickPersistedExportState(persistedState)
   }
+  const availableTypes = new Set(
+    getDesktopExportFormats(documentMode).map(item => item.type)
+  )
+  if (!availableTypes.has(restoredState.exportType)) {
+    restoredState.exportType = fallbackState.exportType
+  }
+  return restoredState
 }
 
 export const persistExportStateSnapshot = state => {
@@ -133,16 +170,16 @@ export const resolveExportContext = fileRef => {
   return createExportContext(fileRef)
 }
 
-export const findExportFormat = type => {
-  return getDesktopExportFormats().find(item => item.type === type) || null
+export const findExportFormat = (type, documentMode = 'mindmap') => {
+  return getDesktopExportFormats(documentMode).find(item => item.type === type) || null
 }
 
-export const isExportFormatDisabled = type => {
-  const target = findExportFormat(type)
+export const isExportFormatDisabled = (type, documentMode = 'mindmap') => {
+  const target = findExportFormat(type, documentMode)
   return !!(target && target.disabled)
 }
 
-export const getResolvedExportType = type => {
-  const target = findExportFormat(type)
+export const getResolvedExportType = (type, documentMode = 'mindmap') => {
+  const target = findExportFormat(type, documentMode)
   return target?.aliasType || type
 }

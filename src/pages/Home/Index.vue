@@ -5,7 +5,6 @@
         <div class="sidebarMeta">{{ $t('home.eyebrow') }}</div>
         <div class="sidebarIntro">
           <h1>{{ $t('home.brandTitle') }}</h1>
-          <p>{{ $t('home.brandDescription') }}</p>
         </div>
 
         <div class="actionList">
@@ -24,6 +23,22 @@
 
           <button
             type="button"
+            class="secondaryAction"
+            :disabled="busy"
+            @click="createFlowchart"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="6" height="4" rx="1"></rect>
+              <rect x="14" y="15" width="6" height="4" rx="1"></rect>
+              <path d="M10 7h4"></path>
+              <path d="M14 17h-4"></path>
+              <path d="M12 9v6"></path>
+            </svg>
+            <span>{{ $t('home.createFlowchart') }}</span>
+          </button>
+
+          <button
+            type="button"
             class="actionItem"
             :disabled="busy"
             @click="openLocalFile"
@@ -38,7 +53,6 @@
             </div>
             <div class="actionText">
               <strong>{{ $t('home.openLocalFile') }}</strong>
-              <span>{{ $t('home.openLocalFileDesc') }}</span>
             </div>
           </button>
 
@@ -57,7 +71,6 @@
             </div>
             <div class="actionText">
               <strong>{{ $t('home.openLocalFolder') }}</strong>
-              <span>{{ $t('home.openLocalFolderDesc') }}</span>
             </div>
           </button>
         </div>
@@ -82,13 +95,6 @@
             <div class="resumeMain">
               <strong>{{ resumeEntry.title }}</strong>
               <span>{{ resumeEntry.path || $t('home.resumeUnsavedPath') }}</span>
-              <em class="resumeHint">
-                {{
-                  hasDirtyDraft
-                    ? $t('home.resumeDirtyHint')
-                    : $t('home.resumeReadyHint')
-                }}
-              </em>
             </div>
             <span class="resumeAction">{{ $t('home.continueAction') }}</span>
           </button>
@@ -98,38 +104,46 @@
           </div>
         </section>
 
-        <section class="workspaceSignals">
-          <div class="sectionHeader">
-            <h2>{{ $t('home.workspaceSignalsTitle') }}</h2>
-          </div>
-          <div class="signalGrid">
-            <article class="signalCard">
-              <span>{{ $t('home.signalResumeTitle') }}</span>
-              <strong>{{ resumeSignalValue }}</strong>
-            </article>
-            <article class="signalCard">
-              <span>{{ $t('home.signalRecentTitle') }}</span>
-              <strong>
-                {{ $t('home.signalRecentValue', { count: recentFiles.length }) }}
-              </strong>
-            </article>
-            <article class="signalCard">
-              <span>{{ $t('home.signalDirectoryTitle') }}</span>
-              <strong>{{ lastDirectory || $t('home.signalDirectoryEmpty') }}</strong>
-            </article>
-          </div>
-        </section>
-
         <header class="mainHeader">
           <h2>{{ $t('home.recentTitle') }}</h2>
-          <button
-            type="button"
-            class="textButton"
-            :disabled="busy || recentFiles.length <= 0"
-            @click="clearRecents"
-          >
-            {{ $t('home.clearRecents') }}
-          </button>
+          <div class="headerActions">
+            <button
+              type="button"
+              class="themeModeToggle"
+              :aria-label="themeToggleLabel"
+              :title="themeToggleLabel"
+              :disabled="busy"
+              @click="toggleAppearance"
+            >
+              <span class="themeModeToggleIcon" aria-hidden="true">
+                <svg v-if="isDark" viewBox="0 0 24 24">
+                  <path
+                    d="M18 14.5A7.5 7.5 0 0 1 9.5 6a8 8 0 1 0 8.5 8.5Z"
+                  ></path>
+                </svg>
+                <svg v-else viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="4"></circle>
+                  <path d="M12 2v2.5"></path>
+                  <path d="M12 19.5V22"></path>
+                  <path d="m4.9 4.9 1.8 1.8"></path>
+                  <path d="m17.3 17.3 1.8 1.8"></path>
+                  <path d="M2 12h2.5"></path>
+                  <path d="M19.5 12H22"></path>
+                  <path d="m4.9 19.1 1.8-1.8"></path>
+                  <path d="m17.3 6.7 1.8-1.8"></path>
+                </svg>
+              </span>
+              <span>{{ isDark ? $t('theme.dark') : $t('theme.light') }}</span>
+            </button>
+            <button
+              type="button"
+              class="textButton"
+              :disabled="busy || recentFiles.length <= 0"
+              @click="clearRecents"
+            >
+              {{ $t('home.clearRecents') }}
+            </button>
+          </div>
         </header>
 
         <div v-if="recentFiles.length > 0" class="recentList">
@@ -142,11 +156,17 @@
             @click="openRecent(item)"
           >
             <div class="recentMain">
-              <strong>{{ resolveRecentTitle(item) }}</strong>
+              <div class="recentTitleRow">
+                <strong>{{ resolveRecentTitle(item) }}</strong>
+                <em class="recentMode">
+                  {{
+                    item.documentMode === 'flowchart'
+                      ? $t('home.documentModeFlowchart')
+                      : $t('home.documentModeMindmap')
+                  }}
+                </em>
+              </div>
               <span>{{ item.path }}</span>
-              <em v-if="lastDirectory" class="recentHint">
-                {{ $t('home.currentDirectory') }}{{ lastDirectory }}
-              </em>
             </div>
             <time class="recentMeta">{{ formatUpdatedAt(item.updatedAt) }}</time>
           </button>
@@ -161,60 +181,6 @@
           <p>{{ $t('home.emptyTitle') }}</p>
         </div>
 
-        <section class="quickStartSection">
-          <div class="sectionHeader">
-            <h2>{{ $t('home.quickStartTitle') }}</h2>
-          </div>
-          <div class="quickStartList">
-            <article class="quickStartCard">
-              <div>
-                <strong>{{ $t('home.quickStartCreateTitle') }}</strong>
-                <p>{{ $t('home.quickStartCreateDesc') }}</p>
-              </div>
-              <button type="button" class="inlineActionButton" @click="createBlankProject">
-                {{ $t('home.createNew') }}
-              </button>
-            </article>
-            <article class="quickStartCard">
-              <div>
-                <strong>{{ $t('home.quickStartEditTitle') }}</strong>
-                <p>{{ $t('home.quickStartEditDesc') }}</p>
-              </div>
-              <button type="button" class="inlineActionButton" @click="openLocalFile">
-                {{ $t('home.openLocalFile') }}
-              </button>
-            </article>
-            <article class="quickStartCard">
-              <div>
-                <strong>{{ $t('home.quickStartExportTitle') }}</strong>
-                <p>{{ $t('home.quickStartExportDesc') }}</p>
-              </div>
-              <button type="button" class="inlineActionButton" @click="openExportCenter">
-                {{ $t('home.quickStartExportTitle') }}
-              </button>
-            </article>
-          </div>
-        </section>
-
-        <section class="experienceSection">
-          <div class="sectionHeader">
-            <h2>{{ $t('home.experienceTipsTitle') }}</h2>
-          </div>
-          <div class="experienceGrid">
-            <article class="experienceCard">
-              <strong>{{ $t('home.searchTipTitle') }}</strong>
-              <p>{{ $t('home.searchTipDesc') }}</p>
-            </article>
-            <article class="experienceCard">
-              <strong>{{ $t('home.exportTipTitle') }}</strong>
-              <p>{{ $t('home.exportTipDesc') }}</p>
-            </article>
-            <article class="experienceCard">
-              <strong>{{ $t('home.recoveryTipTitle') }}</strong>
-              <p>{{ $t('home.recoveryTipDesc') }}</p>
-            </article>
-          </div>
-        </section>
       </main>
     </div>
   </div>
@@ -224,6 +190,11 @@
 import { mapState } from 'pinia'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
+import { createDefaultMindMapData } from '@/platform/shared/configSchema'
+import {
+  getPreferredMindMapThemeValue,
+  toggleThemeMode
+} from '@/stores/runtime'
 
 let workspaceActionsPromise = null
 
@@ -253,16 +224,15 @@ export default {
       recentFiles: 'recentFiles',
       resumeEntry: 'resumeEntry',
       hasResumeEntry: 'hasResumeEntry',
-      hasDirtyDraft: 'hasDirtyDraft',
-      lastDirectory: 'lastDirectory'
+      hasDirtyDraft: 'hasDirtyDraft'
     }),
     ...mapState(useThemeStore, {
       isDark: 'isDark'
     }),
-    resumeSignalValue() {
-      return this.hasResumeEntry
-        ? this.$t('home.signalResumeReady')
-        : this.$t('home.signalResumeEmpty')
+    themeToggleLabel() {
+      return this.isDark
+        ? this.$t('navigatorToolbar.lightMode')
+        : this.$t('navigatorToolbar.darkMode')
     }
   },
   mounted() {
@@ -358,9 +328,23 @@ export default {
       await this.runWorkspaceAction(async () => {
         const { createWorkspaceLocalFile } = await loadWorkspaceActions()
         return createWorkspaceLocalFile({
+          router: this.$router,
+          content: this.createBlankProjectContent()
+        })
+      })
+    },
+
+    async createBlankFlowchartProject() {
+      await this.runWorkspaceAction(async () => {
+        const { createWorkspaceFlowchartFile } = await loadWorkspaceActions()
+        return createWorkspaceFlowchartFile({
           router: this.$router
         })
       })
+    },
+
+    async createFlowchart() {
+      await this.createBlankFlowchartProject()
     },
 
     async openLocalFile() {
@@ -393,20 +377,6 @@ export default {
       })
     },
 
-    async openExportCenter() {
-      if (!this.hasResumeEntry) {
-        this.$message.info(this.$t('home.continueEmpty'))
-        return
-      }
-      await this.runWorkspaceAction(async () => {
-        const { resumeWorkspaceSession } = await loadWorkspaceActions()
-        const result = await resumeWorkspaceSession(this.$router)
-        if (result) {
-          await this.$router.push('/export')
-        }
-      })
-    },
-
     async clearRecents() {
       if (this.recentFiles.length <= 0) return
       try {
@@ -424,6 +394,21 @@ export default {
         const { clearWorkspaceRecentFiles } = await loadWorkspaceActions()
         await clearWorkspaceRecentFiles()
       })
+    },
+
+    createBlankProjectContent() {
+      const themeTemplate = getPreferredMindMapThemeValue(!!this.isDark)
+      return createDefaultMindMapData('思维导图', themeTemplate)
+    },
+
+    async toggleAppearance() {
+      if (this.busy) return
+      try {
+        await toggleThemeMode()
+      } catch (error) {
+        console.error('toggleAppearance failed', error)
+        this.$message.error(error?.message || this.$t('home.actionFailed'))
+      }
     }
   }
 }
@@ -457,19 +442,12 @@ export default {
       }
     }
 
-    .sidebarIntro p,
-    .actionText span,
     .resumeMain span,
-    .resumeMain .resumeHint,
     .resumeEmpty p,
-    .signalCard span,
-    .signalCard strong,
     .recentMain span,
     .recentMeta,
     .textButton,
-    .emptyState p,
-    .quickStartCard p,
-    .experienceCard p {
+    .emptyState p {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
@@ -477,6 +455,17 @@ export default {
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
         transparent;
+    }
+
+    .themeModeToggle {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: hsla(0, 0%, 100%, 0.08);
+      color: hsla(0, 0%, 100%, 0.9);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: hsla(0, 0%, 100%, 0.12);
+      }
     }
 
     .primaryAction {
@@ -487,6 +476,15 @@ export default {
       }
     }
 
+    .secondaryAction {
+      background: rgba(255, 255, 255, 0.05);
+      color: hsla(0, 0%, 100%, 0.92);
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+      }
+    }
+
     .actionItem {
       &:hover:not(:disabled) {
         background: rgba(255, 255, 255, 0.05);
@@ -494,20 +492,16 @@ export default {
     }
 
     .actionIcon,
-    .recentHint {
+    .recentMode {
       color: hsla(0, 0%, 100%, 0.42);
     }
 
     .actionText strong,
     .resumeHeader h2,
-    .sectionHeader h2,
     .resumeMain strong,
     .resumeAction,
     .mainHeader h2,
     .recentMain strong,
-    .quickStartCard strong,
-    .experienceCard strong,
-    .inlineActionButton,
     .textButton:hover:not(:disabled) {
       color: hsla(0, 0%, 100%, 0.92);
     }
@@ -528,20 +522,6 @@ export default {
 
     .resumeEmpty {
       border-color: hsla(0, 0%, 100%, 0.1);
-    }
-
-    .signalCard,
-    .quickStartCard,
-    .experienceCard {
-      background: rgba(255, 255, 255, 0.02);
-      border-color: hsla(0, 0%, 100%, 0.08);
-    }
-
-    .signalCard:hover,
-    .quickStartCard:hover,
-    .experienceCard:hover {
-      border-color: hsla(0, 0%, 100%, 0.14);
-      background: rgba(255, 255, 255, 0.04);
     }
 
     .dirtyBadge {
@@ -607,14 +587,8 @@ export default {
   h1 {
     font-size: 24px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 0;
     letter-spacing: -0.03em;
-  }
-
-  p {
-    font-size: 13px;
-    line-height: 1.6;
-    color: #4b5563;
   }
 }
 
@@ -639,7 +613,7 @@ export default {
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 
   svg {
     width: 16px;
@@ -653,6 +627,43 @@ export default {
 
   &:hover:not(:disabled) {
     background: #333;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.secondaryAction {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 16px;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover:not(:disabled) {
+    background: #eef2f7;
   }
 
   &:disabled {
@@ -700,19 +711,11 @@ export default {
 }
 
 .actionText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
   strong {
+    display: block;
     font-size: 14px;
     font-weight: 500;
     color: #111827;
-  }
-
-  span {
-    font-size: 12px;
-    color: #9ca3af;
   }
 }
 
@@ -793,12 +796,10 @@ export default {
     color: #111827;
   }
 
-  span,
-  .resumeHint {
+  span {
     font-size: 12px;
     color: #6b7280;
     word-break: break-all;
-    font-style: normal;
   }
 }
 
@@ -832,6 +833,59 @@ export default {
     font-size: 16px;
     font-weight: 500;
     color: #111827;
+  }
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.themeModeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #d1d5db;
+    background: #f9fafb;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.themeModeToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 
@@ -904,11 +958,20 @@ export default {
   }
 }
 
-.recentHint {
+.recentTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recentMode {
   font-style: normal;
-  font-size: 12px;
-  color: #d1d5db;
-  word-break: break-all;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .recentMeta {
@@ -942,130 +1005,6 @@ export default {
   }
 }
 
-.sectionHeader {
-  margin-bottom: 12px;
-
-  h2 {
-    font-size: 16px;
-    font-weight: 500;
-    color: #111827;
-  }
-}
-
-.workspaceSignals,
-.quickStartSection,
-.experienceSection {
-  display: flex;
-  flex-direction: column;
-}
-
-.signalGrid,
-.quickStartList,
-.experienceGrid {
-  display: grid;
-  gap: 12px;
-}
-
-.signalGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.quickStartList,
-.experienceGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.signalCard,
-.quickStartCard,
-.experienceCard {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  padding: 16px 18px;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    transform 0.2s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-  }
-}
-
-.signalCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  span {
-    font-size: 12px;
-    color: #6b7280;
-  }
-
-  strong {
-    font-size: 14px;
-    color: #111827;
-    word-break: break-all;
-  }
-}
-
-.quickStartCard {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
-
-  strong {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 14px;
-    color: #111827;
-  }
-
-  p {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #6b7280;
-  }
-}
-
-.experienceCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  strong {
-    font-size: 14px;
-    color: #111827;
-  }
-
-  p {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #6b7280;
-  }
-}
-
-.inlineActionButton {
-  align-self: flex-start;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #111827;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-
-  &:hover {
-    border-color: #9ca3af;
-    background: #f9fafb;
-  }
-}
-
 @media (max-width: 980px) {
   .workspaceShell {
     flex-direction: column;
@@ -1077,11 +1016,6 @@ export default {
     border-bottom: 1px solid #f0f0f0;
   }
 
-  .signalGrid,
-  .quickStartList,
-  .experienceGrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {

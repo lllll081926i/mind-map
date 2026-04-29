@@ -3,6 +3,7 @@ import platform, {
   isDesktopApp,
   saveBootstrapStatePatch
 } from '@/platform'
+import { serializeStoredDocumentContent } from '@/services/flowchartDocument'
 
 const createDefaultRecoveryState = () => ({
   rootPath: '',
@@ -47,8 +48,14 @@ const normalizeRecoveryDraft = draft => {
   if (!draft || typeof draft !== 'object') return null
   const sourcePath = String(draft.sourcePath || '').trim()
   if (!sourcePath) return null
+  const documentMode =
+    String(draft.documentMode || '').trim() === 'flowchart' ||
+    (draft.flowchartData && typeof draft.flowchartData === 'object')
+      ? 'flowchart'
+      : 'mindmap'
   return {
     ...normalizeRecoveryEntry(draft),
+    documentMode,
     isFullDataFile: !!draft.isFullDataFile,
     mindMapData:
       draft.mindMapData && typeof draft.mindMapData === 'object'
@@ -57,6 +64,14 @@ const normalizeRecoveryDraft = draft => {
     mindMapConfig:
       draft.mindMapConfig && typeof draft.mindMapConfig === 'object'
         ? draft.mindMapConfig
+        : null,
+    flowchartData:
+      draft.flowchartData && typeof draft.flowchartData === 'object'
+        ? draft.flowchartData
+        : null,
+    flowchartConfig:
+      draft.flowchartConfig && typeof draft.flowchartConfig === 'object'
+        ? draft.flowchartConfig
         : null,
     fileRef: draft.fileRef && typeof draft.fileRef === 'object' ? draft.fileRef : null
   }
@@ -73,13 +88,36 @@ const normalizeRecoveryState = value => {
 }
 
 const serializeRecoveryContent = draft => {
-  if (!draft || !draft.mindMapData) {
+  if (!draft) {
     return null
   }
-  const data = draft.isFullDataFile
-    ? draft.mindMapData
-    : draft.mindMapData.root || draft.mindMapData
-  return JSON.stringify(data)
+  if (draft.documentMode === 'flowchart') {
+    if (!draft.flowchartData) {
+      return null
+    }
+    return serializeStoredDocumentContent({
+      documentMode: 'flowchart',
+      flowchartData: draft.flowchartData,
+      flowchartConfig: draft.flowchartConfig || null
+    })
+  }
+  if (!draft.mindMapData) {
+    return null
+  }
+  return serializeStoredDocumentContent({
+    documentMode: 'mindmap',
+    mindMapData: draft.mindMapData,
+    mindMapConfig: draft.mindMapConfig || null,
+    isFullDataFile: !!draft.isFullDataFile
+  })
+}
+
+const hasRecoveryDraftContent = draft => {
+  if (!draft?.dirty) return false
+  if (draft.documentMode === 'flowchart') {
+    return !!draft.flowchartData
+  }
+  return !!draft.mindMapData
 }
 
 const getTargetRecoveryEntry = (state, bootstrapState) => {
@@ -118,7 +156,7 @@ export const readRecoveryDraftForFile = async fileRef => {
 
 export const resolveFileContentWithRecovery = async (fileRef, fallbackContent) => {
   const draft = await readRecoveryDraftForFile(fileRef)
-  if (!draft?.dirty || !draft.mindMapData) {
+  if (!hasRecoveryDraftContent(draft)) {
     return {
       content: fallbackContent,
       recovered: false,
@@ -136,9 +174,14 @@ export const writeRecoveryDraftForFile = async ({
   fileRef,
   data,
   config = null,
-  isFullDataFile = true
+  isFullDataFile = true,
+  documentMode = 'mindmap'
 } = {}) => {
   const sourcePath = String(fileRef?.path || '').trim()
+  const normalizedDocumentMode =
+    String(documentMode || fileRef?.documentMode || '').trim() === 'flowchart'
+      ? 'flowchart'
+      : 'mindmap'
   if (!isDesktopApp() || !sourcePath || !data || typeof data !== 'object') {
     return null
   }
@@ -148,10 +191,27 @@ export const writeRecoveryDraftForFile = async ({
       title: String(fileRef?.name || getFileName(sourcePath)).trim(),
       dirty: true,
       updatedAt: Date.now(),
+      documentMode: normalizedDocumentMode,
       isFullDataFile: !!isFullDataFile,
-      mindMapData: data,
-      mindMapConfig: config && typeof config === 'object' ? config : null,
-      fileRef: fileRef && typeof fileRef === 'object' ? fileRef : null
+      mindMapData: normalizedDocumentMode === 'flowchart' ? null : data,
+      mindMapConfig:
+        normalizedDocumentMode === 'flowchart' || !config || typeof config !== 'object'
+          ? null
+          : config,
+      flowchartData: normalizedDocumentMode === 'flowchart' ? data : null,
+      flowchartConfig:
+        normalizedDocumentMode === 'flowchart' &&
+        config &&
+        typeof config === 'object'
+          ? config
+          : null,
+      fileRef:
+        fileRef && typeof fileRef === 'object'
+          ? {
+              ...fileRef,
+              documentMode: normalizedDocumentMode
+            }
+          : null
     })
   )
   void refreshRecoveryState().catch(error => {
@@ -188,7 +248,9 @@ export const clearAllRecoveryDrafts = async () => {
     await saveBootstrapStatePatch({
       currentDocument: null,
       mindMapData: null,
-      mindMapConfig: null
+      mindMapConfig: null,
+      flowchartData: null,
+      flowchartConfig: null
     })
     const runtimeModule = await import('@/stores/runtime')
     runtimeModule.syncRuntimeFromWorkspaceMeta(getBootstrapState())
@@ -215,20 +277,36 @@ export const hydrateBootstrapStateFromRecovery = async (
       sourcePath: entry.sourcePath
     })
   )
-  if (!draft?.mindMapData) {
+  if (!hasRecoveryDraftContent(draft)) {
     return state
   }
-  await saveBootstrapStatePatch({
+  const currentDocument = {
     currentDocument: {
       path: draft.sourcePath,
       name: String(draft.fileRef?.name || getFileName(draft.sourcePath)).trim(),
       source: 'desktop',
       dirty: !!draft.dirty,
-      isFullDataFile: !!draft.isFullDataFile
+      isFullDataFile: !!draft.isFullDataFile,
+      documentMode: draft.documentMode
     },
-    lastDirectory: getDirectoryPath(draft.sourcePath),
+    lastDirectory: getDirectoryPath(draft.sourcePath)
+  }
+  if (draft.documentMode === 'flowchart') {
+    await saveBootstrapStatePatch({
+      ...currentDocument,
+      mindMapData: null,
+      mindMapConfig: null,
+      flowchartData: draft.flowchartData,
+      flowchartConfig: draft.flowchartConfig || null
+    })
+    return state
+  }
+  await saveBootstrapStatePatch({
+    ...currentDocument,
     mindMapData: draft.mindMapData,
-    mindMapConfig: draft.mindMapConfig || null
+    mindMapConfig: draft.mindMapConfig || null,
+    flowchartData: null,
+    flowchartConfig: null
   })
   return state
 }

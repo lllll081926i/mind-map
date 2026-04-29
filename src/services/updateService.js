@@ -1,5 +1,7 @@
 import {
+  createReleaseNotesPreview,
   createManualUpdateResult,
+  formatReleasePublishedAt,
   parseGitHubLatestRelease
 } from './updateServiceCore.mjs'
 
@@ -8,6 +10,35 @@ const RELEASE_REQUEST_TIMEOUT_MS = 8000
 export const getReleasePageUrl = () => String(__APP_RELEASE_URL__ || '').trim()
 
 export const getReleaseApiUrl = () => String(__APP_RELEASE_API_URL__ || '').trim()
+
+export const createUpdateDialogMessage = (result, t) => {
+  const sections = [
+    t('setting.updateAvailableMessage', {
+      version: result.latestVersion
+    })
+  ]
+  if (result.releaseName) {
+    sections.push(
+      t('setting.updateReleaseName', {
+        name: result.releaseName
+      })
+    )
+  }
+  const publishedAt = formatReleasePublishedAt(result.publishedAt)
+  if (publishedAt) {
+    sections.push(
+      t('setting.updatePublishedAt', {
+        date: publishedAt
+      })
+    )
+  }
+  sections.push(t('setting.updateOpenReleasePageTip'))
+  const notesPreview = createReleaseNotesPreview(result.notes)
+  if (notesPreview) {
+    sections.push(`${t('setting.updateNotesLabel')}\n${notesPreview}`)
+  }
+  return sections.join('\n\n')
+}
 
 export const fetchLatestRelease = async () => {
   const releaseApiUrl = getReleaseApiUrl()

@@ -23,12 +23,20 @@ const editPageSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Edit.vue'),
   'utf8'
 )
+const countSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Count.vue'),
+  'utf8'
+)
 const aiChatSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/AiChat.vue'),
   'utf8'
 )
 const toolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Toolbar.vue'),
+  'utf8'
+)
+const flowchartDocumentSource = fs.readFileSync(
+  path.resolve('src/services/flowchartDocument.js'),
   'utf8'
 )
 const importSource = fs.readFileSync(
@@ -83,7 +91,8 @@ test('工作台文件动作服务不再直接依赖 simple-mind-map 示例数据
 
 test('JSON 解析入口改为直接依赖轻量 json 工具，避免误拉取 DOMPurify', () => {
   assert.match(workspaceActionsSource, /from '@\/utils\/json'/)
-  assert.match(toolbarSource, /from '@\/utils\/json'/)
+  assert.match(toolbarSource, /from '@\/services\/flowchartDocument'/)
+  assert.match(flowchartDocumentSource, /from '@\/utils\/json'/)
   assert.match(importSource, /from '@\/utils\/json'/)
   assert.match(clipboardSource, /from '@\/utils\/json'/)
   assert.doesNotMatch(workspaceActionsSource, /from '@\/utils'/)
@@ -152,6 +161,12 @@ test('桌面启动核心状态模块不再直接依赖 simple-mind-map 示例数
 })
 
 test('编辑页核心重子组件改为按需异步加载', () => {
+  assert.match(editPageSource, /const loadOutlineSidebar = \(\) => import\('\.\/OutlineSidebar\.vue'\)/)
+  assert.match(editPageSource, /const loadStyle = \(\) => import\('\.\/Style\.vue'\)/)
+  assert.match(editPageSource, /const loadBaseStyle = \(\) => import\('\.\/BaseStyle\.vue'\)/)
+  assert.match(editPageSource, /const loadTheme = \(\) => import\('\.\/Theme\.vue'\)/)
+  assert.match(editPageSource, /const loadStructure = \(\) => import\('\.\/Structure\.vue'\)/)
+  assert.match(editPageSource, /const loadSetting = \(\) => import\('\.\/Setting\.vue'\)/)
   assert.match(
     editPageSource,
     /import\('\.\/NavigatorToolbar\.vue'\)/
@@ -183,6 +198,21 @@ test('编辑页次级 UI 延后挂载，优先让主画布进入可用态', () =
   assert.match(editPageSource, /secondaryUiReady: false/)
   assert.match(editPageSource, /scheduleSecondaryUiMount\(\)/)
   assert.match(editPageSource, /cancelSecondaryUiMount\(\)/)
+  assert.match(editPageSource, /let primarySidebarPanelsPromise = null/)
+  assert.match(editPageSource, /let themePreviewAssetsPromise = null/)
+  assert.match(editPageSource, /const preloadPrimarySidebarPanels = async \(\) =>/)
+  assert.match(editPageSource, /const preloadThemePreviewAssets = async \(\) =>/)
+  assert.match(editPageSource, /import\('simple-mind-map-plugin-themes\/themeImgMap'\)/)
+  assert.match(editPageSource, /import\('simple-mind-map-plugin-themes\/themeList'\)/)
+  assert.match(editPageSource, /const img = new Image\(\)/)
+  assert.match(editPageSource, /return preloadThemePreviewAssets\(\)/)
+  assert.match(editPageSource, /primarySidebarPreloadFrame: 0/)
+  assert.match(editPageSource, /primarySidebarPreloadTimer: 0/)
+  assert.match(editPageSource, /cancelPrimarySidebarPreload\(\)/)
+  assert.match(editPageSource, /schedulePrimarySidebarPreload\(\)/)
+  assert.match(editPageSource, /this\.primarySidebarPreloadFrame = requestAnimationFrame\(/)
+  assert.match(editPageSource, /this\.primarySidebarPreloadTimer = window\.setTimeout\(/)
+  assert.match(editPageSource, /this\.schedulePrimarySidebarPreload\(\)/)
   assert.match(editPageSource, /<Navigator[\s\S]*secondaryUiReady/m)
   assert.match(editPageSource, /<Search[\s\S]*secondaryUiReady/m)
   assert.match(editPageSource, /<NodeIconToolbar[\s\S]*secondaryUiReady/m)
@@ -338,4 +368,41 @@ test('编辑页和导出弹窗的 resize 同步改为 requestAnimationFrame 限�
   assert.match(exportPageSource, /previewResizeFrame: 0/)
   assert.match(exportPageSource, /cancelAnimationFrame\(this\.previewResizeFrame\)/)
   assert.match(exportPageSource, /this\.previewResizeFrame = requestAnimationFrame\(/)
+})
+
+test('编辑页自动保存改为尾触发合并，避免大图编辑时高频整树写回', () => {
+  assert.match(editPageSource, /const DATA_SAVE_DEBOUNCE_MS = 400/)
+  assert.match(editPageSource, /storeRootTimer: null/)
+  assert.match(editPageSource, /pendingRootData: null/)
+  assert.match(editPageSource, /scheduleRootDataSave\(data\)/)
+  assert.match(
+    editPageSource,
+    /this\.onDataChange = data => \{\s*this\.scheduleRootDataSave\(data\)\s*\}/
+  )
+  assert.match(editPageSource, /flushPendingRootDataSave\(\)/)
+  assert.match(editPageSource, /clearPendingRootDataSave\(\)/)
+  assert.match(
+    editPageSource,
+    /manualSave\(\)\s*\{\s*this\.clearPendingRootDataSave\(\)\s*storeData\(this\.mindMap\.getData\(true\)\)/
+  )
+  assert.doesNotMatch(
+    editPageSource,
+    /this\.onDataChange = data => \{\s*storeData\(\{\s*root: data\s*\}\)\s*\}/
+  )
+})
+
+test('统计面板改为异步合并更新，避免每次 data_change 都同步全量遍历', () => {
+  assert.match(countSource, /const COUNT_UPDATE_DEBOUNCE_MS = 120/)
+  assert.match(countSource, /countUpdateFrame: 0/)
+  assert.match(countSource, /countUpdateTimer: 0/)
+  assert.match(countSource, /pendingCountData: null/)
+  assert.match(countSource, /scheduleCountUpdate\(this\.mindMap\.getData\(\)\)/)
+  assert.match(countSource, /cancelScheduledCountUpdate\(\)/)
+  assert.match(countSource, /flushCountUpdate\(\)/)
+  assert.match(countSource, /countStats\(data\)/)
+  assert.match(countSource, /onDataChange\(data\)\s*\{\s*this\.scheduleCountUpdate\(data\)/)
+  assert.doesNotMatch(
+    countSource,
+    /onDataChange\(data\)\s*\{[\s\S]*this\.walk\(data,/
+  )
 })

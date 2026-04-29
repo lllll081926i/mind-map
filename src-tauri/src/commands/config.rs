@@ -67,6 +67,8 @@ pub async fn record_recent_file(
     version: meta_snapshot.version,
     mind_map_data: serde_json::Value::Null,
     mind_map_config: None,
+    flowchart_data: serde_json::Value::Null,
+    flowchart_config: None,
     local_config: meta_snapshot.local_config.clone(),
     ai_config: meta_snapshot.ai_config.clone(),
     recent_files: meta_snapshot.recent_files.clone(),

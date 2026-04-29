@@ -31,11 +31,16 @@
       :mindMap="mindMap"
       v-if="!isZenMode && secondaryUiReady"
     ></NavigatorToolbar>
-    <component
-      :is="primarySidebarComponent"
-      v-bind="primarySidebarProps"
-      v-if="primarySidebarComponent"
-    ></component>
+    <template
+      v-for="(SidebarComponent, key) in primarySidebarComponents"
+      :key="key"
+    >
+      <component
+        :is="SidebarComponent"
+        v-bind="getPrimarySidebarProps(key)"
+        v-if="shouldMountPrimarySidebar(key)"
+      ></component>
+    </template>
     <AssociativeLineStyle
       v-if="mindMap"
       :mindMap="mindMap"
@@ -100,7 +105,7 @@
 import { defineAsyncComponent } from 'vue'
 import defaultNodeImage from '@/assets/img/图片加载失败.svg'
 import Count from './Count.vue'
-import { getData, getConfig, storeData } from '@/api'
+import { getData, getConfig, storeConfig, storeData } from '@/api'
 import Navigator from './Navigator.vue'
 import NodeImgPreview from './NodeImgPreview.vue'
 import SidebarTrigger from './SidebarTrigger.vue'
@@ -118,18 +123,31 @@ import AssociativeLineStyle from './AssociativeLineStyle.vue'
 import NodeImgPlacementToolbar from './NodeImgPlacementToolbar.vue'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
+import { useThemeStore } from '@/stores/theme'
+import {
+  applyMindMapThemeMode,
+  getMindMapThemeMetaByValue
+} from '@/stores/runtime'
 
-const OutlineSidebar = defineAsyncComponent(() => import('./OutlineSidebar.vue'))
+const loadOutlineSidebar = () => import('./OutlineSidebar.vue')
+const loadStyle = () => import('./Style.vue')
+const loadBaseStyle = () => import('./BaseStyle.vue')
+const loadTheme = () => import('./Theme.vue')
+const loadStructure = () => import('./Structure.vue')
+const loadSetting = () => import('./Setting.vue')
+const loadShortcutKey = () => import('./ShortcutKey.vue')
+
+const OutlineSidebar = defineAsyncComponent(loadOutlineSidebar)
 const NavigatorToolbar = defineAsyncComponent(() =>
   import('./NavigatorToolbar.vue')
 )
 const Contextmenu = defineAsyncComponent(() => import('./Contextmenu.vue'))
-const Style = defineAsyncComponent(() => import('./Style.vue'))
-const BaseStyle = defineAsyncComponent(() => import('./BaseStyle.vue'))
-const Theme = defineAsyncComponent(() => import('./Theme.vue'))
-const Structure = defineAsyncComponent(() => import('./Structure.vue'))
-const Setting = defineAsyncComponent(() => import('./Setting.vue'))
-const ShortcutKey = defineAsyncComponent(() => import('./ShortcutKey.vue'))
+const Style = defineAsyncComponent(loadStyle)
+const BaseStyle = defineAsyncComponent(loadBaseStyle)
+const Theme = defineAsyncComponent(loadTheme)
+const Structure = defineAsyncComponent(loadStructure)
+const Setting = defineAsyncComponent(loadSetting)
+const ShortcutKey = defineAsyncComponent(loadShortcutKey)
 const Search = defineAsyncComponent(() => import('./Search.vue'))
 const NodeIconSidebar = defineAsyncComponent(() =>
   import('./NodeIconSidebar.vue')
@@ -166,6 +184,9 @@ let handleClipboardTextPromise = null
 let mindMapRuntimePromise = null
 let deferredMindMapPluginsPromise = null
 let extendedIconListPromise = null
+let primarySidebarPanelsPromise = null
+let themePreviewAssetsPromise = null
+const DATA_SAVE_DEBOUNCE_MS = 400
 const VIEW_DATA_DEBOUNCE_MS = 300
 const BUILTIN_NODE_ICON_TYPES = ['expression', 'priority', 'progress', 'sign']
 const PRIMARY_SIDEBAR_COMPONENTS = {
@@ -334,6 +355,54 @@ const loadExtendedIconList = async () => {
   return extendedIconListPromise
 }
 
+const preloadPrimarySidebarPanels = async () => {
+  if (!primarySidebarPanelsPromise) {
+    primarySidebarPanelsPromise = Promise.all([
+      loadOutlineSidebar(),
+      loadStyle(),
+      loadBaseStyle(),
+      loadTheme(),
+      loadStructure(),
+      loadSetting(),
+      loadShortcutKey()
+    ]).catch(error => {
+      primarySidebarPanelsPromise = null
+      throw error
+    })
+  }
+  return primarySidebarPanelsPromise
+}
+
+const preloadThemePreviewAssets = async () => {
+  if (!themePreviewAssetsPromise) {
+    themePreviewAssetsPromise = Promise.all([
+      import('simple-mind-map-plugin-themes/themeImgMap'),
+      import('simple-mind-map-plugin-themes/themeList')
+    ])
+      .then(([themeImgMapModule, themeListModule]) => {
+        const themeImgMap = themeImgMapModule.default || {}
+        const themeList = Array.isArray(themeListModule.default)
+          ? themeListModule.default
+          : []
+        const imageList = [
+          ...Object.values(themeImgMap),
+          ...themeList.map(item => item?.img)
+        ].filter(Boolean)
+        Array.from(new Set(imageList)).forEach(src => {
+          const img = new Image()
+          img.decoding = 'async'
+          img.src = src
+        })
+        return imageList
+      })
+      .catch(error => {
+        themePreviewAssetsPromise = null
+        throw error
+      })
+  }
+  return themePreviewAssetsPromise
+}
+
 const hasExtendedNodeIcons = data => {
   const visit = node => {
     if (!node || typeof node !== 'object') return false
@@ -458,9 +527,11 @@ export default {
       mindMapData: null,
       mindMapConfig: {},
       prevImg: '',
+      storeRootTimer: null,
       storeConfigTimer: null,
       resizeFrame: 0,
       showDragMask: false,
+      pendingRootData: null,
       onDataChange: null,
       onViewDataChange: null,
       richTextPluginReady: false,
@@ -479,12 +550,24 @@ export default {
       editorEventsBound: false,
       secondaryUiReady: false,
       secondaryUiFrame: 0,
-      secondaryUiTimer: 0
+      secondaryUiTimer: 0,
+      primarySidebarPreloadFrame: 0,
+      primarySidebarPreloadTimer: 0,
+      mountedPrimarySidebars: Object.keys(PRIMARY_SIDEBAR_COMPONENTS).reduce(
+        (result, key) => {
+          result[key] = false
+          return result
+        },
+        {}
+      )
     }
   },
   computed: {
     ...mapState(useSettingsStore, {
       localConfig: 'localConfig'
+    }),
+    ...mapState(useThemeStore, {
+      isDark: 'isDark'
     }),
     ...mapState(useAppStore, {
       extraTextOnExport: 'extraTextOnExport',
@@ -519,47 +602,14 @@ export default {
     mindMapContainerClasses() {
       return [this.editorBackgroundStyleClass]
     },
-    primarySidebarComponent() {
-      const key = this.activeSidebar
-      if (!key) return null
-      if (key === 'nodeStyle' && this.isZenMode) {
-        return null
-      }
-      if (key !== 'shortcutKey' && !this.mindMap) {
-        return null
-      }
-      return PRIMARY_SIDEBAR_COMPONENTS[key] || null
-    },
-    primarySidebarProps() {
-      switch (this.activeSidebar) {
-        case 'outline':
-        case 'nodeStyle':
-        case 'structure':
-          return {
-            mindMap: this.mindMap
-          }
-        case 'baseStyle':
-          return {
-            data: this.mindMapData,
-            configData: this.mindMapConfig,
-            mindMap: this.mindMap
-          }
-        case 'theme':
-          return {
-            data: this.mindMapData,
-            mindMap: this.mindMap
-          }
-        case 'setting':
-          return {
-            configData: this.mindMapConfig,
-            mindMap: this.mindMap
-          }
-        default:
-          return {}
-      }
+    primarySidebarComponents() {
+      return PRIMARY_SIDEBAR_COMPONENTS
     }
   },
   watch: {
+    isDark() {
+      void this.syncMindMapThemeMode()
+    },
     openNodeRichText() {
       if (this.openNodeRichText) {
         this.addRichTextPlugin()
@@ -568,6 +618,7 @@ export default {
       }
     },
     activeSidebar(value) {
+      this.markPrimarySidebarMounted(value)
       if (value === 'formulaSidebar' && this.openNodeRichText) {
         this.addRichTextPlugin()
       }
@@ -593,6 +644,7 @@ export default {
   },
   beforeUnmount() {
     this.cancelSecondaryUiMount()
+    this.cancelPrimarySidebarPreload()
     this.unbindEditorEvents()
     if (this.onDataChange) {
       this.$bus.$off('data_change', this.onDataChange)
@@ -600,7 +652,9 @@ export default {
     if (this.onViewDataChange) {
       this.$bus.$off('view_data_change', this.onViewDataChange)
     }
+    this.flushPendingRootDataSave()
     this.clearResizeFrame()
+    clearTimeout(this.storeRootTimer)
     clearTimeout(this.storeConfigTimer)
     clearCurrentDataGetter()
     this.unbindMindMapEvents()
@@ -612,6 +666,79 @@ export default {
     this.mindMap = null
   },
   methods: {
+    async syncMindMapThemeMode() {
+      if (!this.mindMap) {
+        return null
+      }
+      const currentThemeMeta = this.getCurrentMindMapThemeMeta()
+      if (currentThemeMeta && currentThemeMeta.dark === this.isDark) {
+        return null
+      }
+      return applyMindMapThemeMode(this.mindMap, this.isDark)
+    },
+
+    getCurrentMindMapThemeMeta() {
+      if (!this.mindMap || typeof this.mindMap.getTheme !== 'function') {
+        return null
+      }
+      return getMindMapThemeMetaByValue(this.mindMap.getTheme())
+    },
+
+    markPrimarySidebarMounted(key) {
+      if (!PRIMARY_SIDEBAR_COMPONENTS[key]) {
+        return
+      }
+      this.mountedPrimarySidebars[key] = true
+    },
+
+    mountAllPrimarySidebars() {
+      Object.keys(PRIMARY_SIDEBAR_COMPONENTS).forEach(key => {
+        this.mountedPrimarySidebars[key] = true
+      })
+    },
+
+    shouldMountPrimarySidebar(key) {
+      if (!PRIMARY_SIDEBAR_COMPONENTS[key]) {
+        return false
+      }
+      if (key === 'nodeStyle' && this.isZenMode) {
+        return false
+      }
+      if (key !== 'shortcutKey' && !this.mindMap) {
+        return false
+      }
+      return this.mountedPrimarySidebars[key] || this.activeSidebar === key
+    },
+
+    getPrimarySidebarProps(key) {
+      switch (key) {
+        case 'outline':
+        case 'nodeStyle':
+        case 'structure':
+          return {
+            mindMap: this.mindMap
+          }
+        case 'baseStyle':
+          return {
+            data: this.mindMapData,
+            configData: this.mindMapConfig,
+            mindMap: this.mindMap
+          }
+        case 'theme':
+          return {
+            data: this.mindMapData,
+            mindMap: this.mindMap
+          }
+        case 'setting':
+          return {
+            configData: this.mindMapConfig,
+            mindMap: this.mindMap
+          }
+        default:
+          return {}
+      }
+    },
+
     bindEditorEvents() {
       if (this.editorEventsBound) {
         return
@@ -747,6 +874,35 @@ export default {
       }
     },
 
+    cancelPrimarySidebarPreload() {
+      if (this.primarySidebarPreloadFrame) {
+        cancelAnimationFrame(this.primarySidebarPreloadFrame)
+        this.primarySidebarPreloadFrame = 0
+      }
+      if (this.primarySidebarPreloadTimer) {
+        clearTimeout(this.primarySidebarPreloadTimer)
+        this.primarySidebarPreloadTimer = 0
+      }
+    },
+
+    schedulePrimarySidebarPreload() {
+      this.cancelPrimarySidebarPreload()
+      this.primarySidebarPreloadFrame = requestAnimationFrame(() => {
+        this.primarySidebarPreloadFrame = 0
+        this.primarySidebarPreloadTimer = window.setTimeout(() => {
+          this.primarySidebarPreloadTimer = 0
+          void preloadPrimarySidebarPanels()
+            .then(() => {
+              this.mountAllPrimarySidebars()
+              return preloadThemePreviewAssets()
+            })
+            .catch(error => {
+              console.error('preload primary sidebar resources failed', error)
+            })
+        }, 180)
+      })
+    },
+
     scheduleSecondaryUiMount() {
       this.cancelSecondaryUiMount()
       this.secondaryUiReady = false
@@ -765,6 +921,7 @@ export default {
         return
       }
       this.secondaryUiReady = true
+      this.schedulePrimarySidebarPreload()
     },
 
     // 显示loading
@@ -805,6 +962,38 @@ export default {
       return createDefaultMindMapData()
     },
 
+    clearPendingRootDataSave() {
+      if (this.storeRootTimer) {
+        clearTimeout(this.storeRootTimer)
+        this.storeRootTimer = null
+      }
+      this.pendingRootData = null
+    },
+
+    flushPendingRootDataSave() {
+      if (this.storeRootTimer) {
+        clearTimeout(this.storeRootTimer)
+        this.storeRootTimer = null
+      }
+      if (!this.pendingRootData) {
+        return
+      }
+      const nextRootData = this.pendingRootData
+      this.pendingRootData = null
+      storeData({ root: nextRootData })
+    },
+
+    scheduleRootDataSave(data) {
+      this.pendingRootData = data
+      if (this.storeRootTimer) {
+        return
+      }
+      this.storeRootTimer = setTimeout(() => {
+        this.storeRootTimer = null
+        this.flushPendingRootDataSave()
+      }, DATA_SAVE_DEBOUNCE_MS)
+    },
+
     // 存储数据当数据有变时
     bindSaveEvent() {
       if (this.onDataChange) {
@@ -814,7 +1003,7 @@ export default {
         this.$bus.$off('view_data_change', this.onViewDataChange)
       }
       this.onDataChange = data => {
-        storeData({ root: data })
+        this.scheduleRootDataSave(data)
       }
       this.onViewDataChange = data => {
         clearTimeout(this.storeConfigTimer)
@@ -830,6 +1019,7 @@ export default {
 
     // 手动保存
     manualSave() {
+      this.clearPendingRootDataSave()
       storeData(this.mindMap.getData(true))
     },
 
@@ -1099,6 +1289,7 @@ export default {
           hasFileURL
         })
       )
+      await this.syncMindMapThemeMode()
       void this.ensureDeferredMindMapPluginsReady()
       this.patchMindMapExport()
       await this.loadPlugins(initialData)
@@ -1241,6 +1432,12 @@ export default {
         this.mindMap.setData(data)
       }
       this.mindMap?.view?.reset?.()
+      if ('configData' in options) {
+        this.mindMapConfig = options.configData || {}
+        storeConfig(options.configData || null)
+      } else if (options.skipSave) {
+        this.mindMapConfig = getConfig() || {}
+      }
       if (!options.skipSave) {
         this.manualSave()
       }
@@ -1293,8 +1490,12 @@ export default {
       if (!this.mindMap || !richTextPluginsPromise) return
       const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
       if (!this.mindMap || this.openNodeRichText) return
-      this.mindMap.removePlugin(Formula)
-      this.mindMap.removePlugin(RichText)
+      if (this.mindMap.formula) {
+        this.mindMap.removePlugin(Formula)
+      }
+      if (this.mindMap.richText) {
+        this.mindMap.removePlugin(RichText)
+      }
     },
 
     // 加载滚动条插件
@@ -1310,7 +1511,9 @@ export default {
       if (!this.mindMap || !scrollbarPluginPromise) return
       const ScrollbarPlugin = await loadScrollbarPlugin()
       if (!this.mindMap || this.isShowScrollbar) return
-      this.mindMap.removePlugin(ScrollbarPlugin)
+      if (this.mindMap.scrollbar) {
+        this.mindMap.removePlugin(ScrollbarPlugin)
+      }
     },
 
     // 拖拽文件到页面导入

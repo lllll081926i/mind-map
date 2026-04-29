@@ -5,15 +5,18 @@ import platform, {
 } from '@/platform'
 import {
   createDesktopFsError,
+  flushDocumentSessionSync,
   markDocumentDirty,
   getLastDirectory,
   setCurrentFileRef
 } from '@/services/documentSession'
 import {
   createBlankProjectRef,
+  createBlankFlowchartProjectRef,
   createDirectoryWorkspaceRef,
   createRecentProjectRef,
-  createTemplateProjectRef
+  createTemplateProjectRef,
+  createFlowchartTemplateProjectRef
 } from '@/services/workspaceProjectModel'
 import {
   getWorkspaceMetaState,
@@ -21,13 +24,22 @@ import {
   setWorkspaceRecentFiles
 } from '@/services/workspaceState'
 import { getWorkspaceResumeEntry } from './workspaceSession.js'
-import { parseExternalJsonSafely } from '@/utils/json'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import { setIsHandleLocalFile, syncRuntimeFromWorkspaceMeta } from '@/stores/runtime'
 import { resolveFileContentWithRecovery } from '@/services/recoveryStorage'
+import { parseExternalJsonSafely } from '@/utils/json'
+import {
+  createDefaultFlowchartData,
+  parseStoredDocumentContent as parseStoredDocumentPayload,
+  serializeStoredDocumentContent
+} from '@/services/flowchartDocument'
+import { saveBootstrapStatePatch } from '@/platform'
 
 export const createWorkspaceTemplateData = (title = '思维导图') =>
   createDefaultMindMapData(title)
+
+export const createWorkspaceFlowchartTemplateData = (title = '流程图') =>
+  createDefaultFlowchartData(title)
 
 const getDirectoryPath = filePath => {
   const value = String(filePath || '').trim()
@@ -56,15 +68,31 @@ export const normalizeWorkspaceMindMapData = data => {
   }
 }
 
-const parseMindMapContent = content => {
-  const data = parseExternalJsonSafely(content)
-  if (!data || typeof data !== 'object') {
-    throw new Error('文件内容不是有效的思维导图数据')
+export const parseStoredDocumentContent = content => {
+  const parsed =
+    typeof content === 'string' ? parseExternalJsonSafely(content) : content
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('文件内容不是有效的项目数据')
   }
-  return {
-    data: normalizeWorkspaceMindMapData(data),
-    isFullDataFile: !!data.root
+  return parseStoredDocumentPayload(parsed)
+}
+
+const applyParsedDocumentState = async parsedDocument => {
+  if (parsedDocument.documentMode === 'flowchart') {
+    await saveBootstrapStatePatch({
+      mindMapData: null,
+      mindMapConfig: null,
+      flowchartData: parsedDocument.flowchartData,
+      flowchartConfig: parsedDocument.flowchartConfig || null
+    })
+    return
   }
+  await saveBootstrapStatePatch({
+    mindMapData: parsedDocument.mindMapData,
+    mindMapConfig: parsedDocument.mindMapConfig || null,
+    flowchartData: null,
+    flowchartConfig: null
+  })
 }
 
 const enterEditor = async router => {
@@ -87,13 +115,18 @@ export const resumeWorkspaceSession = async router => {
 
 const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   const resolvedContent = await resolveFileContentWithRecovery(fileRef, content)
-  const normalizedData = parseMindMapContent(resolvedContent.content)
+  const parsedDocument = parseStoredDocumentContent(resolvedContent.content)
   const recentProjectRef = {
     ...createRecentProjectRef(fileRef),
-    isFullDataFile: normalizedData.isFullDataFile
+    isFullDataFile: parsedDocument.isFullDataFile,
+    documentMode: parsedDocument.documentMode
   }
   setCurrentFileRef(recentProjectRef, recentProjectRef.mode || 'desktop')
-  storeData(normalizedData.data)
+  await flushDocumentSessionSync()
+  await applyParsedDocumentState(parsedDocument)
+  if (parsedDocument.documentMode !== 'flowchart') {
+    storeData(parsedDocument.data)
+  }
   setIsHandleLocalFile(true)
   markDocumentDirty(!!resolvedContent.recovered)
   persistWorkspaceLastDirectory(getDirectoryPath(recentProjectRef.path || ''))
@@ -105,7 +138,7 @@ const hydrateWorkspaceFileSession = async (fileRef, content, router) => {
   return {
     fileRef: recentProjectRef,
     content: resolvedContent.content,
-    data: normalizedData.data
+    data: parsedDocument.data
   }
 }
 
@@ -155,7 +188,11 @@ export const createWorkspaceLocalFile = async ({
   suggestedName = '思维导图'
 } = {}) => {
   try {
-    const serialized = JSON.stringify(content)
+    const serialized = serializeStoredDocumentContent({
+      documentMode: 'mindmap',
+      data: content,
+      isFullDataFile: true
+    })
     const projectRef =
       suggestedName === '思维导图'
         ? createBlankProjectRef(suggestedName)
@@ -168,6 +205,42 @@ export const createWorkspaceLocalFile = async ({
     if (!fileRef) return null
     persistWorkspaceLastDirectory(getDirectoryPath(fileRef.path || ''))
     return hydrateWorkspaceFileSession(fileRef, serialized, router)
+  } catch (error) {
+    throw createDesktopFsError(error)
+  }
+}
+
+export const createWorkspaceFlowchartFile = async ({
+  router,
+  content = createWorkspaceFlowchartTemplateData(),
+  config = null,
+  suggestedName = '流程图'
+} = {}) => {
+  try {
+    const serialized = serializeStoredDocumentContent({
+      documentMode: 'flowchart',
+      data: content,
+      flowchartConfig: config,
+      isFullDataFile: true
+    })
+    const projectRef =
+      suggestedName === '流程图'
+        ? createBlankFlowchartProjectRef(suggestedName)
+        : createFlowchartTemplateProjectRef(suggestedName)
+    const fileRef = await platform.saveMindMapFileAs({
+      suggestedName: projectRef.title,
+      content: serialized,
+      defaultPath: getLastDirectory()
+    })
+    if (!fileRef) return null
+    return hydrateWorkspaceFileSession(
+      {
+        ...fileRef,
+        documentMode: 'flowchart'
+      },
+      serialized,
+      router
+    )
   } catch (error) {
     throw createDesktopFsError(error)
   }

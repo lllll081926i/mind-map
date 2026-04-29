@@ -27,7 +27,8 @@ export const createBlankProjectRef = title => {
     mode: 'desktop',
     title: normalizedTitle,
     name: `${normalizedTitle}.smm`,
-    path: ''
+    path: '',
+    documentMode: 'mindmap'
   }
 }
 
@@ -38,7 +39,32 @@ export const createTemplateProjectRef = title => {
     mode: 'desktop',
     title: normalizedTitle,
     name: `${normalizedTitle}.smm`,
-    path: ''
+    path: '',
+    documentMode: 'mindmap'
+  }
+}
+
+export const createBlankFlowchartProjectRef = title => {
+  const normalizedTitle = normalizeTitle(title || '流程图')
+  return {
+    kind: 'blank',
+    mode: 'desktop',
+    title: normalizedTitle,
+    name: `${normalizedTitle}.smm`,
+    path: '',
+    documentMode: 'flowchart'
+  }
+}
+
+export const createFlowchartTemplateProjectRef = title => {
+  const normalizedTitle = normalizeTitle(title || '流程图')
+  return {
+    kind: 'template',
+    mode: 'desktop',
+    title: normalizedTitle,
+    name: `${normalizedTitle}.smm`,
+    path: '',
+    documentMode: 'flowchart'
   }
 }
 
@@ -51,7 +77,11 @@ export const createRecentProjectRef = fileRef => {
     path,
     name,
     title: normalizeTitle(stripExtension(name)),
-    updatedAt: Number(fileRef?.updatedAt || Date.now())
+    updatedAt: Number(fileRef?.updatedAt || Date.now()),
+    documentMode:
+      String(fileRef?.documentMode || '').trim() === 'flowchart'
+        ? 'flowchart'
+        : 'mindmap'
   }
 }
 

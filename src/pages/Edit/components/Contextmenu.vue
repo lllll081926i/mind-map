@@ -351,13 +351,15 @@ export default {
     // 节点右键显示
     show(e, node) {
       this.type = 'node'
-      this.isShow = true
       this.node = node
       const number = this.node.getData('number')
       if (number) {
         this.numberType = number.type || 1
         this.numberLevel = number.level === '' ? 1 : number.level
       }
+      this.left = e.clientX + 10
+      this.top = e.clientY + 10
+      this.isShow = true
       this.$nextTick(() => {
         const { x, y } = this.getShowPosition(e.clientX + 10, e.clientY + 10)
         this.left = x
@@ -402,6 +404,8 @@ export default {
     // 画布右键显示
     show2(e) {
       this.type = 'svg'
+      this.left = e.clientX + 10
+      this.top = e.clientY + 10
       this.isShow = true
       this.$nextTick(() => {
         const { x, y } = this.getShowPosition(e.clientX + 10, e.clientY + 10)

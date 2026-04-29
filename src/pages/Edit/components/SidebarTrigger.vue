@@ -155,8 +155,9 @@ export default {
   bottom: 20px;
   right: 0;
   z-index: 1201;
+  will-change: right;
   transition:
-    right 0.24s ease,
+    right 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     max-height 0.2s ease;
   display: flex;
   flex-direction: column;

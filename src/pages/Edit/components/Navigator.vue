@@ -115,7 +115,7 @@ export default {
       clearTimeout(this.timer)
       this.timer = setTimeout(() => {
         this.drawMiniMap()
-      }, 500)
+      }, 300)
     },
 
     // 计算容器宽度

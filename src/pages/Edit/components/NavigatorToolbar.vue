@@ -145,22 +145,19 @@
 import Scale from './Scale.vue'
 import Fullscreen from './Fullscreen.vue'
 import MouseAction from './MouseAction.vue'
-import { storeData } from '@/api'
 import { mapState } from 'pinia'
 import Demonstrate from './Demonstrate.vue'
-import themeList from 'simple-mind-map-plugin-themes/themeList'
 import { useAppStore } from '@/stores/app'
 import {
   emitShowLoading,
   emitShowSearch,
   emitToggleMiniMap
 } from '@/services/appEvents'
-import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import {
-  applyLocalConfigPatch,
   setActiveSidebar,
-  setIsReadonly
+  setIsReadonly,
+  toggleMindMapThemeMode
 } from '@/stores/runtime'
 
 // 导航器工具栏
@@ -186,11 +183,7 @@ export default {
       isReadonly: 'isReadonly'
     }),
     ...mapState(useThemeStore, {
-      isDark: 'isDark',
-      extendThemeGroupList: 'extendThemeGroupList'
-    }),
-    ...mapState(useSettingsStore, {
-      localConfig: 'localConfig'
+      isDark: 'isDark'
     })
   },
   methods: {
@@ -212,80 +205,9 @@ export default {
       setActiveSidebar('shortcutKey')
     },
 
-    getAllThemes() {
-      const extendThemeList = []
-      this.extendThemeGroupList.forEach(group => {
-        extendThemeList.push(...group.list)
-      })
-      return [
-        {
-          name: this.$t('theme.default'),
-          value: 'default',
-          dark: false
-        },
-        ...themeList,
-        ...extendThemeList
-      ]
-    },
-
-    getThemeMeta(themeValue) {
-      return this.getAllThemes().find(item => {
-        return item.value === themeValue
-      })
-    },
-
-    getPreferredThemeValue(expectDark) {
-      const fallbackTheme = expectDark ? 'dark4' : 'default'
-      const rememberKey = expectDark ? 'lastDarkTheme' : 'lastLightTheme'
-      const preferredTheme = this.localConfig[rememberKey] || fallbackTheme
-      const target = this.getThemeMeta(preferredTheme)
-      if (target && target.dark === expectDark) {
-        return target.value
-      }
-      const fallbackTarget = this.getThemeMeta(fallbackTheme)
-      if (fallbackTarget && fallbackTarget.dark === expectDark) {
-        return fallbackTarget.value
-      }
-      const firstMatchedTheme = this.getAllThemes().find(item => {
-        return item.dark === expectDark
-      })
-      return firstMatchedTheme ? firstMatchedTheme.value : this.mindMap.getTheme()
-    },
-
     toggleDark() {
-      const currentTheme = this.mindMap.getTheme()
-      const currentThemeMeta = this.getThemeMeta(currentTheme)
-      const nextIsDark = !this.isDark
-      const nextTheme = this.getPreferredThemeValue(nextIsDark)
-      const customThemeConfig = this.mindMap.getCustomThemeConfig()
-      const nextLocalConfig = {
-        isDark: nextIsDark
-      }
-      if (currentThemeMeta) {
-        if (currentThemeMeta.dark) {
-          nextLocalConfig.lastDarkTheme = currentThemeMeta.value
-          nextLocalConfig.lastLightTheme = this.localConfig.lastLightTheme
-        } else {
-          nextLocalConfig.lastLightTheme = currentThemeMeta.value
-          nextLocalConfig.lastDarkTheme = this.localConfig.lastDarkTheme
-        }
-      }
-      if (nextIsDark) {
-        nextLocalConfig.lastDarkTheme = nextTheme
-      } else {
-        nextLocalConfig.lastLightTheme = nextTheme
-      }
       emitShowLoading()
-      this.mindMap.setTheme(nextTheme)
-      storeData({
-        theme: {
-          template: nextTheme,
-          config: customThemeConfig
-        }
-      })
-      applyLocalConfigPatch({
-        ...nextLocalConfig
-      })
+      void toggleMindMapThemeMode(this.mindMap)
     },
 
     backToRoot() {

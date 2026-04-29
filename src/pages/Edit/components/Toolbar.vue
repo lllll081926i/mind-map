@@ -131,6 +131,25 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-tooltip
+          effect="dark"
+          :content="$t('toolbar.saveTip')"
+          placement="bottom"
+          v-if="!isMobile && canDirectSave"
+        >
+          <div
+            class="toolbarBtn fileActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.save')"
+            @click="saveCurrentLocalFile"
+            @keydown.enter.prevent="saveCurrentLocalFile"
+            @keydown.space.prevent="saveCurrentLocalFile"
+          >
+            <span class="icon iconfont iconwenjian"></span>
+            <span class="text">{{ $t('toolbar.save') }}</span>
+          </div>
+        </el-tooltip>
         <div
           class="toolbarBtn fileActionBtn"
           role="button"
@@ -262,15 +281,6 @@
         </div>
       </div>
       <div class="toolbarBlock toolbarMetaBlock" v-if="!isMobile">
-        <div class="toolbarStatus" :class="toolbarStatusType">
-          <span class="statusDot"></span>
-          <div class="statusText">
-            <strong>{{ toolbarStatusText }}</strong>
-            <span>
-              {{ $t('toolbar.statusDocumentPrefix') }}{{ toolbarDocumentLabel }}
-            </span>
-          </div>
-        </div>
         <div class="toolbarQuickActions">
           <div
             class="toolbarBtn quickActionBtn"
@@ -283,18 +293,6 @@
           >
             <span class="icon iconfont iconsousuo"></span>
             <span class="text">{{ $t('toolbar.searchAction') }}</span>
-          </div>
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.shortcutAction')"
-            @click="openShortcutKey"
-            @keydown.enter.prevent="openShortcutKey"
-            @keydown.space.prevent="openShortcutKey"
-          >
-            <span class="icon shortcutBadge">⌘</span>
-            <span class="text">{{ $t('toolbar.shortcutAction') }}</span>
           </div>
         </div>
       </div>
@@ -327,15 +325,18 @@
 <script>
 import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
-import { ElNotification as Notification } from 'element-plus'
 import { getConfig, getData } from '@/api'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
-import { parseExternalJsonSafely } from '@/utils/json'
+import {
+  parseStoredDocumentContent,
+  serializeStoredDocumentContent
+} from '@/services/flowchartDocument'
 import { throttle, isMobile } from 'simple-mind-map/src/utils/index'
 import platform, {
   getRecentFiles,
   isDesktopApp,
-  recordRecentFile
+  recordRecentFile,
+  saveBootstrapStatePatch
 } from '@/platform'
 import { createDefaultMindMapData } from '@/platform/shared/configSchema'
 import {
@@ -399,23 +400,42 @@ const isSameLocalFileRef = (left, right) => {
   return leftRef.path === rightRef.path && leftRef.mode === rightRef.mode
 }
 
-const parseToolbarLocalFileContent = (str, invalidContentMessage) => {
-  let data = parseExternalJsonSafely(str)
-  if (!data || typeof data !== 'object') {
-    throw new Error(invalidContentMessage)
+const formatTimeLabel = timestamp => {
+  const value = Number(timestamp || 0)
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
   }
-  if (data.root) {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const parseToolbarLocalFileContent = (str, invalidContentMessage) => {
+  let parsedDocument
+  try {
+    parsedDocument = parseStoredDocumentContent(str)
+  } catch (error) {
+    throw new Error(invalidContentMessage, {
+      cause: error
+    })
+  }
+  if (parsedDocument.documentMode === 'flowchart') {
     return {
-      data,
-      isFullDataFile: true
+      documentMode: 'flowchart',
+      data: parsedDocument.flowchartData,
+      flowchartData: parsedDocument.flowchartData,
+      flowchartConfig: parsedDocument.flowchartConfig || null,
+      isFullDataFile: true,
+      configData: parsedDocument.flowchartConfig || null
     }
   }
   return {
-    data: {
-      ...createDefaultMindMapData(),
-      root: data
-    },
-    isFullDataFile: false
+    documentMode: 'mindmap',
+    data: parsedDocument.mindMapData,
+    isFullDataFile: parsedDocument.isFullDataFile,
+    configData: parsedDocument.mindMapConfig || null
   }
 }
 
@@ -468,6 +488,8 @@ export default {
       isFullDataFile: true,
       waitingWriteToLocalFile: false,
       recoveredDraftLoaded: false,
+      lastSuccessfulSaveAt: 0,
+      lastLocalSaveErrorMessage: '',
       pendingLocalFileRef: null,
       localFileReadRequestId: 0,
       localFileWriteRequestId: 0,
@@ -514,6 +536,10 @@ export default {
       return this.localConfig.showToolbarLabels !== false
     },
 
+    canDirectSave() {
+      return this.isHandleLocalFile && !!this.currentDocument?.path
+    },
+
     hasPotentialDataLoss() {
       return !!this.currentDocument?.dirty || this.waitingWriteToLocalFile
     },
@@ -527,6 +553,9 @@ export default {
     },
 
     toolbarStatusText() {
+      if (this.lastLocalSaveErrorMessage) {
+        return this.$t('toolbar.statusSaveFailed')
+      }
       if (this.waitingWriteToLocalFile) {
         return this.$t('toolbar.statusAutosaving')
       }
@@ -542,7 +571,55 @@ export default {
       return this.$t('toolbar.statusNoFile')
     },
 
+    toolbarStatusDetail() {
+      const time = formatTimeLabel(this.lastSuccessfulSaveAt)
+      if (this.lastLocalSaveErrorMessage) {
+        return this.$t('toolbar.statusSaveFailedDetail', {
+          message: this.lastLocalSaveErrorMessage
+        })
+      }
+      if (this.waitingWriteToLocalFile) {
+        return this.$t('toolbar.statusAutosavingDetail', {
+          target: this.toolbarDocumentLabel
+        })
+      }
+      if (this.recoveredDraftLoaded) {
+        return this.$t('toolbar.statusRecoveredDetail', {
+          target: this.toolbarDocumentLabel
+        })
+      }
+      if (this.currentDocument?.dirty) {
+        if (time) {
+          return this.$t('toolbar.statusUnsyncedDetailWithTime', {
+            time
+          })
+        }
+        if (this.currentDocument?.path) {
+          return this.$t('toolbar.statusUnsyncedDetail')
+        }
+        return this.$t('toolbar.statusNoFileDetail')
+      }
+      if (this.currentDocument?.path || this.currentFileName) {
+        if (time) {
+          return this.$t('toolbar.statusSavedDetailWithTime', {
+            time
+          })
+        }
+        return this.$t('toolbar.statusSavedDetail')
+      }
+      return this.$t('toolbar.statusNoFileDetail')
+    },
+
+    toolbarStatusTitle() {
+      const path = String(this.currentDocument?.path || '').trim()
+      if (this.lastLocalSaveErrorMessage) {
+        return this.lastLocalSaveErrorMessage
+      }
+      return path || this.toolbarStatusDetail
+    },
+
     toolbarStatusType() {
+      if (this.lastLocalSaveErrorMessage) return 'failed'
       if (this.waitingWriteToLocalFile) return 'autosaving'
       if (this.recoveredDraftLoaded) return 'recovered'
       if (this.currentDocument?.dirty) return 'dirty'
@@ -567,7 +644,8 @@ export default {
   watch: {
     isHandleLocalFile(val) {
       if (!val) {
-        Notification.closeAll()
+        this.lastSuccessfulSaveAt = 0
+        this.lastLocalSaveErrorMessage = ''
       }
     },
     btnLit: {
@@ -656,15 +734,53 @@ export default {
       setActiveSidebar('shortcutKey')
     },
 
+    getLeaveConfirmOptions(actionKey = '') {
+      const normalizedAction = String(actionKey || '').trim()
+      const configMap = {
+        returnHome: {
+          titleKey: 'toolbar.leaveConfirmReturnHomeTitle',
+          messageKey: 'toolbar.leaveConfirmReturnHomeMessage'
+        },
+        openFile: {
+          titleKey: 'toolbar.leaveConfirmOpenFileTitle',
+          messageKey: 'toolbar.leaveConfirmOpenFileMessage'
+        },
+        openRecentFile: {
+          titleKey: 'toolbar.leaveConfirmOpenRecentFileTitle',
+          messageKey: 'toolbar.leaveConfirmOpenRecentFileMessage'
+        },
+        openDirectory: {
+          titleKey: 'toolbar.leaveConfirmOpenDirectoryTitle',
+          messageKey: 'toolbar.leaveConfirmOpenDirectoryMessage'
+        },
+        editLocalFile: {
+          titleKey: 'toolbar.leaveConfirmEditLocalFileTitle',
+          messageKey: 'toolbar.leaveConfirmEditLocalFileMessage'
+        },
+        newFile: {
+          titleKey: 'toolbar.leaveConfirmNewFileTitle',
+          messageKey: 'toolbar.leaveConfirmNewFileMessage'
+        }
+      }
+      const selectedConfig = configMap[normalizedAction] || {}
+      return {
+        title: this.$t(selectedConfig.titleKey || 'toolbar.leaveConfirmTitle'),
+        message: this.$t(
+          selectedConfig.messageKey || 'toolbar.leaveConfirmMessage'
+        )
+      }
+    },
+
     async confirmPotentialDataLoss(actionKey = '') {
       const nextAction = String(actionKey || '').trim()
       if (!this.hasPotentialDataLoss) {
         return true
       }
+      const confirmOptions = this.getLeaveConfirmOptions(nextAction)
       try {
         await this.$confirm(
-          this.$t('toolbar.leaveConfirmMessage'),
-          this.$t('toolbar.leaveConfirmTitle'),
+          confirmOptions.message,
+          confirmOptions.title,
           {
             type: 'warning'
           }
@@ -675,6 +791,29 @@ export default {
         return true
       } catch (_error) {
         return false
+      }
+    },
+
+    async saveCurrentLocalFile() {
+      if (!this.canDirectSave) {
+        await this.saveLocalFile()
+        return
+      }
+      const writeTask = this.createLocalWriteTask(getData())
+      if (!writeTask) {
+        return
+      }
+      if (this.timer) {
+        clearTimeout(this.timer)
+        this.timer = null
+      }
+      this.waitingWriteToLocalFile = true
+      markDocumentDirty(true)
+      try {
+        await this.writeRecoveryDraft(writeTask)
+        await this.writeLocalFile(writeTask)
+      } catch (error) {
+        console.error('saveCurrentLocalFile failed', error)
       }
     },
 
@@ -861,6 +1000,7 @@ export default {
         return
       }
       this.waitingWriteToLocalFile = true
+      this.lastLocalSaveErrorMessage = ''
       markDocumentDirty(true)
       this.scheduleRecoveryDraftWrite(writeTask)
       this.timer = setTimeout(() => {
@@ -1068,7 +1208,24 @@ export default {
         this.$t('toolbar.fileContentError')
       )
       this.isFullDataFile = normalized.isFullDataFile
-      this.$bus.$emit('setData', normalized.data)
+      if (normalized.documentMode === 'flowchart') {
+        void saveBootstrapStatePatch({
+          mindMapData: null,
+          mindMapConfig: null,
+          flowchartData: normalized.flowchartData,
+          flowchartConfig: normalized.flowchartConfig || null
+        })
+        return normalized
+      }
+      void saveBootstrapStatePatch({
+        mindMapData: normalized.data,
+        mindMapConfig: normalized.configData || null,
+        flowchartData: null,
+        flowchartConfig: null
+      })
+      this.$bus.$emit('setData', normalized.data, {
+        configData: normalized.configData || null
+      })
       return normalized
     },
 
@@ -1100,14 +1257,34 @@ export default {
         const nextFileRef = {
           ...fileRef,
           name: String(fileResult.name || fileRef.name || '').trim(),
-          isFullDataFile: normalized.isFullDataFile
+          isFullDataFile: normalized.isFullDataFile,
+          documentMode: normalized.documentMode
+        }
+        const setDataOptions = {
+          configData: normalized.configData || null
         }
         this.isFullDataFile = normalized.isFullDataFile
         setCurrentFileRef(nextFileRef, nextFileRef.mode || 'desktop')
         setIsHandleLocalFile(true)
-        this.$bus.$emit('setData', normalized.data, {
-          skipSave: true
-        })
+        if (normalized.documentMode === 'flowchart') {
+          await saveBootstrapStatePatch({
+            mindMapData: null,
+            mindMapConfig: null,
+            flowchartData: normalized.flowchartData,
+            flowchartConfig: normalized.flowchartConfig || null
+          })
+        } else {
+          await saveBootstrapStatePatch({
+            mindMapData: normalized.data,
+            mindMapConfig: setDataOptions.configData,
+            flowchartData: null,
+            flowchartConfig: null
+          })
+          this.$bus.$emit('setData', normalized.data, {
+            skipSave: true,
+            configData: setDataOptions.configData
+          })
+        }
         await recordRecentFile(nextFileRef)
         if (!this.isLatestLocalFileRead(requestId, fileRef)) {
           return false
@@ -1115,17 +1292,10 @@ export default {
         this.pendingLocalFileRef = null
         markDocumentDirty(!!fileResult.recoveredFromDraft)
         this.recoveredDraftLoaded = !!fileResult.recoveredFromDraft
+        this.lastSuccessfulSaveAt = 0
+        this.lastLocalSaveErrorMessage = ''
         this.refreshRecentFiles()
         syncRuntimeFromWorkspaceMeta(getWorkspaceMetaState())
-        Notification.closeAll()
-        Notification({
-          title: this.$t('toolbar.tip'),
-          message: `${this.$t('toolbar.editingLocalFileTipFront')}${
-            nextFileRef.name
-          }${this.$t('toolbar.editingLocalFileTipEnd')}`,
-          duration: 0,
-          showClose: true
-        })
         if (fileResult.recoveredFromDraft) {
           this.$message.success(this.$t('toolbar.recoveredDraftLoaded'))
         }
@@ -1154,7 +1324,8 @@ export default {
         id: ++this.localFileWriteRequestId,
         fileRef,
         content,
-        isFullDataFile
+        isFullDataFile,
+        configData: getConfig()
       }
     },
 
@@ -1179,20 +1350,25 @@ export default {
       let writeSucceeded = false
       this.currentLocalFileWriteRequestId = writeTask.id
       try {
-        let content = writeTask.content
-        if (!writeTask.isFullDataFile) {
-          content = content.root
-        }
-        const string = JSON.stringify(content)
+        const string = serializeStoredDocumentContent({
+          documentMode: 'mindmap',
+          mindMapData: writeTask.content,
+          mindMapConfig: writeTask.configData,
+          isFullDataFile: writeTask.isFullDataFile
+        })
         await platform.writeMindMapFile(writeTask.fileRef, string)
         await recordRecentFile(writeTask.fileRef)
         this.refreshRecentFiles()
+        this.lastSuccessfulSaveAt = Date.now()
+        this.lastLocalSaveErrorMessage = ''
         writeSucceeded = true
       } catch (error) {
         console.error('writeLocalFile failed', error)
         const fileError = createDesktopFsError(error)
+        this.lastLocalSaveErrorMessage =
+          fileError.message || this.$t('toolbar.fileSaveFailed')
         this.$message.error(
-          fileError.message || this.$t('toolbar.fileOpenFailed')
+          this.lastLocalSaveErrorMessage
         )
       } finally {
         if (this.currentLocalFileWriteRequestId === writeTask.id) {
@@ -1216,6 +1392,7 @@ export default {
           }
           this.recoveredDraftLoaded = false
           markDocumentDirty(false)
+          this.lastLocalSaveErrorMessage = ''
         }
       }
     },
@@ -1238,9 +1415,16 @@ export default {
     async createLocalFile(content) {
       try {
         const previousFileRef = snapshotLocalFileRef(getCurrentFileRef())
+        const configData = getConfig()
+        const serializedContent = serializeStoredDocumentContent({
+          documentMode: 'mindmap',
+          mindMapData: content,
+          mindMapConfig: configData,
+          isFullDataFile: true
+        })
         const nextFileHandle = await platform.saveMindMapFileAs({
           suggestedName: this.$t('toolbar.defaultFileName'),
-          content: JSON.stringify(content),
+          content: serializedContent,
           defaultPath: getLastDirectory()
         })
         if (!nextFileHandle) {
@@ -1257,10 +1441,12 @@ export default {
           await this.applyLocalFileResult(
             {
               ...nextFileHandle,
-              content: JSON.stringify(content)
+              content: serializedContent
             },
             requestId
           )
+          this.lastSuccessfulSaveAt = Date.now()
+          this.lastLocalSaveErrorMessage = ''
           if (this.recoveryTimer) {
             clearTimeout(this.recoveryTimer)
             this.recoveryTimer = null
@@ -1581,61 +1767,8 @@ export default {
     .toolbarMetaBlock {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: flex-end;
       margin-left: 12px;
-
-      .toolbarStatus {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 220px;
-        padding: 8px 12px;
-        border-radius: 10px;
-        border: 1px solid var(--toolbar-border);
-        background: rgba(15, 23, 42, 0.03);
-
-        .statusDot {
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: #16a34a;
-          flex-shrink: 0;
-        }
-
-        .statusText {
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-
-          strong {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--toolbar-text-hover-color);
-          }
-
-          span {
-            font-size: 11px;
-            color: var(--toolbar-subtle-text-color);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 260px;
-          }
-        }
-
-        &.autosaving .statusDot {
-          background: #f59e0b;
-        }
-
-        &.recovered .statusDot {
-          background: #2563eb;
-        }
-
-        &.dirty .statusDot {
-          background: #dc2626;
-        }
-      }
 
       .toolbarQuickActions {
         display: flex;
@@ -1645,11 +1778,6 @@ export default {
 
       .quickActionBtn {
         min-width: 38px;
-      }
-
-      .shortcutBadge {
-        font-size: 14px;
-        font-weight: 700;
       }
     }
 
@@ -1749,11 +1877,6 @@ export default {
         }
       }
 
-      .toolbarMetaBlock {
-        .toolbarStatus {
-          min-width: 190px;
-        }
-      }
     }
 
     .toolbarMeasure {

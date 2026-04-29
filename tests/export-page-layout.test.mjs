@@ -23,11 +23,10 @@ test('独立导出页存在并列出主要导出格式', () => {
   assert.match(source, /exportPage\.formatNames\.\$\{key\}/)
 })
 
-test('独立导出页包含文件名、说明、选项与导出操作区', () => {
+test('独立导出页包含文件名、选项、预览与导出操作区', () => {
   const source = fs.readFileSync(exportPagePath, 'utf8')
 
   assert.match(source, /\$t\('exportPage\.fileName'\)/)
-  assert.match(source, /\$t\('exportPage\.descriptionLabel'\)/)
   assert.match(source, /\$t\('exportPage\.optionsLabel'\)/)
   assert.match(source, /\$t\('exportPage\.export'\)/)
   assert.match(source, /class="exportOverlay"/)
@@ -36,10 +35,22 @@ test('独立导出页包含文件名、说明、选项与导出操作区', () =>
   assert.match(source, /class="previewPanel"/)
   assert.match(source, /class="previewSurface"/)
   assert.match(source, /\$t\('exportPage\.preview'\)/)
-  assert.match(source, /\$t\('exportPage\.previewDesc'\)/)
-  assert.match(source, /class="statusMetaList"/)
-  assert.match(source, /\$t\('exportPage\.currentDocumentLabel'\)/)
-  assert.match(source, /\$t\('exportPage\.rememberedLabel'\)/)
+})
+
+test('独立导出页已移除附加说明文案区块', () => {
+  const source = fs.readFileSync(exportPagePath, 'utf8')
+
+  assert.doesNotMatch(source, /\$t\('exportPage\.description'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.descriptionLabel'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.previewDesc'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.disabledTip'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.noExtraOptions'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.rememberedTip'\)/)
+  assert.doesNotMatch(source, /\$t\('exportPage\.warmupHint'\)/)
+  assert.doesNotMatch(source, /class="statusMetaList"/)
+  assert.doesNotMatch(source, /class="previewHeader"/)
+  assert.doesNotMatch(source, /class="previewWarmupHint"/)
+  assert.doesNotMatch(source, /class="statusText"/)
 })
 
 test('导出弹窗仅通过遮罩关闭，不再保留右上角按钮或 Esc 关闭', () => {
@@ -92,9 +103,34 @@ test('导出页会记住上次导出选项并预热当前格式的导出插件',
 
   assert.match(source, /restorePersistedExportState/)
   assert.match(source, /persistExportStateSnapshot/)
-  assert.match(source, /rememberedSummary/)
-  assert.match(source, /\$t\('exportPage\.rememberedTip'\)/)
   assert.match(source, /scheduleExportWarmup\(\)/)
+})
+
+test('导出页会根据当前文档模式切换流程图导出格式与预览链路', () => {
+  const exportPageSource = fs.readFileSync(exportPagePath, 'utf8')
+  const exportStateSource = fs.readFileSync(
+    path.resolve('src/services/exportState.js'),
+    'utf8'
+  )
+
+  assert.match(exportStateSource, /const flowchartFormats = \[/)
+  assert.match(exportStateSource, /String\(documentMode \|\| ''\)\.trim\(\) === 'flowchart'/)
+  assert.match(exportPageSource, /documentMode\(\)/)
+  assert.match(exportPageSource, /getDesktopExportFormats\(this\.documentMode\)/)
+  assert.match(exportPageSource, /if \(this\.documentMode === 'flowchart'\)/)
+  assert.match(exportPageSource, /initFlowchartPreview\(/)
+  assert.match(exportPageSource, /handleFlowchartExport\(/)
+  assert.match(exportPageSource, /buildFlowchartSvgMarkup\(/)
+  assert.match(exportPageSource, /saveBinaryFileAs\(/)
+  assert.match(exportPageSource, /showFlowchartBackgroundOption\(\)/)
+  assert.match(exportPageSource, /transparent:\s*!this\.exportState\.withBackground/)
+  assert.match(exportPageSource, /transparent:\s*!withBackground/)
+  assert.match(exportPageSource, /extension = 'png',\s*transparent = false/)
+  assert.match(exportStateSource, /'withBackground'/)
+  assert.match(exportStateSource, /withBackground:\s*String\(documentMode \|\| ''\)\.trim\(\) === 'flowchart' \? false : true/)
+  assert.doesNotMatch(exportPageSource, /link\.download =/)
+  assert.match(exportPageSource, /class="previewCanvas"/)
+  assert.match(exportPageSource, /previewCanvasClass/)
 })
 
 test('HTML 导出格式已启用并走独立 HTML 生成链路', () => {

@@ -1,20 +1,12 @@
 <template>
   <div class="searchContainer" :class="{ isDark: isDark, show: show }">
-    <button
-      class="closeBtnBox"
-      type="button"
-      :title="$t('search.cancel')"
-      @click="close"
-    >
-      <span class="closeBtn iconfont iconguanbi"></span>
-    </button>
     <div class="searchInputBox">
       <el-input
         ref="searchInputRef"
         :placeholder="$t('search.searchPlaceholder')"
         size="small"
         v-model="searchText"
-        @keyup.enter.stop="onSearchNext"
+        @keyup.enter.stop.prevent="onSearchEnter"
         @keydown.shift.enter.stop.prevent="jumpToPrevResult()"
         @keyup.esc.stop="close"
         @keydown.stop
@@ -33,19 +25,6 @@
       <div class="searchInfo" v-if="showSearchInfo && !isUndef(searchText)">
         {{ currentIndex }} / {{ total }}
       </div>
-    </div>
-    <div class="searchTips">
-      <div class="resultSummary">
-        {{
-          total > 0
-            ? $t('search.resultsSummary', {
-                count: total,
-                index: activeResultIndex + 1
-              })
-            : $t('search.idleHint')
-        }}
-      </div>
-      <p>{{ $t('search.usageHint') }}</p>
     </div>
     <el-input
       v-if="showReplaceInput"
@@ -125,6 +104,9 @@ export default {
       show: false,
       searchText: '',
       replaceText: '',
+      searchDraftText: '',
+      replaceDraftText: '',
+      replaceDraftVisible: false,
       showReplaceInput: false,
       searchedKeyword: '',
       currentIndex: 0,
@@ -156,7 +138,7 @@ export default {
     }
   },
   created() {
-    this.removeShowSearchListener = onShowSearch(this.showSearch)
+    this.removeShowSearchListener = onShowSearch(this.toggleSearch)
     this.mindMap.on('search_info_change', this.handleSearchInfoChange)
     this.mindMap.on('node_click', this.blur)
     this.mindMap.on('draw_click', this.blur)
@@ -165,9 +147,9 @@ export default {
       'search_match_node_list_change',
       this.onSearchMatchNodeListChange
     )
-    this.mindMap.keyCommand.addShortcut('Control+f', this.showSearch)
+    this.mindMap.keyCommand.addShortcut('Control+f', this.toggleSearch)
     window.addEventListener('resize', this.setSearchResultListHeight)
-    this.$bus.$on('setData', this.close)
+    this.$bus.$on('setData', this.handleDocumentChange)
   },
   mounted() {
     this.setSearchResultListHeight()
@@ -182,9 +164,9 @@ export default {
       'search_match_node_list_change',
       this.onSearchMatchNodeListChange
     )
-    this.mindMap.keyCommand.removeShortcut('Control+f', this.showSearch)
+    this.mindMap.keyCommand.removeShortcut('Control+f', this.toggleSearch)
     window.removeEventListener('resize', this.setSearchResultListHeight)
-    this.$bus.$off('setData', this.close)
+    this.$bus.$off('setData', this.handleDocumentChange)
   },
   methods: {
     isUndef,
@@ -225,11 +207,59 @@ export default {
       this.showSearchInfo = true
     },
 
-    showSearch() {
+    cacheSearchDraft() {
+      this.searchDraftText = this.searchText
+      this.replaceDraftText = this.replaceText
+      this.replaceDraftVisible = this.showReplaceInput
+    },
+
+    restoreSearchDraft() {
+      this.searchText = this.searchDraftText
+      this.replaceText = this.replaceDraftText
+      this.showReplaceInput =
+        this.replaceDraftVisible && !!String(this.searchDraftText || '').trim()
+    },
+
+    resetSearchDraft() {
+      this.searchDraftText = ''
+      this.replaceDraftText = ''
+      this.replaceDraftVisible = false
+    },
+
+    resetSearchState() {
+      this.show = false
+      this.showSearchResultList = false
+      this.showSearchInfo = false
+      this.total = 0
+      this.currentIndex = 0
+      this.activeResultIndex = -1
+      this.searchedKeyword = ''
+      this.searchText = ''
+      this.replaceText = ''
+      this.showReplaceInput = false
+      this.mindMap.search.endSearch()
+    },
+
+    handleDocumentChange() {
+      this.resetSearchDraft()
+      this.resetSearchState()
+    },
+
+    openSearch() {
       this.show = true
+      this.restoreSearchDraft()
       this.$nextTick(() => {
         this.$refs.searchInputRef?.focus()
+        this.$refs.searchInputRef?.select?.()
       })
+    },
+
+    toggleSearch() {
+      if (this.show) {
+        this.close()
+        return
+      }
+      this.openSearch()
     },
 
     hideReplaceInput() {
@@ -261,18 +291,27 @@ export default {
       }
     },
 
-    onSearchNext() {
+    executeSearch({ restart = false } = {}) {
       const keyword = this.searchText.trim()
       if (!keyword) {
         return
       }
       this.showSearchResultList = true
-      if (this.total > 0 && keyword === this.searchedKeyword) {
-        this.jumpToNextResult()
-        return
+      if (restart || keyword !== this.searchedKeyword) {
+        this.mindMap.search.endSearch()
+        this.total = 0
+        this.currentIndex = 0
+        this.activeResultIndex = -1
+        this.showSearchInfo = false
+        this.searchedKeyword = keyword
       }
-      this.searchedKeyword = keyword
-      this.mindMap.search.search(this.searchText)
+      this.mindMap.search.search(keyword)
+    },
+
+    onSearchEnter() {
+      this.executeSearch({
+        restart: true
+      })
     },
 
     replace() {
@@ -284,16 +323,8 @@ export default {
     },
 
     close() {
-      this.show = false
-      this.showSearchResultList = false
-      this.showSearchInfo = false
-      this.total = 0
-      this.currentIndex = 0
-      this.activeResultIndex = -1
-      this.searchedKeyword = ''
-      this.searchText = ''
-      this.hideReplaceInput()
-      this.mindMap.search.endSearch()
+      this.cacheSearchDraft()
+      this.resetSearchState()
     },
 
     onSearchMatchNodeListChange(list) {
@@ -342,7 +373,9 @@ export default {
 
     jumpToNextResult() {
       if (this.searchResultList.length <= 0) {
-        this.mindMap.search.search(this.searchText)
+        this.executeSearch({
+          restart: true
+        })
         return
       }
       const nextIndex =
@@ -364,14 +397,14 @@ export default {
 <style lang="less" scoped>
 .searchContainer {
   background-color: rgba(255, 255, 255, 0.96);
-  padding: 14px;
-  width: 312px;
-  border-radius: 16px;
+  padding: 10px;
+  width: 248px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
   position: fixed;
-  top: 92px;
-  right: -320px;
+  top: 90px;
+  right: -256px;
   transition:
     right 0.24s ease,
     opacity 0.24s ease,
@@ -394,13 +427,6 @@ export default {
 
     .searchInputBox {
       .searchInfo {
-        color: rgba(255, 255, 255, 0.92);
-      }
-    }
-
-    .searchTips {
-      .resultSummary,
-      p {
         color: rgba(255, 255, 255, 0.92);
       }
     }
@@ -478,72 +504,30 @@ export default {
     gap: 8px;
   }
 
-  .searchTips {
-    margin-top: 10px;
-
-    .resultSummary {
-      font-size: 12px;
-      font-weight: 600;
-      color: rgba(15, 23, 42, 0.8);
-      margin-bottom: 4px;
-    }
-
-    p {
-      font-size: 12px;
-      line-height: 1.5;
-      color: rgba(15, 23, 42, 0.62);
-    }
-  }
-
   .searchActions {
     display: flex;
-    justify-content: flex-end;
     gap: 8px;
-    margin-top: 12px;
-  }
+    margin-top: 8px;
 
-  .closeBtnBox {
-    position: absolute;
-    right: 14px;
-    top: 14px;
-    width: 28px;
-    height: 28px;
-    background-color: transparent;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    border-radius: 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    box-shadow: none;
-    z-index: 2;
-    padding: 0;
-    color: rgba(15, 23, 42, 0.78);
-    transition:
-      background-color 0.2s ease,
-      border-color 0.2s ease,
-      color 0.2s ease;
-
-    &:hover {
-      background-color: rgba(15, 23, 42, 0.06);
-      border-color: rgba(15, 23, 42, 0.1);
-      color: rgba(15, 23, 42, 0.96);
-    }
-
-    .closeBtn {
-      font-size: 12px;
-      line-height: 1;
+    :deep(.el-button) {
+      flex: 1;
+      margin: 0;
+      min-width: 0;
+      height: 30px;
+      border-radius: 8px;
+      padding: 0 8px;
+      font-size: 13px;
     }
   }
 
   .searchInputBox {
     position: relative;
-    padding-right: 40px;
 
     :deep(.el-input__wrapper) {
-      min-height: 40px;
-      border-radius: 10px;
+      min-height: 34px;
+      border-radius: 8px;
       box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08) inset;
+      padding: 0 10px;
     }
 
     :deep(.el-input__inner),
@@ -552,13 +536,17 @@ export default {
       color: inherit;
     }
 
+    :deep(.el-input__inner) {
+      font-size: 13px;
+    }
+
     .searchInfo {
       position: absolute;
-      right: 82px;
+      right: 12px;
       top: 50%;
       transform: translateY(-50%);
       color: rgba(15, 23, 42, 0.64);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
     }
   }
@@ -572,9 +560,9 @@ export default {
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12);
     border-radius: 12px;
-    margin-top: 8px;
+    margin-top: 6px;
     overflow-y: auto;
-    padding: 12px 0;
+    padding: 8px 0;
 
     .searchResultItem {
       height: 30px;

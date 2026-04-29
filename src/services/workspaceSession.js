@@ -38,7 +38,11 @@ export const normalizeWorkspaceCurrentDocument = currentDocument => {
     name: String(currentDocument.name || '').trim(),
     source: String(currentDocument.source || '').trim(),
     dirty: !!currentDocument.dirty,
-    isFullDataFile: !!currentDocument.isFullDataFile
+    isFullDataFile: !!currentDocument.isFullDataFile,
+    documentMode:
+      String(currentDocument.documentMode || '').trim() === 'flowchart'
+        ? 'flowchart'
+        : 'mindmap'
   }
 }
 

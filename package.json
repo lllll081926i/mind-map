@@ -20,7 +20,7 @@
     "test:update": "node --test tests/update-service-core.test.mjs",
     "test:utils": "node --test tests/json-utils.test.mjs",
     "test:desktop-runtime": "node --test tests/platform-runtime.test.mjs",
-    "test:desktop-flow": "node --test tests/desktop-workspace-routing.test.mjs tests/workspace-actions.test.mjs tests/editor-topbar-entrypoints.test.mjs tests/export-page-layout.test.mjs tests/home-page-layout.test.mjs tests/workspace-settings-layout.test.mjs tests/workspace-session.test.mjs tests/workspace-resume-layout.test.mjs tests/design-panels-layout.test.mjs tests/ai-basic-experience.test.mjs tests/ai-store-session.test.mjs",
+    "test:desktop-flow": "node --test tests/desktop-workspace-routing.test.mjs tests/workspace-actions.test.mjs tests/editor-topbar-entrypoints.test.mjs tests/export-page-layout.test.mjs tests/home-page-layout.test.mjs tests/workspace-settings-layout.test.mjs tests/workspace-session.test.mjs tests/workspace-resume-layout.test.mjs tests/design-panels-layout.test.mjs tests/ai-basic-experience.test.mjs tests/ai-store-session.test.mjs tests/flowchart-document.test.mjs tests/flowchart-editor-layout.test.mjs tests/flowchart-ai-generation.test.mjs tests/mindmap-editor-ux.test.mjs",
     "test:behavior": "node --test tests/ai-proxy-server.test.mjs tests/p0-p1-hardening.test.mjs tests/p2-governance.test.mjs tests/file-association-config.test.mjs tests/review-remediation.test.mjs tests/desktop-startup-performance.test.mjs",
     "test:all": "npm run test:update && npm run test:utils && npm run test:desktop-runtime && npm run test:desktop-flow && npm run test:behavior",
     "test:e2e": "playwright test",

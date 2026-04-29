@@ -165,15 +165,15 @@
         <div class="appInfoCard">
           <div class="appInfoRow">
             <span>运行时</span>
-            <strong>桌面版</strong>
+            <strong class="sidebarReadonlyMetric">桌面版</strong>
           </div>
           <div class="appInfoRow">
             <span>平台</span>
-            <strong>{{ appPlatformLabel }}</strong>
+            <strong class="sidebarReadonlyMetric">{{ appPlatformLabel }}</strong>
           </div>
           <div class="appInfoRow">
             <span>版本</span>
-            <strong>v{{ appVersion }}</strong>
+            <strong class="sidebarReadonlyMetric">v{{ appVersion }}</strong>
           </div>
           <div class="appInfoActions">
             <el-button
@@ -188,15 +188,19 @@
         <div class="appInfoCard recoveryInfoCard">
           <div class="appInfoRow">
             <span>恢复文件</span>
-            <strong>{{ recoverySummary.entries.length }} 个</strong>
+            <strong class="sidebarReadonlyMetric">{{ recoverySummary.entries.length }} 个</strong>
           </div>
           <div class="appInfoRow">
             <span>当前目录</span>
-            <strong>{{ recoverySummary.rootPath || '未初始化' }}</strong>
+            <strong class="sidebarReadonlyMetric">{{
+              recoverySummary.rootPath || '未初始化'
+            }}</strong>
           </div>
           <div class="appInfoRow">
             <span>生效模式</span>
-            <strong>{{ recoverySummary.origin || '未初始化' }}</strong>
+            <strong class="sidebarReadonlyMetric">{{
+              recoverySummary.origin || '未初始化'
+            }}</strong>
           </div>
           <p class="recoveryHint">
             删除异常退出后用于恢复未保存内容的恢复文件，不影响正式文档和最近文件。恢复文件会在正式保存后自动清理。
@@ -306,7 +310,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocalConfigPatch } from '@/stores/runtime'
 import {
-  checkForUpdates as runUpdateCheck
+  checkForUpdates as runUpdateCheck,
+  createUpdateDialogMessage
 } from '@/services/updateService'
 import { openExternalUrl } from '@/platform'
 import {
@@ -469,21 +474,26 @@ export default {
       try {
         const result = await runUpdateCheck(this.appVersion)
         if (result.status === 'update-available') {
-          const notes = result.notes ? `\n\n${result.notes}` : ''
           if (result.url) {
-            this.$confirm(
-              `${this.$t('setting.updateAvailableMessage', {
-                version: result.latestVersion
-              })}\n\n${this.$t('setting.updateOpenReleasePageTip')}${notes}`,
+            const action = await this.$confirm(
+              createUpdateDialogMessage(result, this.$t),
               this.$t('setting.updateAvailableTitle'),
               {
                 confirmButtonText: this.$t('setting.openReleasePage'),
                 cancelButtonText: this.$t('setting.updateLater'),
                 type: 'info'
               }
-            )
-              .then(() => openExternalUrl(result.url))
-              .catch(() => {})
+            ).catch(action => action)
+            if (action !== 'confirm') {
+              return
+            }
+            try {
+              await openExternalUrl(result.url)
+            } catch (error) {
+              this.$message.error(
+                error?.message || this.$t('setting.updateOpenReleasePageFailed')
+              )
+            }
             return
           }
           this.$message.info(
@@ -699,6 +709,11 @@ export default {
 
 .appInfoActions {
   padding-top: 12px;
+}
+
+.sidebarReadonlyMetric {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .recoveryHint {

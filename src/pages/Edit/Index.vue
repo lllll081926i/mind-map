@@ -4,9 +4,15 @@
     :class="{ isDark: isDark, activeSidebar: activeSidebar }"
   >
     <template v-if="show">
-      <Toolbar v-if="!isZenMode"></Toolbar>
-      <Edit></Edit>
-      <ExportDialog v-if="isExportRoute"></ExportDialog>
+      <template v-if="isFlowchartDocument">
+        <FlowchartEditor></FlowchartEditor>
+        <ExportDialog v-if="isExportRoute"></ExportDialog>
+      </template>
+      <template v-else>
+        <Toolbar v-if="!isZenMode"></Toolbar>
+        <Edit></Edit>
+        <ExportDialog v-if="isExportRoute"></ExportDialog>
+      </template>
     </template>
   </div>
 </template>
@@ -15,11 +21,15 @@
 import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import { useEditorStore } from '@/stores/editor'
 import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 
 const Toolbar = defineAsyncComponent(() => import('./components/Toolbar.vue'))
 const Edit = defineAsyncComponent(() => import('./components/Edit.vue'))
+const FlowchartEditor = defineAsyncComponent(() =>
+  import('./components/FlowchartEditor.vue')
+)
 const ExportDialog = defineAsyncComponent(() => import('../Export/Index.vue'))
 
 const EDIT_PAGE_UI_ICON_STYLE_ID = 'edit-page-ui-icons'
@@ -224,6 +234,7 @@ export default {
   components: {
     Toolbar,
     Edit,
+    FlowchartEditor,
     ExportDialog
   },
   data() {
@@ -238,9 +249,18 @@ export default {
     ...mapState(useThemeStore, {
       isDark: 'isDark'
     }),
+    ...mapState(useEditorStore, {
+      currentDocument: 'currentDocument'
+    }),
     ...mapState(useAppStore, {
       activeSidebar: 'activeSidebar'
     }),
+    documentMode() {
+      return this.currentDocument?.documentMode || 'mindmap'
+    },
+    isFlowchartDocument() {
+      return this.documentMode === 'flowchart'
+    },
     isZenMode() {
       return this.localConfig.isZenMode
     },

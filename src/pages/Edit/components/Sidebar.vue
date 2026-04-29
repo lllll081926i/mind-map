@@ -41,7 +41,9 @@ export default {
   },
   data() {
     return {
-      zIndex: 1100
+      zIndex: 1100,
+      enterFrame: 0,
+      entered: false
     }
   },
   computed: {
@@ -58,10 +60,12 @@ export default {
       return this.sidebarTransitionMode === 'swap'
     },
     sidebarStyle() {
+      const isVisible = this.isShown && this.entered
+      const isSwapVisible = this.isSwapTransition && this.isShown
       const hiddenRight = `-${sidebarLayout.panelWidth + sidebarLayout.panelRight + 20}px`
-      const right = this.isSwapTransition
+      const right = isSwapVisible
         ? `${sidebarLayout.panelRight}px`
-        : this.isShown
+        : isVisible
           ? `${sidebarLayout.panelRight}px`
           : hiddenRight
       return {
@@ -70,8 +74,10 @@ export default {
         bottom: `${sidebarLayout.panelBottom}px`,
         width: `${sidebarLayout.panelWidth}px`,
         right,
-        opacity: this.isShown ? 1 : 0,
-        pointerEvents: this.isShown ? 'auto' : 'none'
+        opacity: isVisible ? 1 : 0,
+        transform:
+          isSwapVisible && !isVisible ? 'translateX(18px)' : 'translateX(0)',
+        pointerEvents: isVisible ? 'auto' : 'none'
       }
     }
   },
@@ -80,15 +86,45 @@ export default {
       if (val && !oldVal) {
         this.zIndex = 1100 + store.sidebarZIndex++
       }
+      this.syncEnteredState(val)
     }
   },
   created() {
     this.$bus.$on('closeSideBar', this.handleCloseSidebar)
   },
+  mounted() {
+    this.syncEnteredState(this.isShown)
+  },
   beforeUnmount() {
     this.$bus.$off('closeSideBar', this.handleCloseSidebar)
+    this.clearEnterFrame()
   },
   methods: {
+    clearEnterFrame() {
+      if (!this.enterFrame) {
+        return
+      }
+      cancelAnimationFrame(this.enterFrame)
+      this.enterFrame = 0
+    },
+
+    syncEnteredState(isShown) {
+      this.clearEnterFrame()
+      if (!isShown) {
+        this.entered = false
+        return
+      }
+      if (this.isSwapTransition) {
+        this.entered = true
+        return
+      }
+      this.entered = false
+      this.enterFrame = requestAnimationFrame(() => {
+        this.enterFrame = 0
+        this.entered = true
+      })
+    },
+
     handleCloseSidebar() {
       if (!this.isShown) {
         return
@@ -122,14 +158,18 @@ export default {
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
-  will-change: right, opacity;
+  transform: translateX(0);
+  will-change: right, opacity, transform;
   transition:
     right 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
+    opacity 0.18s ease,
+    transform 0.22s ease;
 
   &.isSwapTransition {
-    will-change: opacity;
-    transition: opacity 0.18s ease;
+    will-change: opacity, transform;
+    transition:
+      opacity 0.18s ease,
+      transform 0.22s ease;
   }
 
   &.isDark {

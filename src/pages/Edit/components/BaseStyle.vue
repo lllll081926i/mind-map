@@ -1049,6 +1049,8 @@ export default {
   },
   beforeUnmount() {
     this.$bus.$off('setData', this.onSetData)
+    clearTimeout(this.storeDataTimer)
+    clearTimeout(this.outerFramePaddingTimer)
   },
   methods: {
     onSetData() {
@@ -1137,12 +1139,15 @@ export default {
       this.data.theme.config[key] = value
       emitShowLoading()
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
-        theme: {
-          template: this.mindMap.getTheme(),
-          config: this.data.theme.config
-        }
-      })
+      clearTimeout(this.storeDataTimer)
+      this.storeDataTimer = setTimeout(() => {
+        storeData({
+          theme: {
+            template: this.mindMap.getTheme(),
+            config: this.data.theme.config
+          }
+        })
+      }, 300)
     },
 
     // 更新彩虹线条配置
@@ -1169,7 +1174,10 @@ export default {
       this.mindMap.updateConfig({
         [prop]: value
       })
-      storeConfig(this.configData)
+      clearTimeout(this.outerFramePaddingTimer)
+      this.outerFramePaddingTimer = setTimeout(() => {
+        storeConfig(this.configData)
+      }, 300)
       this.mindMap.render()
     },
 
@@ -1187,12 +1195,15 @@ export default {
       }
       this.data.theme.config[this.marginActiveTab][type] = value
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
-        theme: {
-          template: this.mindMap.getTheme(),
-          config: this.data.theme.config
-        }
-      })
+      clearTimeout(this.storeDataTimer)
+      this.storeDataTimer = setTimeout(() => {
+        storeData({
+          theme: {
+            template: this.mindMap.getTheme(),
+            config: this.data.theme.config
+          }
+        })
+      }, 300)
     },
 
     useBg(bg) {
@@ -1235,8 +1246,8 @@ export default {
       PingFang SC;
     font-weight: 500;
     color: rgba(26, 26, 26, 0.9);
-    margin-bottom: 10px;
-    margin-top: 35px;
+    margin-bottom: 8px;
+    margin-top: 24px;
 
     &.noTop {
       margin-top: 0;
@@ -1246,7 +1257,7 @@ export default {
   .row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 
     &.noBottom {
       margin-bottom: 0;
@@ -1260,7 +1271,7 @@ export default {
       width: 100%;
       display: flex;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .segmentTab {
@@ -1281,11 +1292,11 @@ export default {
     }
 
     .imgUpload {
-      margin-bottom: 5px;
+      margin-bottom: 2px;
     }
 
     &.editorBackgroundStyleRow {
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .btnGroup {
@@ -1297,7 +1308,7 @@ export default {
     .rowItem {
       display: flex;
       align-items: center;
-      margin-bottom: 5px;
+      margin-bottom: 2px;
 
       &.spaceBetween {
         justify-content: space-between;

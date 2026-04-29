@@ -32,7 +32,8 @@ const syncBootstrapState = () => {
           name: sessionState.fileRef.name || '',
           source: sessionState.source || '',
           dirty: !!sessionState.dirty,
-          isFullDataFile: !!sessionState.fileRef.isFullDataFile
+          isFullDataFile: !!sessionState.fileRef.isFullDataFile,
+          documentMode: sessionState.fileRef.documentMode || 'mindmap'
         }
       : null
   )
@@ -68,7 +69,8 @@ export const hydrateDocumentSession = () => {
         mode: 'desktop',
         path: currentDocument?.path || '',
         name: currentDocument?.name || '',
-        isFullDataFile: !!currentDocument?.isFullDataFile
+        isFullDataFile: !!currentDocument?.isFullDataFile,
+        documentMode: currentDocument?.documentMode || 'mindmap'
       },
       source: currentDocument?.source || 'desktop',
       dirty: !!currentDocument?.dirty
@@ -82,6 +84,12 @@ export const hydrateDocumentSession = () => {
 export const getDocumentSession = () => sessionState
 
 export const getCurrentFileRef = () => sessionState.fileRef
+
+export const flushDocumentSessionSync = () => {
+  return bootstrapSyncQueue.catch(error => {
+    console.error('flushDocumentSessionSync failed', error)
+  })
+}
 
 export const setCurrentFileRef = (fileRef, source = '') => {
   sessionState = {

@@ -5,7 +5,6 @@
         <header class="dialogHeader">
           <div class="dialogHeaderMain">
             <h1>{{ $t('exportPage.title') }}</h1>
-            <p>{{ $t('exportPage.description') }}</p>
           </div>
         </header>
 
@@ -37,18 +36,6 @@
               <span class="tagExtension">.{{ currentFileExtension }}</span>
             </div>
 
-            <div class="statusMetaList">
-              <div class="statusMetaItem">
-                <span>{{ $t('exportPage.currentDocumentLabel') }}</span>
-                <strong>{{ currentDocumentName }}</strong>
-              </div>
-              <div class="statusMetaItem">
-                <span>{{ $t('exportPage.rememberedLabel') }}</span>
-                <strong>{{ rememberedSummary }}</strong>
-              </div>
-            </div>
-            <p class="rememberedTip">{{ $t('exportPage.rememberedTip') }}</p>
-
             <div class="settingGroup">
               <label class="settingLabel" for="exportFileName">{{
                 $t('exportPage.fileName')
@@ -65,23 +52,8 @@
             </div>
 
             <div class="settingGroup">
-              <label class="settingLabel">{{
-                $t('exportPage.descriptionLabel')
-              }}</label>
-              <div class="infoText">
-                <span class="infoDot"></span>
-                <span>{{ currentFormat.desc }}</span>
-              </div>
-            </div>
-
-            <div class="settingGroup">
               <label class="settingLabel">{{ $t('exportPage.optionsLabel') }}</label>
-
-              <div v-if="isDisabledFormat" class="emptyOption">
-                {{ $t('exportPage.disabledTip') }}
-              </div>
-
-              <template v-else>
+              <template v-if="!isDisabledFormat">
                 <div class="toggleRow" v-if="showConfigOption">
                   <span>{{ $t('exportPage.includeConfig') }}</span>
                   <el-switch v-model="exportState.withConfig" />
@@ -129,13 +101,14 @@
                   <el-switch v-model="exportState.isTransparent" />
                 </div>
 
+                <div class="toggleRow" v-if="showFlowchartBackgroundOption">
+                  <span>{{ $t('exportPage.withBackground') }}</span>
+                  <el-switch v-model="exportState.withBackground" />
+                </div>
+
                 <div class="toggleRow" v-if="showFitBgOption">
                   <span>{{ $t('exportPage.fitBg') }}</span>
                   <el-switch v-model="exportState.isFitBg" />
-                </div>
-
-                <div v-if="!hasVisibleOptions" class="emptyOption">
-                  {{ $t('exportPage.noExtraOptions') }}
                 </div>
               </template>
             </div>
@@ -143,20 +116,22 @@
 
           <aside class="previewPanel" v-loading="previewLoading">
             <div class="previewTitle">{{ $t('exportPage.preview') }}</div>
-            <div class="previewHeader">{{ $t('exportPage.previewDesc') }}</div>
-            <div class="previewWarmupHint">{{ $t('exportPage.warmupHint') }}</div>
             <div class="previewSurface">
-              <div ref="previewRef" class="previewCanvas"></div>
+              <div
+                ref="previewRef"
+                class="previewCanvas"
+                :class="previewCanvasClass"
+                :style="flowchartPreviewStyle"
+              ></div>
             </div>
           </aside>
         </div>
 
         <footer class="dialogFooter">
-          <div class="statusText">{{ statusText }}</div>
           <el-button
             type="primary"
             :loading="exporting"
-            :disabled="isDisabledFormat || !mindMap"
+            :disabled="isDisabledFormat || !canExportCurrentDocument"
             @click="handleExport"
           >
             {{ $t('exportPage.export') }}
@@ -170,12 +145,16 @@
 <script>
 import { mapState } from 'pinia'
 import { getConfig, getData } from '@/api'
-import platform, { ensureBootstrapDocumentState } from '@/platform'
+import platform, { ensureBootstrapDocumentState, getBootstrapState } from '@/platform'
 import { getCurrentFileRef, getLastDirectory } from '@/services/documentSession'
+import {
+  buildFlowchartSvgMarkup,
+  createDefaultFlowchartData,
+  getFlowchartExportBounds
+} from '@/services/flowchartDocument'
 import { buildMindMapHtmlDocument } from '@/services/htmlExport'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
 import { useEditorStore } from '@/stores/editor'
-import { useSettingsStore } from '@/stores/settings'
 import { useThemeStore } from '@/stores/theme'
 import { sanitizeFileName } from '@/utils'
 import {
@@ -223,6 +202,8 @@ const createFallbackExportFormat = t => ({
 })
 
 const createFallbackData = () => createWorkspaceTemplateData()
+
+const createFallbackFlowchartData = () => createDefaultFlowchartData('流程图')
 
 const normalizeMindMapData = data => {
   if (
@@ -365,6 +346,7 @@ export default {
       previewLoading: true,
       exporting: false,
       mindMap: null,
+      flowchartPreviewMarkup: '',
       exportPluginState: {
         base: false,
         pdf: false,
@@ -385,11 +367,15 @@ export default {
     ...mapState(useEditorStore, {
       currentDocument: 'currentDocument'
     }),
-    ...mapState(useSettingsStore, {
-      localConfig: 'localConfig'
-    }),
+    documentMode() {
+      return (
+        this.currentDocument?.documentMode ||
+        this.exportContext.fileRef?.documentMode ||
+        'mindmap'
+      )
+    },
     exportFormats() {
-      const exportFormats = getDesktopExportFormats().map(item => ({
+      const exportFormats = getDesktopExportFormats(this.documentMode).map(item => ({
         ...item,
         displayName: getFormatDisplayName(this.$t, item.type)
       }))
@@ -407,19 +393,25 @@ export default {
       )
     },
     isDisabledFormat() {
-      return isExportFormatDisabled(this.exportState.exportType)
+      return isExportFormatDisabled(this.exportState.exportType, this.documentMode)
     },
     currentFileExtension() {
+      if (this.documentMode === 'flowchart') {
+        return this.exportState.exportType
+      }
       if (this.exportState.exportType === 'png') {
         return this.exportState.imageFormat
       }
-      return getResolvedExportType(this.exportState.exportType)
+      return getResolvedExportType(this.exportState.exportType, this.documentMode)
     },
     showConfigOption() {
-      return ['smm', 'json'].includes(this.exportState.exportType)
+      return (
+        this.documentMode !== 'flowchart' &&
+        ['smm', 'json'].includes(this.exportState.exportType)
+      )
     },
     showImageOptions() {
-      return this.exportState.exportType === 'png'
+      return this.documentMode !== 'flowchart' && this.exportState.exportType === 'png'
     },
     showPaddingOptions() {
       return ['png', 'svg', 'pdf', 'pdf-hd'].includes(
@@ -427,60 +419,55 @@ export default {
       )
     },
     showFooterOption() {
-      return ['png', 'svg', 'pdf', 'pdf-hd'].includes(
-        this.exportState.exportType
+      return (
+        this.documentMode !== 'flowchart' &&
+        ['png', 'svg', 'pdf', 'pdf-hd'].includes(
+          this.exportState.exportType
+        )
       )
     },
     showTransparentOption() {
-      return ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      return (
+        this.documentMode !== 'flowchart' &&
+        ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType)
+      )
+    },
+    showFlowchartBackgroundOption() {
+      return (
+        this.documentMode === 'flowchart' &&
+        ['png', 'svg'].includes(this.exportState.exportType)
+      )
     },
     showFitBgOption() {
       return (
+        this.documentMode !== 'flowchart' &&
         ['png', 'pdf', 'pdf-hd'].includes(this.exportState.exportType) &&
         !this.exportState.isTransparent
       )
     },
-    hasVisibleOptions() {
-      return [
-        this.showConfigOption,
-        this.showImageOptions,
-        this.showPaddingOptions,
-        this.showFooterOption,
-        this.showTransparentOption,
-        this.showFitBgOption
-      ].some(Boolean)
+    canExportCurrentDocument() {
+      if (this.documentMode === 'flowchart') {
+        return !!this.getFlowchartData().nodes.length
+      }
+      return !!this.mindMap
     },
-    rememberedSummary() {
-      const summaryList = [
-        this.currentFormat.displayName,
-        `.${this.currentFileExtension}`
-      ]
-      if (this.showConfigOption && this.exportState.withConfig) {
-        summaryList.push(this.$t('exportPage.includeConfig'))
+    previewCanvasClass() {
+      return {
+        isFlowchart: this.documentMode === 'flowchart'
       }
-      if (this.showTransparentOption && this.exportState.isTransparent) {
-        summaryList.push(this.$t('exportPage.transparentBg'))
-      }
-      return summaryList.join(' / ')
     },
-    statusText() {
-      if (this.isDisabledFormat) {
-        return this.$t('exportPage.statusDisabled')
+    flowchartPreviewStyle() {
+      if (this.documentMode !== 'flowchart') {
+        return {}
       }
-      if (this.exporting) {
-        return this.$t('exportPage.statusPreparing')
-      }
-      return this.$t('exportPage.statusReady', {
-        extension: this.currentFileExtension
+      const bounds = getFlowchartExportBounds(this.getFlowchartData(), {
+        paddingX: this.exportState.paddingX,
+        paddingY: this.exportState.paddingY
       })
+      return {
+        aspectRatio: `${bounds.width} / ${bounds.height}`
+      }
     },
-    currentDocumentName() {
-      return (
-        this.currentDocument?.name ||
-        this.exportContext.fileRef?.name ||
-        `${this.exportContext.fileName}.smm`
-      )
-    }
   },
   watch: {
     exportState: {
@@ -493,16 +480,45 @@ export default {
       }
     },
     'exportState.exportType'() {
+      this.ensureExportTypeForMode()
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
+      }
       this.scheduleExportWarmup()
     },
+    'exportState.paddingX'() {
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
+      }
+    },
+    'exportState.paddingY'() {
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
+      }
+    },
+    'exportState.withBackground'() {
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
+      }
+    },
     'exportState.imageFormat'() {
-      if (this.exportState.exportType === 'png') {
+      if (this.documentMode !== 'flowchart' && this.exportState.exportType === 'png') {
         this.scheduleExportWarmup()
+      }
+    },
+    documentMode() {
+      this.ensureExportTypeForMode()
+      void this.initPreview()
+    },
+    isDark() {
+      if (this.documentMode === 'flowchart') {
+        void this.initPreview()
       }
     }
   },
   async mounted() {
     this.bindPreviewResize()
+    this.ensureExportTypeForMode()
     this.scheduleExportWarmup()
     await ensureBootstrapDocumentState()
     await this.initPreview()
@@ -573,12 +589,15 @@ export default {
 
     scheduleExportWarmup() {
       this.clearExportWarmupTask()
+      if (this.documentMode === 'flowchart') {
+        return
+      }
       this.exportWarmupTimer = window.setTimeout(() => {
         this.exportWarmupTimer = 0
         const resolvedType =
           this.exportState.exportType === 'png'
             ? this.exportState.imageFormat
-            : getResolvedExportType(this.exportState.exportType)
+            : getResolvedExportType(this.exportState.exportType, this.documentMode)
         void this.ensureExportPluginsInstalled(resolvedType).catch(error => {
           console.warn('scheduleExportWarmup failed', error)
         })
@@ -602,6 +621,9 @@ export default {
     },
 
     syncPreviewViewport() {
+      if (this.documentMode === 'flowchart') {
+        return
+      }
       if (!this.mindMap || this.previewResizeFrame) {
         return
       }
@@ -625,7 +647,20 @@ export default {
     },
 
     selectFormat(item) {
+      if (!item || item.disabled || item.type === this.exportState.exportType) {
+        return
+      }
       this.exportState.exportType = item.type
+    },
+
+    ensureExportTypeForMode() {
+      const formats = this.exportFormats
+      if (!formats.length) {
+        return
+      }
+      if (!formats.some(item => item.type === this.exportState.exportType)) {
+        this.exportState.exportType = formats[0].type
+      }
     },
 
     async goEdit() {
@@ -660,6 +695,10 @@ export default {
       this.previewLoading = true
       try {
         const previewEl = await this.waitForPreviewContainerReady()
+        if (this.documentMode === 'flowchart') {
+          this.initFlowchartPreview(previewEl)
+          return
+        }
         if (this.mindMap) {
           this.mindMap.destroy()
           this.mindMap = null
@@ -702,7 +741,146 @@ export default {
       }
     },
 
+    getFlowchartData() {
+      return getBootstrapState().flowchartData || createFallbackFlowchartData()
+    },
+
+    getFlowchartConfig() {
+      const bootstrapState = getBootstrapState()
+      return bootstrapState.flowchartConfig || {
+        snapToGrid: false,
+        gridSize: 24,
+        themeId: 'blueprint',
+        strictAlignment: false,
+        backgroundStyle: 'grid'
+      }
+    },
+
+    initFlowchartPreview(previewEl) {
+      if (!previewEl) {
+        throw new Error(this.$t('exportPage.previewContainerMissing'))
+      }
+      if (this.mindMap) {
+        this.mindMap.destroy()
+        this.mindMap = null
+      }
+      this.flowchartPreviewMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
+        flowchartConfig: this.getFlowchartConfig(),
+        isDark: this.isDark,
+        transparent: !this.exportState.withBackground,
+        paddingX: this.exportState.paddingX,
+        paddingY: this.exportState.paddingY
+      })
+      previewEl.innerHTML = this.flowchartPreviewMarkup
+    },
+
+    loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve(image)
+        image.onerror = reject
+        image.src = url
+      })
+    },
+
+    async buildFlowchartRasterBlob({
+      svgMarkup,
+      extension = 'png',
+      transparent = false
+    }) {
+      const bounds = getFlowchartExportBounds(this.getFlowchartData(), {
+        paddingX: this.exportState.paddingX,
+        paddingY: this.exportState.paddingY
+      })
+      const blob = new Blob([svgMarkup], {
+        type: 'image/svg+xml;charset=utf-8'
+      })
+      const url = URL.createObjectURL(blob)
+      try {
+        const image = await this.loadImage(url)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(bounds.width, image.width)
+        canvas.height = Math.max(bounds.height, image.height)
+        const context = canvas.getContext('2d')
+        if (!context) {
+          throw new Error(this.$t('exportPage.exportFailed'))
+        }
+        if (extension === 'jpg' || !transparent) {
+          context.fillStyle = this.isDark ? '#171a1f' : '#ffffff'
+          context.fillRect(0, 0, canvas.width, canvas.height)
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        const mimeType = extension === 'jpg' ? 'image/jpeg' : 'image/png'
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(nextBlob => {
+            if (nextBlob) {
+              resolve(nextBlob)
+              return
+            }
+            reject(new Error(this.$t('exportPage.exportFailed')))
+          }, mimeType)
+        })
+        return {
+          blob,
+          mimeType
+        }
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    },
+
+    async exportFlowchartAsRaster({
+      svgMarkup,
+      fileName,
+      extension = 'png',
+      transparent = false
+    }) {
+      const { blob, mimeType } = await this.buildFlowchartRasterBlob({
+        svgMarkup,
+        extension,
+        transparent
+      })
+      await platform.saveBinaryFileAs({
+        suggestedName: fileName,
+        content: await blob.arrayBuffer(),
+        defaultPath: this.currentDocument?.path || '',
+        extension,
+        name: extension === 'jpg' ? 'JPG 文件' : 'PNG 文件',
+        mimeType
+      })
+    },
+
+    async handleFlowchartExport(safeFileName) {
+      const exportType = this.exportState.exportType
+      const withBackground = !!this.exportState.withBackground
+      const svgMarkup = buildFlowchartSvgMarkup(this.getFlowchartData(), {
+        flowchartConfig: this.getFlowchartConfig(),
+        isDark: this.isDark,
+        transparent: !withBackground,
+        paddingX: this.exportState.paddingX,
+        paddingY: this.exportState.paddingY
+      })
+      if (exportType === 'svg') {
+        await platform.saveTextFileAs({
+          suggestedName: safeFileName,
+          content: svgMarkup,
+          defaultPath: this.currentDocument?.path || '',
+          extension: 'svg',
+          name: 'SVG 文件',
+          mimeType: 'image/svg+xml;charset=utf-8'
+        })
+        return
+      }
+      await this.exportFlowchartAsRaster({
+        svgMarkup,
+        fileName: safeFileName,
+        extension: 'png',
+        transparent: !withBackground
+      })
+    },
+
     async ensureExportPluginsInstalled(exportType) {
+      if (this.documentMode === 'flowchart') return
       if (!this.mindMap) return
       if (!this.exportPluginState.base) {
         const ExportPlugin = await loadExportBasePlugin()
@@ -722,7 +900,7 @@ export default {
     },
 
     async handleExport() {
-      if (!this.mindMap || this.isDisabledFormat || this.exporting) {
+      if (!this.canExportCurrentDocument || this.isDisabledFormat || this.exporting) {
         return
       }
       const safeFileName = sanitizeFileName(
@@ -730,61 +908,19 @@ export default {
         this.$t('exportPage.fallbackFileName')
       )
       const resolvedType =
-        this.exportState.exportType === 'png'
+        this.documentMode !== 'flowchart' && this.exportState.exportType === 'png'
           ? this.exportState.imageFormat
-          : getResolvedExportType(this.exportState.exportType)
+          : getResolvedExportType(this.exportState.exportType, this.documentMode)
       this.exporting = true
       try {
-        await this.ensureExportPluginsInstalled(resolvedType)
-        this.mindMap.updateConfig({
-          exportPaddingX: Number(this.exportState.paddingX) || 0,
-          exportPaddingY: Number(this.exportState.paddingY) || 0
-        })
-        if (this.exportState.exportType === 'html') {
-          const svgMarkup = await this.mindMap.export('svg', false, safeFileName)
-          const htmlContent = buildMindMapHtmlDocument({
-            fileName: safeFileName,
-            svgMarkup
-          })
-          const fileRef = await platform.saveTextFileAs({
-            suggestedName: safeFileName,
-            content: htmlContent,
-            defaultPath: getLastDirectory(),
-            extension: 'html',
-            name: 'HTML',
-            mimeType: 'text/html;charset=utf-8'
-          })
-          if (!fileRef) {
-            return
-          }
-        } else if (['smm', 'json'].includes(this.exportState.exportType)) {
-          await this.mindMap.export(
-            resolvedType,
-            true,
-            safeFileName,
-            this.exportState.withConfig
-          )
-        } else if (['png', 'jpg'].includes(resolvedType)) {
-          await this.mindMap.export(
-            resolvedType,
-            true,
-            safeFileName,
-            this.exportState.isTransparent,
-            null,
-            this.exportState.isFitBg
-          )
-        } else if (resolvedType === 'svg') {
-          await this.mindMap.export(
-            resolvedType,
-            true,
-            safeFileName,
-            `* {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }`
-          )
+        if (this.documentMode === 'flowchart') {
+          await this.handleFlowchartExport(safeFileName)
         } else if (resolvedType === 'pdf') {
+          await this.ensureExportPluginsInstalled(resolvedType)
+          this.mindMap.updateConfig({
+            exportPaddingX: Number(this.exportState.paddingX) || 0,
+            exportPaddingY: Number(this.exportState.paddingY) || 0
+          })
           await this.mindMap.export(
             resolvedType,
             true,
@@ -793,7 +929,58 @@ export default {
             this.exportState.isFitBg
           )
         } else {
-          await this.mindMap.export(resolvedType, true, safeFileName)
+          await this.ensureExportPluginsInstalled(resolvedType)
+          this.mindMap.updateConfig({
+            exportPaddingX: Number(this.exportState.paddingX) || 0,
+            exportPaddingY: Number(this.exportState.paddingY) || 0
+          })
+          if (this.exportState.exportType === 'html') {
+            const svgMarkup = await this.mindMap.export('svg', false, safeFileName)
+            const htmlContent = buildMindMapHtmlDocument({
+              fileName: safeFileName,
+              svgMarkup
+            })
+            const fileRef = await platform.saveTextFileAs({
+              suggestedName: safeFileName,
+              content: htmlContent,
+              defaultPath: getLastDirectory(),
+              extension: 'html',
+              name: 'HTML',
+              mimeType: 'text/html;charset=utf-8'
+            })
+            if (!fileRef) {
+              return
+            }
+          } else if (['smm', 'json'].includes(this.exportState.exportType)) {
+            await this.mindMap.export(
+              resolvedType,
+              true,
+              safeFileName,
+              this.exportState.withConfig
+            )
+          } else if (['png', 'jpg'].includes(resolvedType)) {
+            await this.mindMap.export(
+              resolvedType,
+              true,
+              safeFileName,
+              this.exportState.isTransparent,
+              null,
+              this.exportState.isFitBg
+            )
+          } else if (resolvedType === 'svg') {
+            await this.mindMap.export(
+              resolvedType,
+              true,
+              safeFileName,
+              `* {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }`
+            )
+          } else {
+            await this.mindMap.export(resolvedType, true, safeFileName)
+          }
         }
         this.$notify.success({
           title: this.$t('exportPage.exportDoneTitle'),
@@ -838,17 +1025,8 @@ export default {
       border-color: rgba(255, 255, 255, 0.08);
     }
 
-    .dialogHeaderMain p,
     .settingLabel,
-    .infoText,
-    .previewHeader,
-    .previewWarmupHint,
-    .previewHint,
-    .statusText,
-    .inputSuffix,
-    .emptyOption,
-    .rememberedTip,
-    .statusMetaItem span {
+    .inputSuffix {
       color: hsla(0, 0%, 100%, 0.56);
     }
 
@@ -862,12 +1040,6 @@ export default {
 
     .previewPanel {
       background: #171b22;
-    }
-
-    .statusMetaItem,
-    .previewWarmupHint {
-      background: rgba(255, 255, 255, 0.03);
-      border-color: rgba(255, 255, 255, 0.08);
     }
 
     .previewSurface {
@@ -901,10 +1073,6 @@ export default {
     .inputSuffix {
       background: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.08);
-    }
-
-    .infoDot {
-      background: hsla(0, 0%, 100%, 0.3);
     }
 
     .badgeSoon {
@@ -973,14 +1141,9 @@ export default {
 
 .dialogHeaderMain {
   h1 {
-    margin: 0 0 2px;
+    margin: 0;
     font-size: 16px;
     font-weight: 600;
-  }
-
-  p {
-    font-size: 12px;
-    color: #9ca3af;
   }
 }
 
@@ -1074,40 +1237,6 @@ export default {
   margin-bottom: 32px;
 }
 
-.statusMetaList {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.statusMetaItem {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(15, 23, 42, 0.02);
-
-  span {
-    font-size: 12px;
-    color: #6b7280;
-  }
-
-  strong {
-    font-size: 13px;
-    color: #111827;
-    word-break: break-all;
-  }
-}
-
-.rememberedTip {
-  margin-bottom: 28px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #6b7280;
-}
-
 .settingGroup.nested {
   margin-top: 16px;
   margin-bottom: 0;
@@ -1147,24 +1276,6 @@ export default {
   font-family: monospace;
 }
 
-.infoText {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #9ca3af;
-}
-
-.infoDot {
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: rgba(156, 163, 175, 0.72);
-}
-
 .toggleRow {
   display: flex;
   align-items: center;
@@ -1179,11 +1290,6 @@ export default {
   align-items: flex-start;
 }
 
-.emptyOption {
-  font-size: 13px;
-  color: #9ca3af;
-}
-
 .previewPanel {
   display: flex;
   flex-direction: column;
@@ -1194,23 +1300,7 @@ export default {
 .previewTitle {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.previewHeader {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-bottom: 8px;
-}
-
-.previewWarmupHint {
   margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(15, 23, 42, 0.02);
-  font-size: 12px;
-  color: #6b7280;
 }
 
 .previewSurface {
@@ -1230,6 +1320,23 @@ export default {
   width: 100%;
   height: 100%;
   cursor: grab;
+
+  &.isFlowchart {
+    height: auto;
+    min-height: 100%;
+    padding: 20px;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    :deep(svg) {
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+      display: block;
+    }
+  }
 }
 
 :deep(.previewCanvas .smm-mind-map-container) {
@@ -1241,16 +1348,10 @@ export default {
   min-height: 64px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
   padding: 0 32px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   background: #fff;
-}
-
-.statusText {
-  font-size: 13px;
-  color: #4b5563;
 }
 
 :deep(.el-input) {

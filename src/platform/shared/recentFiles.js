@@ -16,7 +16,11 @@ export const normalizeRecentFiles = list => {
     map.set(path, {
       path,
       name: String(item.name || path.split(/[\\/]/).pop() || path),
-      updatedAt
+      updatedAt,
+      documentMode:
+        String(item.documentMode || '').trim() === 'flowchart'
+          ? 'flowchart'
+          : 'mindmap'
     })
   })
   return [...map.values()]
@@ -31,7 +35,11 @@ export const upsertRecentFile = (list, nextItem) => {
     {
       path,
       name: String(nextItem.name || path.split(/[\\/]/).pop() || path),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      documentMode:
+        String(nextItem.documentMode || '').trim() === 'flowchart'
+          ? 'flowchart'
+          : 'mindmap'
     },
     ...(Array.isArray(list) ? list : []).filter(item => {
       return normalizePath(item && item.path) !== path
