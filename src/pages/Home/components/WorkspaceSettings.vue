@@ -165,15 +165,15 @@
         <div class="appInfoCard">
           <div class="appInfoRow">
             <span>运行时</span>
-            <strong>桌面版</strong>
+            <strong class="sidebarReadonlyMetric">桌面版</strong>
           </div>
           <div class="appInfoRow">
             <span>平台</span>
-            <strong>{{ appPlatformLabel }}</strong>
+            <strong class="sidebarReadonlyMetric">{{ appPlatformLabel }}</strong>
           </div>
           <div class="appInfoRow">
             <span>版本</span>
-            <strong>v{{ appVersion }}</strong>
+            <strong class="sidebarReadonlyMetric">v{{ appVersion }}</strong>
           </div>
           <div class="appInfoActions">
             <el-button
@@ -188,15 +188,19 @@
         <div class="appInfoCard recoveryInfoCard">
           <div class="appInfoRow">
             <span>恢复文件</span>
-            <strong>{{ recoverySummary.entries.length }} 个</strong>
+            <strong class="sidebarReadonlyMetric">{{ recoverySummary.entries.length }} 个</strong>
           </div>
           <div class="appInfoRow">
             <span>当前目录</span>
-            <strong>{{ recoverySummary.rootPath || '未初始化' }}</strong>
+            <strong class="sidebarReadonlyMetric">{{
+              recoverySummary.rootPath || '未初始化'
+            }}</strong>
           </div>
           <div class="appInfoRow">
             <span>生效模式</span>
-            <strong>{{ recoverySummary.origin || '未初始化' }}</strong>
+            <strong class="sidebarReadonlyMetric">{{
+              recoverySummary.origin || '未初始化'
+            }}</strong>
           </div>
           <p class="recoveryHint">
             删除异常退出后用于恢复未保存内容的恢复文件，不影响正式文档和最近文件。恢复文件会在正式保存后自动清理。
@@ -705,6 +709,11 @@ export default {
 
 .appInfoActions {
   padding-top: 12px;
+}
+
+.sidebarReadonlyMetric {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .recoveryHint {

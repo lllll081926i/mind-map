@@ -198,8 +198,17 @@ export default {
   methods: {
     onRichTextSelectionChange(hasRange, rect, formatInfo) {
       if (hasRange) {
-        this.style.left = rect.left + rect.width / 2 + 'px'
-        this.style.top = rect.top - 60 + 'px'
+        let left = rect.left + rect.width / 2
+        let top = rect.top - 60
+        // 上边界检查：工具栏高度约 55px
+        if (top < 10) {
+          top = rect.bottom + 10
+        }
+        // 左右边界检查：工具栏宽度约 500px（55px × 9 按钮）
+        const halfWidth = 250
+        left = Math.max(halfWidth + 10, Math.min(left, window.innerWidth - halfWidth - 10))
+        this.style.left = left + 'px'
+        this.style.top = top + 'px'
         this.formatInfo = { ...(formatInfo || {}) }
       }
       this.showRichTextToolbar = hasRange
@@ -287,6 +296,7 @@ export default {
   display: flex;
   align-items: center;
   transform: translateX(-50%);
+  transition: opacity 0.15s ease, top 0.1s ease, left 0.1s ease;
 
   &.isDark {
     background: #363b3f;

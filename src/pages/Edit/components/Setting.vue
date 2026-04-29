@@ -385,19 +385,19 @@
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">运行时</span>
-          <span class="value">{{ appRuntimeLabel }}</span>
+          <span class="value sidebarReadonlyMetric">{{ appRuntimeLabel }}</span>
         </div>
       </div>
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">平台</span>
-          <span class="value">{{ appPlatformLabel }}</span>
+          <span class="value sidebarReadonlyMetric">{{ appPlatformLabel }}</span>
         </div>
       </div>
       <div class="row">
         <div class="rowItem infoRow">
           <span class="name">版本</span>
-          <span class="value">v{{ appVersion }}</span>
+          <span class="value sidebarReadonlyMetric">v{{ appVersion }}</span>
         </div>
       </div>
       <div class="row">
@@ -525,6 +525,7 @@ export default {
   },
   beforeUnmount() {
     this.$bus.$off('toggleOpenNodeRichText', this.onToggleOpenNodeRichText)
+    clearTimeout(this.storeConfigTimer)
   },
   methods: {
     setLocalConfig(data) {
@@ -572,7 +573,10 @@ export default {
         [key]: value
       })
       this.configData[key] = value
-      storeConfig(this.configData)
+      clearTimeout(this.storeConfigTimer)
+      this.storeConfigTimer = setTimeout(() => {
+        storeConfig(this.configData)
+      }, 300)
       if (
         [
           'alwaysShowExpandBtn',
@@ -765,6 +769,11 @@ export default {
       .value {
         color: inherit;
         opacity: 0.8;
+      }
+
+      .sidebarReadonlyMetric {
+        user-select: none;
+        -webkit-user-select: none;
       }
 
       .block {

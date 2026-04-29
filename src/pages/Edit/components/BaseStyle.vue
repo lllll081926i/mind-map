@@ -1049,6 +1049,8 @@ export default {
   },
   beforeUnmount() {
     this.$bus.$off('setData', this.onSetData)
+    clearTimeout(this.storeDataTimer)
+    clearTimeout(this.outerFramePaddingTimer)
   },
   methods: {
     onSetData() {
@@ -1137,12 +1139,15 @@ export default {
       this.data.theme.config[key] = value
       emitShowLoading()
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
-        theme: {
-          template: this.mindMap.getTheme(),
-          config: this.data.theme.config
-        }
-      })
+      clearTimeout(this.storeDataTimer)
+      this.storeDataTimer = setTimeout(() => {
+        storeData({
+          theme: {
+            template: this.mindMap.getTheme(),
+            config: this.data.theme.config
+          }
+        })
+      }, 300)
     },
 
     // 更新彩虹线条配置
@@ -1169,7 +1174,10 @@ export default {
       this.mindMap.updateConfig({
         [prop]: value
       })
-      storeConfig(this.configData)
+      clearTimeout(this.outerFramePaddingTimer)
+      this.outerFramePaddingTimer = setTimeout(() => {
+        storeConfig(this.configData)
+      }, 300)
       this.mindMap.render()
     },
 
@@ -1187,12 +1195,15 @@ export default {
       }
       this.data.theme.config[this.marginActiveTab][type] = value
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
-        theme: {
-          template: this.mindMap.getTheme(),
-          config: this.data.theme.config
-        }
-      })
+      clearTimeout(this.storeDataTimer)
+      this.storeDataTimer = setTimeout(() => {
+        storeData({
+          theme: {
+            template: this.mindMap.getTheme(),
+            config: this.data.theme.config
+          }
+        })
+      }, 300)
     },
 
     useBg(bg) {

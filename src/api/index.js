@@ -59,16 +59,6 @@ export const storeConfig = config => {
   }
 }
 
-// 存储语言
-export const storeLang = lang => {
-  return lang || 'zh'
-}
-
-// 获取存储的语言
-export const getLang = () => {
-  return 'zh'
-}
-
 // 存储本地配置
 export const storeLocalConfig = config => {
   persistLocalConfig(config)

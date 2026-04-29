@@ -71,7 +71,7 @@ export default {
       insertType: '',
       isInTreArea: false,
       isAfterCreateNewNode: false,
-      refreshFrameId: 0,
+      refreshTimer: 0,
       outlineVersion: 0
     }
   },
@@ -97,20 +97,14 @@ export default {
     this.$bus.$off('data_change', this.handleDataChange)
     this.$bus.$off('node_tree_render_end', this.handleNodeTreeRenderEnd)
     this.$bus.$off('hide_text_edit', this.handleHideTextEdit)
-    if (this.refreshFrameId) {
-      cancelAnimationFrame(this.refreshFrameId)
-      this.refreshFrameId = 0
-    }
+    clearTimeout(this.refreshTimer)
   },
   methods: {
     scheduleRefresh() {
-      if (this.refreshFrameId) {
-        return
-      }
-      this.refreshFrameId = requestAnimationFrame(() => {
-        this.refreshFrameId = 0
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = setTimeout(() => {
         this.refresh()
-      })
+      }, 150)
     },
 
     handleHideTextEdit() {

@@ -1490,8 +1490,12 @@ export default {
       if (!this.mindMap || !richTextPluginsPromise) return
       const { RichText, Formula } = await this.ensureRichTextPluginsLoaded()
       if (!this.mindMap || this.openNodeRichText) return
-      this.mindMap.removePlugin(Formula)
-      this.mindMap.removePlugin(RichText)
+      if (this.mindMap.formula) {
+        this.mindMap.removePlugin(Formula)
+      }
+      if (this.mindMap.richText) {
+        this.mindMap.removePlugin(RichText)
+      }
     },
 
     // 加载滚动条插件
@@ -1507,7 +1511,9 @@ export default {
       if (!this.mindMap || !scrollbarPluginPromise) return
       const ScrollbarPlugin = await loadScrollbarPlugin()
       if (!this.mindMap || this.isShowScrollbar) return
-      this.mindMap.removePlugin(ScrollbarPlugin)
+      if (this.mindMap.scrollbar) {
+        this.mindMap.removePlugin(ScrollbarPlugin)
+      }
     },
 
     // 拖拽文件到页面导入
