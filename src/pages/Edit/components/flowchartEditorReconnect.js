@@ -37,6 +37,123 @@ export const flowchartReconnectMethods = {
     }
   },
 
+  getEdgeManualRoutePoints(edge) {
+    const pathPoints = Array.isArray(edge?.pathPoints) ? edge.pathPoints : []
+    return pathPoints.slice(1, -1)
+      .map(point => ({
+        x: Number(point?.x || 0),
+        y: Number(point?.y || 0)
+      }))
+  },
+
+  getEdgeRouteDragSnapValue({
+    edge,
+    axis,
+    affectedIndexes = [],
+    nextValue,
+    threshold
+  }) {
+    const pathPoints = Array.isArray(edge?.pathPoints) ? edge.pathPoints : []
+    const candidates = new Set()
+    affectedIndexes.forEach(manualIndex => {
+      const previousPoint = pathPoints[manualIndex] || null
+      const nextPoint = pathPoints[manualIndex + 2] || null
+      const manualPoint = pathPoints[manualIndex + 1] || null
+      ;[previousPoint, nextPoint, manualPoint, edge?.sourcePoint, edge?.targetPoint].forEach(
+        point => {
+          const candidateValue = Number(point?.[axis])
+          if (Number.isFinite(candidateValue)) {
+            candidates.add(candidateValue)
+          }
+        }
+      )
+    })
+    let bestValue = null
+    let bestDiff = Infinity
+    candidates.forEach(candidateValue => {
+      const diff = Math.abs(candidateValue - nextValue)
+      if (diff <= threshold && diff < bestDiff) {
+        bestValue = candidateValue
+        bestDiff = diff
+      }
+    })
+    return bestValue
+  },
+
+  simplifyEdgeManualRoutePoints(edge, manualPoints = []) {
+    const points = [
+      edge?.sourcePoint || null,
+      ...(Array.isArray(manualPoints) ? manualPoints : []),
+      edge?.targetPoint || null
+    ]
+      .map(point => ({
+        x: Number(point?.x || 0),
+        y: Number(point?.y || 0)
+      }))
+      .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    const simplifiedPoints = []
+    const isSamePoint = (firstPoint, secondPoint) => {
+      return (
+        Math.abs(Number(firstPoint?.x || 0) - Number(secondPoint?.x || 0)) <= 0.001 &&
+        Math.abs(Number(firstPoint?.y || 0) - Number(secondPoint?.y || 0)) <= 0.001
+      )
+    }
+    const isCollinearPoint = (previousPoint, currentPoint, nextPoint) => {
+      const previousDeltaX =
+        Number(currentPoint?.x || 0) - Number(previousPoint?.x || 0)
+      const previousDeltaY =
+        Number(currentPoint?.y || 0) - Number(previousPoint?.y || 0)
+      const nextDeltaX =
+        Number(nextPoint?.x || 0) - Number(currentPoint?.x || 0)
+      const nextDeltaY =
+        Number(nextPoint?.y || 0) - Number(currentPoint?.y || 0)
+      const isCollinear =
+        (Math.abs(previousDeltaX) <= 0.001 && Math.abs(nextDeltaX) <= 0.001) ||
+        (Math.abs(previousDeltaY) <= 0.001 && Math.abs(nextDeltaY) <= 0.001)
+      if (!isCollinear) {
+        return false
+      }
+      return previousDeltaX * nextDeltaX + previousDeltaY * nextDeltaY >= 0
+    }
+    points.forEach(point => {
+      if (
+        simplifiedPoints.length &&
+        isSamePoint(simplifiedPoints[simplifiedPoints.length - 1], point)
+      ) {
+        return
+      }
+      while (
+        simplifiedPoints.length >= 2 &&
+        isCollinearPoint(
+          simplifiedPoints[simplifiedPoints.length - 2],
+          simplifiedPoints[simplifiedPoints.length - 1],
+          point
+        )
+      ) {
+        simplifiedPoints.pop()
+      }
+      simplifiedPoints.push(point)
+    })
+    return simplifiedPoints.slice(1, -1)
+  },
+
+  applyManualRouteToEdge(edge, manualPoints = []) {
+    const normalizedManualPoints = this.simplifyEdgeManualRoutePoints(
+      edge,
+      (Array.isArray(manualPoints) ? manualPoints : [])
+      .map(point => ({
+        x: Number(point?.x || 0),
+        y: Number(point?.y || 0)
+      }))
+      .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    )
+    edge.route = normalizedManualPoints.length
+      ? {
+          manualPoints: normalizedManualPoints
+        }
+      : null
+  },
+
   beginEdgeReconnect(edgeId, endpoint, pointerEvent) {
     const edge = this.edgesWithLayout.find(item => item.id === edgeId)
     if (!edge || !['source', 'target'].includes(endpoint)) {
@@ -250,10 +367,13 @@ export const flowchartReconnectMethods = {
     this.selectedEdgeId = edgeId
     this.selectedNodeIds = []
     this.edgeToolbarState = null
+    const manualPoints = this.getEdgeManualRoutePoints(edge)
     this.edgeBendDragState = {
       edgeId,
-      bendIndex: Number(segmentIndex || 0),
+      kind: 'segment',
+      segmentIndex: Number(segmentIndex || 0),
       axis: isVertical ? 'x' : 'y',
+      manualPoints,
       straightSnap: this.getEdgeStraightRouteSnap(edge, isVertical ? 'x' : 'y')
     }
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
@@ -278,10 +398,13 @@ export const flowchartReconnectMethods = {
     this.selectedEdgeId = edgeId
     this.selectedNodeIds = []
     this.edgeToolbarState = null
+    const manualPoints = this.getEdgeManualRoutePoints(edge)
     this.edgeBendDragState = {
       edgeId,
+      kind: 'bend',
       bendIndex,
       axis: bendHandle.axis,
+      manualPoints,
       straightSnap: this.getEdgeStraightRouteSnap(edge, bendHandle.axis)
     }
     this.pendingEdgeBendPoint = this.getWorldPointFromEvent(pointerEvent)
@@ -319,24 +442,92 @@ export const flowchartReconnectMethods = {
     if (!edge) {
       return
     }
-    const axis = this.edgeBendDragState.axis === 'y' ? 'y' : 'x'
-    const nextValue = axis === 'x' ? Number(nextPoint.x || 0) : Number(nextPoint.y || 0)
+    const dragState = this.edgeBendDragState
+    const manualPoints = (Array.isArray(dragState.manualPoints) ? dragState.manualPoints : [])
+      .map(point => ({ ...point }))
     const snapThreshold = this.getStraightEdgeSnapThreshold
       ? this.getStraightEdgeSnapThreshold()
       : FLOWCHART_STRAIGHT_EDGE_SNAP_THRESHOLD
-    if (
-      this.edgeBendDragState.straightSnap?.axis === axis &&
-      Math.abs(nextValue - this.edgeBendDragState.straightSnap.value) <= snapThreshold
-    ) {
-      edge.route = null
+    if (dragState.kind === 'segment') {
+      const pathPoints = Array.isArray(edge?.pathPoints) ? edge.pathPoints : []
+      const segmentIndex = Number(dragState.segmentIndex || 0)
+      const startPoint = pathPoints[segmentIndex] || null
+      const endPoint = pathPoints[segmentIndex + 1] || null
+      if (!startPoint || !endPoint) {
+        return
+      }
+      const axis = dragState.axis === 'y' ? 'y' : 'x'
+      let nextValue = axis === 'x' ? Number(nextPoint.x || 0) : Number(nextPoint.y || 0)
+      const affectedIndexes = []
+      if (segmentIndex > 0) {
+        affectedIndexes.push(segmentIndex - 1)
+      }
+      if (segmentIndex < pathPoints.length - 2) {
+        affectedIndexes.push(segmentIndex)
+      }
+      if (
+        dragState.straightSnap?.axis === axis &&
+        Math.abs(nextValue - this.edgeBendDragState.straightSnap.value) <= snapThreshold
+      ) {
+        edge.route = null
+        return
+      }
+      const snappedValue = this.getEdgeRouteDragSnapValue({
+        edge,
+        axis,
+        affectedIndexes,
+        nextValue,
+        threshold: snapThreshold
+      })
+      if (Number.isFinite(snappedValue)) {
+        nextValue = snappedValue
+      }
+      if (!affectedIndexes.length) {
+        const firstPoint = pathPoints[0] || edge.sourcePoint
+        const lastPoint = pathPoints[pathPoints.length - 1] || edge.targetPoint
+        this.applyManualRouteToEdge(edge, [
+          axis === 'x'
+            ? { x: nextValue, y: Number(firstPoint?.y || 0) }
+            : { x: Number(firstPoint?.x || 0), y: nextValue },
+          axis === 'x'
+            ? { x: nextValue, y: Number(lastPoint?.y || 0) }
+            : { x: Number(lastPoint?.x || 0), y: nextValue }
+        ])
+        return
+      }
+      affectedIndexes.forEach(index => {
+        if (!manualPoints[index]) {
+          return
+        }
+        manualPoints[index][axis] = nextValue
+      })
+      this.applyManualRouteToEdge(edge, manualPoints)
       return
     }
-    edge.route = {
-      orthogonalLane: {
-        axis,
-        value: nextValue
-      }
+    const nextManualPoint = {
+      x: Number(nextPoint.x || 0),
+      y: Number(nextPoint.y || 0)
     }
+    if (!manualPoints.length) {
+      manualPoints.push(nextManualPoint)
+    } else {
+      const bendIndex = Math.max(0, Math.min(manualPoints.length - 1, Number(dragState.bendIndex || 0)))
+      manualPoints[bendIndex] = nextManualPoint
+    }
+    const snapAxisList = ['x', 'y']
+    snapAxisList.forEach(axis => {
+      const snappedValue = this.getEdgeRouteDragSnapValue({
+        edge,
+        axis,
+        affectedIndexes: [Math.max(0, Number(dragState.bendIndex || 0))],
+        nextValue: Number(nextManualPoint[axis] || 0),
+        threshold: snapThreshold
+      })
+      if (Number.isFinite(snappedValue)) {
+        manualPoints[Math.max(0, Number(dragState.bendIndex || 0))][axis] = snappedValue
+      }
+    })
+    this.applyManualRouteToEdge(edge, manualPoints)
   },
 
   async commitEdgeBendDrag(pointerEvent) {

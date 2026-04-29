@@ -101,6 +101,21 @@ export default {
           maxY: -Infinity
         }
       )
+      this.edges.forEach(edge => {
+        ;(Array.isArray(edge?.pathPoints) ? edge.pathPoints : []).forEach(point => {
+          bounds.minX = Math.min(bounds.minX, Number(point?.x || 0))
+          bounds.minY = Math.min(bounds.minY, Number(point?.y || 0))
+          bounds.maxX = Math.max(bounds.maxX, Number(point?.x || 0))
+          bounds.maxY = Math.max(bounds.maxY, Number(point?.y || 0))
+        })
+        ;(Array.isArray(edge?.arrowMarkers) ? edge.arrowMarkers : []).forEach(marker => {
+          const arrowReach = Math.max(6, Number(marker?.size || 1) * 6)
+          bounds.minX = Math.min(bounds.minX, Number(marker?.x || 0) - arrowReach)
+          bounds.minY = Math.min(bounds.minY, Number(marker?.y || 0) - arrowReach)
+          bounds.maxX = Math.max(bounds.maxX, Number(marker?.x || 0) + arrowReach)
+          bounds.maxY = Math.max(bounds.maxY, Number(marker?.y || 0) + arrowReach)
+        })
+      })
       const padding = 160
       const viewportRect = this.viewportRect
       const minX = Math.min(bounds.minX, viewportRect.x) - padding
@@ -157,7 +172,7 @@ export default {
     resolveWorldPointFromClientPoint(clientPoint) {
       const rect = this.$el?.getBoundingClientRect?.()
       const bounds = this.contentBounds
-      if (!rect.width || !rect.height) {
+      if (!rect?.width || !rect?.height) {
         return null
       }
       const ratioX = Math.max(

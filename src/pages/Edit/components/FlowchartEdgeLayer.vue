@@ -28,6 +28,7 @@
           :x="edge.labelX"
           :y="edge.labelY"
           :fill="edge.style.labelColor"
+          text-anchor="middle"
           dominant-baseline="middle"
           @mousedown.stop="$emit('start-edge-label-drag', $event, edge.id)"
           @click.stop="$emit('select-edge', edge.id)"
@@ -207,10 +208,6 @@ export default {
       if (points.length < 2 || edge?.style?.pathType !== 'orthogonal') {
         return []
       }
-      const routeAxis = String(edge?.route?.orthogonalLane?.axis || '')
-      if (!routeAxis) {
-        return []
-      }
       return points.slice(0, -1).reduce((result, start, index) => {
         const end = points[index + 1]
         const isVertical = Math.abs(Number(start?.x || 0) - Number(end?.x || 0)) <= 0.001
@@ -222,8 +219,7 @@ export default {
         )
         if (
           (!isVertical && !isHorizontal) ||
-          segmentLength < 24 ||
-          routeAxis !== moveAxis
+          segmentLength < 24
         ) {
           return result
         }

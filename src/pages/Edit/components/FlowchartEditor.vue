@@ -351,7 +351,7 @@ export default {
       return edgesWithLayout
     },
     minimapEdges() {
-      return this.isInteractiveEdgeRouting ? [] : this.edgesWithLayout
+      return this.edgesWithLayout
     },
     flowchartLanes() {
       return Array.isArray(this.flowchartData.lanes) ? this.flowchartData.lanes : []
@@ -715,7 +715,11 @@ export default {
       const s = edge.style
       const ld = this.edgeDirectionLockMap?.[edge.id]
       const routeStr = r
-        ? `${r.orthogonalLane?.axis || ''}:${r.orthogonalLane?.value ?? ''}`
+        ? Array.isArray(r.manualPoints) && r.manualPoints.length
+          ? r.manualPoints
+              .map(point => `${Number(point?.x || 0)},${Number(point?.y || 0)}`)
+              .join(';')
+          : `${r.orthogonalLane?.axis || ''}:${r.orthogonalLane?.value ?? ''}`
         : ''
       const ldStr = ld
         ? `${ld.sourceDirection || ''}:${ld.targetDirection || ''}`
@@ -842,7 +846,7 @@ export default {
             nodes: this.flowchartData.nodes
           }
         )
-        if (Array.isArray(relaxedLayout?.pathPoints) && relaxedLayout.pathPoints.length === 2) {
+        if (Array.isArray(relaxedLayout?.pathPoints) && relaxedLayout.pathPoints.length <= 3) {
           edge.route = null
         }
       })

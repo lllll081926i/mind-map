@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.2.15] - 2026-04-29
+
+### Added
+- Added a substantially upgraded desktop flowchart editing experience with denser business-ready templates, richer minimap feedback, cleaner edge label rendering, and direct route-shape editing that better fits everyday diagram work
+- Added support for dragging flowchart route segments and intermediate bends as first-class controls so users can refine orthogonal paths without fighting the automatic router
+- Added more regression coverage around flowchart routing, template preview layout, export bounds, manual bend simplification, and anchor handling to keep the new editor path stable as iteration continues
+
+### Changed
+- Refined flowchart routing to treat manual route points as structured editor state instead of a fragile lane override, which makes single-bend preference, bend collapse, and route cleanup behave more predictably under repeated edits
+- Improved flowchart SVG/export layout generation so labels, arrows, and long detours contribute to export bounds correctly and complex diagrams are less likely to be clipped in preview or exported output
+- Tightened flowchart preview/template arrangement to reduce accidental overlap in compact previews and keep larger business templates readable before insertion
+- Updated the desktop release workflow to reuse curated changelog notes as the published release body, keep Windows/Linux release config aligned during bundle builds, and verify bundled outputs using the right local artifact rules
+
+### Fixed
+- Fixed several flowchart routing cases where orthogonal edges could keep unnecessary extra bends, lose the expected single-turn path, or drift away from visually aligned horizontal/vertical returns after drag adjustments
+- Fixed minimap coverage so edge paths and arrow markers remain visible in overview calculations instead of disappearing from the navigation frame under larger diagrams
+- Fixed flowchart edge label alignment and interaction details so centered labels render more consistently during preview, export, and direct manipulation
+- Fixed release packaging failures in tag-triggered GitHub Actions where Windows installer, Windows ARM64 installer, and Linux bundle jobs built successfully but were incorrectly failed by post-build artifact validation
+
 ## [0.2.14] - 2026-04-29
 
 ### Added

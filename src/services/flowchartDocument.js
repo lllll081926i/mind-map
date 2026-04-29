@@ -1365,6 +1365,24 @@ function normalizeFlowchartEdgeRoute(route) {
   if (!route || typeof route !== 'object') {
     return null
   }
+  const manualPoints = (Array.isArray(route?.manualPoints) ? route.manualPoints : [])
+    .map(point => {
+      const x = Number(point?.x)
+      const y = Number(point?.y)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null
+      }
+      return {
+        x: Math.round(x * 100) / 100,
+        y: Math.round(y * 100) / 100
+      }
+    })
+    .filter(Boolean)
+  if (manualPoints.length) {
+    return {
+      manualPoints
+    }
+  }
   const laneAxis = String(route?.orthogonalLane?.axis || '').trim()
   const laneValue = Number(route?.orthogonalLane?.value)
   if (!['x', 'y'].includes(laneAxis) || !Number.isFinite(laneValue)) {
@@ -1489,6 +1507,9 @@ const normalizeTemplateLayout = (
   alignTemplateColumnNodes(normalizedTemplate)
   alignTemplateMergeNodes(normalizedTemplate)
   alignTemplateColumnNodes(normalizedTemplate)
+  if (mode === 'preview') {
+    resolveTemplateNodeOverlaps(normalizedTemplate)
+  }
   return normalizedTemplate
 }
 
@@ -1923,6 +1944,110 @@ const simplifyFlowchartOrthogonalPoints = points => {
   return simplifiedPoints
 }
 
+const createFlowchartManualRouteTurnPoint = (
+  currentPoint,
+  targetPoint,
+  previousAxis = ''
+) => {
+  const currentX = Number(currentPoint?.x || 0)
+  const currentY = Number(currentPoint?.y || 0)
+  const targetX = Number(targetPoint?.x || 0)
+  const targetY = Number(targetPoint?.y || 0)
+  if (Math.abs(currentX - targetX) <= 0.001 || Math.abs(currentY - targetY) <= 0.001) {
+    return null
+  }
+  if (previousAxis === 'x') {
+    return {
+      x: currentX,
+      y: targetY
+    }
+  }
+  if (previousAxis === 'y') {
+    return {
+      x: targetX,
+      y: currentY
+    }
+  }
+  if (Math.abs(targetX - currentX) >= Math.abs(targetY - currentY)) {
+    return {
+      x: targetX,
+      y: currentY
+    }
+  }
+  return {
+    x: currentX,
+    y: targetY
+  }
+}
+
+const buildFlowchartManualOrthogonalPathPoints = ({
+  sourcePoint,
+  targetPoint,
+  manualPoints = []
+}) => {
+  const normalizedManualPoints = (Array.isArray(manualPoints) ? manualPoints : [])
+    .map(point => ({
+      x: Number(point?.x || 0),
+      y: Number(point?.y || 0)
+    }))
+    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+  const rawTargets = [...normalizedManualPoints, targetPoint].map(point => ({
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0)
+  }))
+  const pathPoints = [
+    {
+      x: Number(sourcePoint?.x || 0),
+      y: Number(sourcePoint?.y || 0)
+    }
+  ]
+  let previousAxis = ''
+  rawTargets.forEach(target => {
+    const currentPoint = pathPoints[pathPoints.length - 1]
+    const turnPoint = createFlowchartManualRouteTurnPoint(
+      currentPoint,
+      target,
+      previousAxis
+    )
+    if (turnPoint) {
+      pathPoints.push(turnPoint)
+      previousAxis =
+        Math.abs(Number(turnPoint.x || 0) - Number(currentPoint.x || 0)) > 0.001
+          ? 'x'
+          : 'y'
+    }
+    pathPoints.push(target)
+    const previousPoint = pathPoints[pathPoints.length - 2]
+    previousAxis =
+      Math.abs(Number(target.x || 0) - Number(previousPoint?.x || 0)) > 0.001
+        ? 'x'
+        : 'y'
+  })
+  return simplifyFlowchartOrthogonalPoints(pathPoints)
+}
+
+const createFlowchartManualOrthogonalRoute = ({
+  sourcePoint,
+  targetPoint,
+  manualPoints = []
+}) => {
+  const pathPoints = buildFlowchartManualOrthogonalPathPoints({
+    sourcePoint,
+    targetPoint,
+    manualPoints
+  })
+  const normalizedManualPoints = pathPoints.slice(1, -1)
+  return {
+    pathPoints,
+    bendHandles: createFlowchartOrthogonalBendHandlesFromPoints(pathPoints),
+    route: normalizedManualPoints.length
+      ? {
+          manualPoints: normalizedManualPoints
+        }
+      : null
+  }
+}
+
 const getFlowchartNodeBounds = (node, padding = 0) => {
   const normalizedPadding = Math.max(0, Number(padding || 0))
   const left = Number(node?.x || 0) - normalizedPadding
@@ -2288,10 +2413,23 @@ const finalizeFlowchartOrthogonalRoute = (
   }
 ) => {
   const normalizedPathPoints = simplifyFlowchartOrthogonalPoints(candidateRoute?.pathPoints || [])
-  const normalizedRoute = {
-    ...candidateRoute,
-    pathPoints: normalizedPathPoints
-  }
+  const normalizedRoute =
+    Array.isArray(candidateRoute?.route?.manualPoints) &&
+    candidateRoute.route.manualPoints.length
+      ? {
+          ...candidateRoute,
+          pathPoints: normalizedPathPoints,
+          route: normalizedPathPoints.length > 2
+            ? {
+                manualPoints: normalizedPathPoints.slice(1, -1)
+              }
+            : null,
+          bendHandles: createFlowchartOrthogonalBendHandlesFromPoints(normalizedPathPoints)
+        }
+      : {
+          ...candidateRoute,
+          pathPoints: normalizedPathPoints
+        }
   if (
     !doesFlowchartPolylineIntersectObstacles(
       normalizedPathPoints,
@@ -2422,29 +2560,29 @@ const isFlowchartLaneValueForwardFromStubs = ({
   sourceDirection,
   targetDirection
 }) => {
-  if (
-    axis === 'x' &&
-    ['left', 'right'].includes(sourceDirection) &&
-    sourceDirection === targetDirection
-  ) {
-    const directionSign = sourceDirection === 'right' ? 1 : -1
-    return (
-      (laneValue - Number(sourceStub?.x || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP &&
-      (laneValue - Number(targetStub?.x || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP
-    )
+  const epsilon = 0.001
+  const isForwardFromStub = (stub, direction) => {
+    if (axis === 'x') {
+      if (direction === 'right') {
+        return laneValue >= Number(stub?.x || 0) - epsilon
+      }
+      if (direction === 'left') {
+        return laneValue <= Number(stub?.x || 0) + epsilon
+      }
+      return true
+    }
+    if (direction === 'bottom') {
+      return laneValue >= Number(stub?.y || 0) - epsilon
+    }
+    if (direction === 'top') {
+      return laneValue <= Number(stub?.y || 0) + epsilon
+    }
+    return true
   }
-  if (
-    axis === 'y' &&
-    ['top', 'bottom'].includes(sourceDirection) &&
-    sourceDirection === targetDirection
-  ) {
-    const directionSign = sourceDirection === 'bottom' ? 1 : -1
-    return (
-      (laneValue - Number(sourceStub?.y || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP &&
-      (laneValue - Number(targetStub?.y || 0)) * directionSign >= FLOWCHART_ORTHOGONAL_LANE_GAP
-    )
-  }
-  return true
+  return (
+    isForwardFromStub(sourceStub, sourceDirection) &&
+    isForwardFromStub(targetStub, targetDirection)
+  )
 }
 
 const resolveFlowchartOrthogonalLaneValue = ({
@@ -2598,6 +2736,17 @@ const doesFlowchartPathBacktrackNearEndpoint = (
     }
   }
   return false
+}
+
+const doesFlowchartPathBacktrackAtEitherEndpoint = (
+  pathPoints,
+  sourceDirection,
+  targetDirection
+) => {
+  return (
+    doesFlowchartPathBacktrackNearEndpoint(pathPoints, sourceDirection, 'source') ||
+    doesFlowchartPathBacktrackNearEndpoint(pathPoints, targetDirection, 'target')
+  )
 }
 
 const scoreFlowchartConnectionCandidate = ({
@@ -2971,6 +3120,15 @@ const buildFlowchartOrthogonalRoute = ({
       interactive
     })
   }
+  if (Array.isArray(route?.manualPoints) && route.manualPoints.length) {
+    return finalizeRoute(
+      createFlowchartManualOrthogonalRoute({
+        sourcePoint,
+        targetPoint,
+        manualPoints: route.manualPoints
+      })
+    )
+  }
   if (
     shouldUseStraightFlowchartOrthogonalRoute({
       sourcePoint,
@@ -3088,20 +3246,31 @@ const buildFlowchartOrthogonalRoute = ({
         targetPoint
       ])
     }
-  const resolvedLaneValue =
-    route?.orthogonalLane?.axis === laneAxis &&
-    Number.isFinite(Number(route?.orthogonalLane?.value))
-      ? Number(route.orthogonalLane.value)
-      : collectFlowchartLaneCandidateValues({
-            axis: laneAxis,
-            sourcePoint,
-            targetPoint,
-            sourceStub: sourcePoint,
-            targetStub: targetPoint,
-          desiredLane,
-          obstacles,
-          ignoredNodeIds
-        }).find(candidateLaneValue => {
+    const laneCandidates = collectFlowchartLaneCandidateValues({
+      axis: laneAxis,
+      sourcePoint,
+      targetPoint,
+      sourceStub: sourcePoint,
+      targetStub: targetPoint,
+      desiredLane,
+      obstacles,
+      ignoredNodeIds
+    })
+    const resolvedLaneValue =
+      route?.orthogonalLane?.axis === laneAxis &&
+      Number.isFinite(Number(route?.orthogonalLane?.value))
+        ? Number(route.orthogonalLane.value)
+        : laneCandidates.find(candidateLaneValue => {
+          const candidatePoints = buildOppositeRoutePointsForLaneValue(candidateLaneValue)
+          if (
+            doesFlowchartPathBacktrackAtEitherEndpoint(
+              candidatePoints,
+              sourceDirection,
+              targetDirection
+            )
+          ) {
+            return false
+          }
           if (
             !isFlowchartLaneValueForwardFromStubs({
               axis: laneAxis,
@@ -3115,12 +3284,31 @@ const buildFlowchartOrthogonalRoute = ({
             return false
           }
           return !doesFlowchartPolylineIntersectObstacles(
-            buildOppositeRoutePointsForLaneValue(candidateLaneValue),
+            candidatePoints,
             obstacles,
             ignoredNodeIds,
             0
             )
-          }) ?? desiredLane
+          }) ??
+          laneCandidates.find(candidateLaneValue => {
+            const candidatePoints = buildOppositeRoutePointsForLaneValue(candidateLaneValue)
+            return (
+              !doesFlowchartPathBacktrackAtEitherEndpoint(
+                candidatePoints,
+                sourceDirection,
+                targetDirection
+              ) &&
+              isFlowchartLaneValueForwardFromStubs({
+                axis: laneAxis,
+                laneValue: candidateLaneValue,
+                sourceStub: sourcePoint,
+                targetStub: targetPoint,
+                sourceDirection,
+                targetDirection
+              })
+            )
+          }) ??
+          desiredLane
     const firstLanePoint =
       laneAxis === 'x'
         ? { x: resolvedLaneValue, y: sourcePoint.y }
@@ -3199,8 +3387,7 @@ const buildFlowchartOrthogonalRoute = ({
         targetPoint
       ])
     }
-    const resolvedDetourLaneValue =
-      collectFlowchartLaneCandidateValues({
+    const detourLaneCandidates = collectFlowchartLaneCandidateValues({
         axis: detourAxis,
         sourcePoint,
         targetPoint,
@@ -3209,14 +3396,35 @@ const buildFlowchartOrthogonalRoute = ({
         desiredLane: desiredDetourLane,
         obstacles,
         ignoredNodeIds
-      }).find(candidateLaneValue => {
+      })
+    const resolvedDetourLaneValue =
+      detourLaneCandidates.find(candidateLaneValue => {
+        const candidatePoints = buildDetourRoutePointsForLaneValue(candidateLaneValue)
+        if (
+          doesFlowchartPathBacktrackAtEitherEndpoint(
+            candidatePoints,
+            sourceDirection,
+            targetDirection
+          )
+        ) {
+          return false
+        }
         return !doesFlowchartPolylineIntersectObstacles(
-          buildDetourRoutePointsForLaneValue(candidateLaneValue),
+          candidatePoints,
           obstacles,
           ignoredNodeIds,
           0
         )
-      }) ?? detourExtentMax + 72
+      }) ??
+      detourLaneCandidates.find(candidateLaneValue => {
+        const candidatePoints = buildDetourRoutePointsForLaneValue(candidateLaneValue)
+        return !doesFlowchartPathBacktrackAtEitherEndpoint(
+          candidatePoints,
+          sourceDirection,
+          targetDirection
+        )
+      }) ??
+      detourExtentMax + 72
     const firstDetourLanePoint =
       detourAxis === 'x'
         ? { x: resolvedDetourLaneValue, y: sourceStub.y }
@@ -3296,11 +3504,7 @@ const buildFlowchartOrthogonalRoute = ({
       targetPoint
     ])
   }
-  const resolvedLaneValue =
-    route?.orthogonalLane?.axis === laneAxis &&
-    Number.isFinite(Number(route?.orthogonalLane?.value))
-      ? laneValue
-      : collectFlowchartLaneCandidateValues({
+  const laneCandidates = collectFlowchartLaneCandidateValues({
           axis: laneAxis,
           sourcePoint,
           targetPoint,
@@ -3309,7 +3513,22 @@ const buildFlowchartOrthogonalRoute = ({
           desiredLane: laneValue,
           obstacles,
           ignoredNodeIds
-        }).find(candidateLaneValue => {
+        })
+  const resolvedLaneValue =
+    route?.orthogonalLane?.axis === laneAxis &&
+    Number.isFinite(Number(route?.orthogonalLane?.value))
+      ? laneValue
+      : laneCandidates.find(candidateLaneValue => {
+          const candidatePoints = buildRoutePointsForLaneValue(candidateLaneValue)
+          if (
+            doesFlowchartPathBacktrackAtEitherEndpoint(
+              candidatePoints,
+              sourceDirection,
+              targetDirection
+            )
+          ) {
+            return false
+          }
           if (
             !isFlowchartLaneValueForwardFromStubs({
               axis: laneAxis,
@@ -3323,12 +3542,31 @@ const buildFlowchartOrthogonalRoute = ({
             return false
           }
           return !doesFlowchartPolylineIntersectObstacles(
-            buildRoutePointsForLaneValue(candidateLaneValue),
+            candidatePoints,
             obstacles,
             ignoredNodeIds,
             0
           )
-        }) ?? laneValue
+        }) ??
+        laneCandidates.find(candidateLaneValue => {
+          const candidatePoints = buildRoutePointsForLaneValue(candidateLaneValue)
+          return (
+            !doesFlowchartPathBacktrackAtEitherEndpoint(
+              candidatePoints,
+              sourceDirection,
+              targetDirection
+            ) &&
+            isFlowchartLaneValueForwardFromStubs({
+              axis: laneAxis,
+              laneValue: candidateLaneValue,
+              sourceStub,
+              targetStub,
+              sourceDirection,
+              targetDirection
+            })
+          )
+        }) ??
+        laneValue
   const firstLanePoint =
     laneAxis === 'x'
       ? { x: resolvedLaneValue, y: sourceStub.y }
@@ -3377,7 +3615,11 @@ const createTemplateAxisClusters = (values, threshold) => {
   }
   return numericValues.reduce((clusters, value) => {
     const lastCluster = clusters[clusters.length - 1]
-    if (!lastCluster || value - lastCluster.max > threshold) {
+    if (
+      !lastCluster ||
+      value - lastCluster.max > threshold ||
+      value - lastCluster.min > threshold
+    ) {
       clusters.push({
         min: value,
         max: value,
@@ -3902,6 +4144,54 @@ const alignTemplateMergeNodes = templateData => {
   })
 }
 
+const resolveTemplateNodeOverlaps = templateData => {
+  const nodes = Array.isArray(templateData?.nodes) ? templateData.nodes : []
+  if (nodes.length < 2) {
+    return
+  }
+  const horizontalGap = 24
+  const verticalGap = 24
+  for (let pass = 0; pass < 4; pass += 1) {
+    let hasAdjustment = false
+    const sortedNodes = [...nodes].sort((firstNode, secondNode) => {
+      return (
+        Number(firstNode.y || 0) - Number(secondNode.y || 0) ||
+        Number(firstNode.x || 0) - Number(secondNode.x || 0)
+      )
+    })
+    for (let index = 0; index < sortedNodes.length; index += 1) {
+      const currentNode = sortedNodes[index]
+      for (let nextIndex = index + 1; nextIndex < sortedNodes.length; nextIndex += 1) {
+        const nextNode = sortedNodes[nextIndex]
+        const overlapX =
+          Math.min(
+            Number(currentNode.x || 0) + Number(currentNode.width || 0),
+            Number(nextNode.x || 0) + Number(nextNode.width || 0)
+          ) - Math.max(Number(currentNode.x || 0), Number(nextNode.x || 0))
+        const overlapY =
+          Math.min(
+            Number(currentNode.y || 0) + Number(currentNode.height || 0),
+            Number(nextNode.y || 0) + Number(nextNode.height || 0)
+          ) - Math.max(Number(currentNode.y || 0), Number(nextNode.y || 0))
+        if (overlapX <= 0.001 || overlapY <= 0.001) {
+          continue
+        }
+        const currentCenter = getNodeCenter(currentNode)
+        const nextCenter = getNodeCenter(nextNode)
+        if (Math.abs(nextCenter.x - currentCenter.x) >= Math.abs(nextCenter.y - currentCenter.y)) {
+          nextNode.x = snapTemplateCoordinate(Number(nextNode.x || 0) + overlapX + horizontalGap)
+        } else {
+          nextNode.y = snapTemplateCoordinate(Number(nextNode.y || 0) + overlapY + verticalGap)
+        }
+        hasAdjustment = true
+      }
+    }
+    if (!hasAdjustment) {
+      break
+    }
+  }
+}
+
 const getStyleColor = (value, fallback) => {
   const color = String(value || '').trim()
   return color || fallback
@@ -4136,6 +4426,34 @@ const getFlowchartPresetAnchorPoint = (node, anchor) => {
   const y = Number(node?.y || 0)
   const width = Number(node?.width || 0)
   const height = Number(node?.height || 0)
+  const handleKey = String(resolvedAnchor.handleKey || resolvedAnchor.direction || '').trim()
+  if (node?.type === 'input') {
+    const offset = Math.max(width * 0.12, 16)
+    if (handleKey === 'top') {
+      return {
+        x: x + (offset + width) / 2,
+        y
+      }
+    }
+    if (handleKey === 'right') {
+      return {
+        x: x + width - offset / 2,
+        y: y + height / 2
+      }
+    }
+    if (handleKey === 'bottom') {
+      return {
+        x: x + (width - offset) / 2,
+        y: y + height
+      }
+    }
+    if (handleKey === 'left') {
+      return {
+        x: x + offset / 2,
+        y: y + height / 2
+      }
+    }
+  }
   return {
     x: x + width * Number(resolvedAnchor.xRatio || 0),
     y: y + height * Number(resolvedAnchor.yRatio || 0)
@@ -4892,19 +5210,11 @@ export const normalizeFlowchartAiResult = result => {
 
 export const getFlowchartExportBounds = (
   flowchartData,
-  { paddingX = 120, paddingY = 120 } = {}
+  { paddingX = 120, paddingY = 120, edgeLayouts = [] } = {}
 ) => {
   const nodes = Array.isArray(flowchartData?.nodes) ? flowchartData.nodes : []
   const lanes = Array.isArray(flowchartData?.lanes) ? flowchartData.lanes : []
   const items = [...lanes, ...nodes]
-  if (!items.length) {
-    return {
-      x: 0,
-      y: 0,
-      width: 1200,
-      height: 720
-    }
-  }
   const bounds = items.reduce(
     (result, item) => ({
       minX: Math.min(result.minX, Number(item.x || 0)),
@@ -4925,6 +5235,70 @@ export const getFlowchartExportBounds = (
       maxY: -Infinity
     }
   )
+  let hasContent = items.length > 0
+  const extendBoundsWithPoint = point => {
+    const x = Number(point?.x)
+    const y = Number(point?.y)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return
+    }
+    bounds.minX = Math.min(bounds.minX, x)
+    bounds.minY = Math.min(bounds.minY, y)
+    bounds.maxX = Math.max(bounds.maxX, x)
+    bounds.maxY = Math.max(bounds.maxY, y)
+    hasContent = true
+  }
+  const extendBoundsWithRect = rect => {
+    const x = Number(rect?.x)
+    const y = Number(rect?.y)
+    const width = Number(rect?.width)
+    const height = Number(rect?.height)
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      return
+    }
+    bounds.minX = Math.min(bounds.minX, x)
+    bounds.minY = Math.min(bounds.minY, y)
+    bounds.maxX = Math.max(bounds.maxX, x + width)
+    bounds.maxY = Math.max(bounds.maxY, y + height)
+    hasContent = true
+  }
+  edgeLayouts.forEach(entry => {
+    const edge = entry?.edge || entry
+    const layout = entry?.layout || entry
+    ;(Array.isArray(layout?.pathPoints) ? layout.pathPoints : []).forEach(
+      extendBoundsWithPoint
+    )
+    ;(Array.isArray(layout?.arrowMarkers) ? layout.arrowMarkers : []).forEach(marker => {
+      const arrowReach = Math.max(6, Number(marker?.size || 1) * 6)
+      extendBoundsWithRect({
+        x: Number(marker?.x || 0) - arrowReach,
+        y: Number(marker?.y || 0) - arrowReach,
+        width: arrowReach * 2,
+        height: arrowReach * 2
+      })
+    })
+    if (edge?.label) {
+      extendBoundsWithRect(
+        getFlowchartEdgeLabelBox({
+          ...layout,
+          edge
+        })
+      )
+    }
+  })
+  if (!hasContent) {
+    return {
+      x: 0,
+      y: 0,
+      width: 1200,
+      height: 720
+    }
+  }
   return {
     x: Math.floor(bounds.minX - paddingX),
     y: Math.floor(bounds.minY - paddingY),
@@ -4953,10 +5327,6 @@ export const buildFlowchartSvgMarkup = (
     normalizedData.templateId,
     { isDark }
   )
-  const bounds = getFlowchartExportBounds(normalizedData, {
-    paddingX,
-    paddingY
-  })
   const edgeItems = normalizedData.edges
     .map(edge => {
       const sourceNode = normalizedData.nodes.find(node => node.id === edge.source)
@@ -4972,6 +5342,11 @@ export const buildFlowchartSvgMarkup = (
       }
     })
     .filter(Boolean)
+  const bounds = getFlowchartExportBounds(normalizedData, {
+    paddingX,
+    paddingY,
+    edgeLayouts: edgeItems
+  })
   const backgroundStyle = normalizeFlowchartBackgroundStyle(
     normalizedConfig.backgroundStyle
   )
@@ -5032,8 +5407,8 @@ export const buildFlowchartSvgMarkup = (
       })}<text x="${
         Number(node.x || 0) + Number(node.width || 0) / 2
       }" y="${
-        Number(node.y || 0) + Number(node.height || 0) / 2 + 5
-      }" font-size="16" fill="${escapeXml(visualStyle.textColor)}" text-anchor="middle">${escapeXml(node.text)}</text></g>`
+        Number(node.y || 0) + Number(node.height || 0) / 2
+      }" font-size="16" fill="${escapeXml(visualStyle.textColor)}" text-anchor="middle" dominant-baseline="middle">${escapeXml(node.text)}</text></g>`
     })
     .join('')
   const background = transparent
