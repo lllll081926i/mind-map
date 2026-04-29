@@ -35,7 +35,6 @@
 - `npm run build`
 - `node ./scripts/test-ai-provider.mjs`
 - Windows：`npm run desktop:build:windows`
-- macOS：`npm run desktop:build:macos`
 - Linux：`npm run desktop:build:linux`
 
 ## 产物检查
@@ -43,7 +42,6 @@
 - 安装包可生成
 - Windows 产出 `NSIS` 安装包
 - Windows ARM64 产出 `NSIS` 安装包与免安装版
-- macOS 产出 `app` / `dmg`
 - Linux 产出 `deb` / `AppImage`
 - 安装后可启动
 - 卸载流程正常

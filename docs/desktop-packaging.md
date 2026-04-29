@@ -5,7 +5,7 @@
 ## 当前打包基线
 
 - 桌面容器：`Tauri 2`
-- 正式主线：`Windows / macOS / Linux`
+- 正式主线：`Windows / Linux`
 - 当前宿主机：`Windows`
 - 当前默认安装目标：`NSIS`
 - 前端桌面构建输出：`dist-desktop`
@@ -40,7 +40,6 @@ npm run desktop:build
 
 ```bash
 npm run desktop:build:windows
-npm run desktop:build:macos
 npm run desktop:build:linux
 ```
 
@@ -59,7 +58,7 @@ npm run desktop:build:linux
 - 前端打包前置命令：`npm run frontend:build`
 - 默认 `desktop:build` 仅在 Windows 上构建 `NSIS`
   - 这样不会触发 WiX / MSI 下载链路
-  - macOS 和 Linux 通过各自脚本在对应宿主机构建
+  - Linux 通过对应宿主机构建
 
 ## 打包前检查
 
