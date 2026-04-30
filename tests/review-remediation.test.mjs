@@ -2,6 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  decodeAiConfigFromStorage,
+  encodeAiConfigForStorage,
+  normalizeAiConfig
+} from '../src/utils/aiProviders.mjs'
 
 const packageJsonPath = path.resolve('package.json')
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
@@ -224,6 +229,14 @@ const htmlExportSourcePath = path.resolve('src/services/htmlExport.js')
 const htmlExportSource = fs.existsSync(htmlExportSourcePath)
   ? fs.readFileSync(htmlExportSourcePath, 'utf8')
   : ''
+const localConfigStorageSource = fs.readFileSync(
+  path.resolve('src/services/localConfigStorage.js'),
+  'utf8'
+)
+const platformIndexSource = fs.readFileSync(
+  path.resolve('src/platform/index.js'),
+  'utf8'
+)
 const zhCnSource = fs.readFileSync(path.resolve('src/config/zh.js'), 'utf8')
 const tauriRecoverySource = fs.existsSync(tauriRecoverySourcePath)
   ? fs.readFileSync(tauriRecoverySourcePath, 'utf8')
@@ -344,6 +357,7 @@ test('备注浮层卸载时按真实父节点安全移除 DOM，避免返回首�
 })
 
 test('文档会话同步 bootstrap 状态时会兜底捕获持久化异常', () => {
+  assert.match(documentSessionSource, /export const createDesktopFsError = error =>/)
   assert.match(documentSessionSource, /syncBootstrapState failed/)
   assert.match(documentSessionSource, /let bootstrapSyncQueue = Promise\.resolve\(\)/)
   assert.match(documentSessionSource, /bootstrapSyncQueue = bootstrapSyncQueue/)
@@ -763,4 +777,27 @@ test('HTML 导出服务会转义内联脚本中的 SVG 字符串并避免直接 
   assert.equal(htmlExportSource.includes("parseFromString(\n          svgMarkup,\n          'image/svg+xml'"), true)
   assert.equal(htmlExportSource.includes('canvas.replaceChildren('), true)
   assert.doesNotMatch(htmlExportSource, /canvas\.innerHTML\s*=/)
+})
+
+test('AI 配置持久化前会对 key 做 Base64 包装，并在读取时自动解码', () => {
+  const rawConfig = {
+    provider: 'openai',
+    key: 'sk-demo-secret',
+    model: 'gpt-test'
+  }
+  const encoded = encodeAiConfigForStorage(rawConfig)
+  const decoded = decodeAiConfigFromStorage(encoded)
+  const normalized = normalizeAiConfig(encoded)
+
+  assert.notEqual(encoded.key, rawConfig.key)
+  assert.match(String(encoded.key || ''), /^b64:/)
+  assert.equal(decoded.key, rawConfig.key)
+  assert.equal(normalized.key, rawConfig.key)
+})
+
+test('本地配置存储层会对 AI key 编码后写入，并在读取时解码', () => {
+  assert.match(localConfigStorageSource, /encodeAiConfigForStorage\(/)
+  assert.match(localConfigStorageSource, /decodeAiConfigFromStorage\(/)
+  assert.match(platformIndexSource, /serializeBootstrapSnapshot/)
+  assert.match(platformIndexSource, /encodeAiConfigForStorage\(/)
 })

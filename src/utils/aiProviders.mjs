@@ -31,6 +31,7 @@ const DEFAULT_METHOD = 'POST'
 const DEFAULT_PROTOCOL = 'openai-compatible'
 const DEFAULT_PROVIDER = 'volcanoArk'
 export const AI_PROXY_AUTH_HEADER_NAME = 'x-ai-proxy-token'
+const AI_STORAGE_KEY_PREFIX = 'b64:'
 
 export const AI_PROVIDER_LIST = [
   {
@@ -91,6 +92,66 @@ export const AI_CONFIG_KEYS = [
   'port',
   'method'
 ]
+
+/** @param {unknown} value */
+const encodeBase64Utf8 = value => {
+  const normalized = String(value || '')
+  if (!normalized) return ''
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(normalized, 'utf8').toString('base64')
+  }
+  if (typeof btoa === 'function') {
+    return btoa(unescape(encodeURIComponent(normalized)))
+  }
+  return normalized
+}
+
+/** @param {unknown} value */
+const decodeBase64Utf8 = value => {
+  const normalized = String(value || '')
+  if (!normalized) return ''
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(normalized, 'base64').toString('utf8')
+  }
+  if (typeof atob === 'function') {
+    return decodeURIComponent(escape(atob(normalized)))
+  }
+  return normalized
+}
+
+/** @param {unknown} value */
+const decodeStoredAiKey = value => {
+  const normalized = String(value || '')
+  if (!normalized.startsWith(AI_STORAGE_KEY_PREFIX)) {
+    return normalized
+  }
+  const payload = normalized.slice(AI_STORAGE_KEY_PREFIX.length)
+  if (!payload) {
+    return ''
+  }
+  try {
+    return decodeBase64Utf8(payload)
+  } catch (_error) {
+    return normalized
+  }
+}
+
+/** @param {Record<string, unknown> | null | undefined} config */
+export const encodeAiConfigForStorage = config => {
+  const nextConfig = config && typeof config === 'object' ? { ...config } : {}
+  const decodedKey = decodeStoredAiKey(nextConfig.key)
+  nextConfig.key = decodedKey
+    ? `${AI_STORAGE_KEY_PREFIX}${encodeBase64Utf8(decodedKey)}`
+    : ''
+  return nextConfig
+}
+
+/** @param {Record<string, unknown> | null | undefined} config */
+export const decodeAiConfigFromStorage = config => {
+  const nextConfig = config && typeof config === 'object' ? { ...config } : {}
+  nextConfig.key = decodeStoredAiKey(nextConfig.key)
+  return nextConfig
+}
 
 /** @param {Record<string, unknown>} [input] */
 export const separateAppAndAiConfig = input => {
@@ -244,7 +305,7 @@ export const getDefaultAiConfig = provider => {
 
 /** @param {Record<string, unknown> | null | undefined} config */
 export const normalizeAiConfig = config => {
-  const input = config || {}
+  const input = decodeAiConfigFromStorage(config)
   const meta = getAiProviderMeta(input.provider || detectProviderByApi(input.api))
   const defaults = getDefaultAiConfig(meta.value)
   const legacyApi = parseLegacyApi(input.api)

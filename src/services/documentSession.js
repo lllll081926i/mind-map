@@ -137,6 +137,12 @@ export const getLastDirectory = () => {
   return getWorkspaceMetaState().lastDirectory || ''
 }
 
+export const createI18nError = (message, i18nKey) => {
+  const error = new Error(message)
+  error.i18nKey = i18nKey
+  return error
+}
+
 export const createDesktopFsError = error => {
   const fallbackMessage = '文件操作失败'
   if (!error) {
@@ -156,19 +162,22 @@ export const createDesktopFsError = error => {
   if (/not found|系统找不到指定的文件|找不到/.test(normalizedMessage)) {
     return {
       code: 'FILE_NOT_FOUND',
-      message: '文件不存在或已被移动'
+      message: '文件不存在或已被移动',
+      i18nKey: 'errors.fileNotFound'
     }
   }
   if (/permission|denied|拒绝访问|权限/.test(normalizedMessage)) {
     return {
       code: 'PERMISSION_DENIED',
-      message: '当前没有权限访问该文件'
+      message: '当前没有权限访问该文件',
+      i18nKey: 'errors.permissionDenied'
     }
   }
   if (/json|unexpected token|parse/i.test(normalizedMessage)) {
     return {
       code: 'INVALID_JSON',
-      message: '文件内容不是有效的思维导图数据'
+      message: '文件内容不是有效的思维导图数据',
+      i18nKey: 'errors.invalidMindMapData'
     }
   }
   return {

@@ -832,7 +832,11 @@ const zh = {
     "exportFailed": "导出失败",
     "previewInitFailed": "导出预览初始化失败",
     "previewContainerMissing": "未找到导出预览容器",
+    "previewContainerNotReady": "导出预览容器尺寸尚未就绪",
     "fallbackFileName": "思维导图",
+    "fileTypeJpg": "JPG 文件",
+    "fileTypePng": "PNG 文件",
+    "fileTypeSvg": "SVG 文件",
     "statusDocumentLabel": "来源文档",
     "statusTargetLabel": "导出目标",
     "fallbackFormat": {
@@ -856,6 +860,17 @@ const zh = {
   },
   "structure": {
     "title": "结构"
+  },
+  "errors": {
+    "fileOperationFailed": "文件操作失败",
+    "fileNotFound": "文件不存在或已被移动",
+    "permissionDenied": "当前没有权限访问该文件",
+    "invalidMindMapData": "文件内容不是有效的思维导图数据",
+    "invalidProjectData": "文件内容不是有效的项目数据",
+    "invalidFlowchartData": "AI 返回的流程图数据无效",
+    "unnamedNode": "未命名节点",
+    "updateManifestInvalid": "更新清单格式无效",
+    "githubReleaseInvalid": "GitHub Release 数据格式无效"
   }
 }
 

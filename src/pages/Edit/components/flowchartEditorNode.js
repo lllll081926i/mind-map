@@ -18,26 +18,92 @@ export const flowchartNodeMethods = {
   },
 
   getNodePlacementPoint(type = 'process', worldPoint = null) {
+    const resolvePoint = point => {
+      return this.findAvailableNodePlacementPoint(type, point)
+    }
     if (
       Number.isFinite(Number(worldPoint?.x)) &&
       Number.isFinite(Number(worldPoint?.y))
     ) {
-      return {
+      return resolvePoint({
         x: Number(worldPoint.x),
         y: Number(worldPoint.y)
-      }
+      })
     }
     if (this.selectedNodeIds.length === 1) {
       const sourceNode = this.getNodeById(this.selectedNodeIds[0])
       if (sourceNode) {
         const size = this.getDefaultNodeSizeByType(type)
-        return {
+        return resolvePoint({
           x: Number(sourceNode.x || 0) + Number(sourceNode.width || 0) + size.width / 2 + 96,
           y: Number(sourceNode.y || 0) + Number(sourceNode.height || 0) / 2
-        }
+        })
       }
     }
-    return this.getViewportCenterWorldPoint()
+    return resolvePoint(this.getViewportCenterWorldPoint())
+  },
+
+  getPlacementRectFromCenter(centerPoint, size) {
+    return {
+      x: Number(centerPoint.x || 0) - size.width / 2,
+      y: Number(centerPoint.y || 0) - size.height / 2,
+      width: size.width,
+      height: size.height
+    }
+  },
+
+  isFlowchartPlacementOccupied(rect, gap = 24) {
+    return (this.flowchartData.nodes || []).some(node => {
+      const nodeRect = {
+        x: Number(node.x || 0),
+        y: Number(node.y || 0),
+        width: Number(node.width || 0),
+        height: Number(node.height || 0)
+      }
+      return !(
+        rect.x + rect.width + gap <= nodeRect.x ||
+        rect.x >= nodeRect.x + nodeRect.width + gap ||
+        rect.y + rect.height + gap <= nodeRect.y ||
+        rect.y >= nodeRect.y + nodeRect.height + gap
+      )
+    })
+  },
+
+  findAvailableNodePlacementPoint(type = 'process', preferredPoint = null) {
+    const size = this.getDefaultNodeSizeByType(type)
+    const origin = {
+      x: Number(preferredPoint?.x || 0),
+      y: Number(preferredPoint?.y || 0)
+    }
+    const isAvailable = point => {
+      const rect = this.getPlacementRectFromCenter(point, size)
+      return !this.isFlowchartPlacementOccupied(rect)
+    }
+    if (isAvailable(origin)) {
+      return origin
+    }
+    const stepX = Math.max(size.width + 96, 220)
+    const stepY = Math.max(size.height + 72, 144)
+    for (let ring = 1; ring <= 8; ring++) {
+      const candidates = [
+        { x: origin.x + stepX * ring, y: origin.y },
+        { x: origin.x, y: origin.y + stepY * ring },
+        { x: origin.x + stepX * ring, y: origin.y + stepY * ring },
+        { x: origin.x - stepX * ring, y: origin.y },
+        { x: origin.x, y: origin.y - stepY * ring },
+        { x: origin.x - stepX * ring, y: origin.y + stepY * ring },
+        { x: origin.x + stepX * ring, y: origin.y - stepY * ring },
+        { x: origin.x - stepX * ring, y: origin.y - stepY * ring }
+      ]
+      const availablePoint = candidates.find(isAvailable)
+      if (availablePoint) {
+        return availablePoint
+      }
+    }
+    return {
+      x: origin.x + stepX,
+      y: origin.y
+    }
   },
 
   normalizeAddNodePayload(payload = 'process') {

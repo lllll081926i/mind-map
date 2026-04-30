@@ -1,5 +1,9 @@
 import { getBootstrapState, saveBootstrapStatePatch } from '@/platform'
-import { separateAppAndAiConfig } from '@/utils/aiProviders.mjs'
+import {
+  decodeAiConfigFromStorage,
+  encodeAiConfigForStorage,
+  separateAppAndAiConfig
+} from '@/utils/aiProviders.mjs'
 
 export const persistLocalConfig = config => {
   const state = getBootstrapState()
@@ -9,17 +13,18 @@ export const persistLocalConfig = config => {
       ...state.localConfig,
       ...localConfig
     },
-    aiConfig: {
+    aiConfig: encodeAiConfigForStorage({
       ...state.aiConfig,
       ...aiConfig
-    }
+    })
   })
 }
 
 export const loadLocalConfig = () => {
   const state = getBootstrapState()
+  const aiConfig = decodeAiConfigFromStorage(state.aiConfig)
   return {
     ...state.localConfig,
-    ...state.aiConfig
+    ...aiConfig
   }
 }

@@ -7,14 +7,14 @@ const normalizeSvgMarkup = svgMarkup => {
 const stripUnsafeSvgMarkupFallback = svgMarkup => {
   return String(svgMarkup || '')
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/\s+on[a-z-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '')
+    .replace(/\s+on[a-z-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(
       /\s+(href|xlink:href)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi,
       ''
     )
 }
 
-const sanitizeSvgMarkup = svgMarkup => {
+export const sanitizeSvgMarkup = svgMarkup => {
   const normalizedSvgMarkup = normalizeSvgMarkup(svgMarkup)
   if (!normalizedSvgMarkup) {
     return ''
@@ -66,8 +66,10 @@ const serializeForInlineScript = value => {
   return JSON.stringify(String(value || '')).replace(/</g, '\\u003c')
 }
 
+const DEFAULT_HTML_EXPORT_TITLE = '思维导图'
+
 const normalizeDocumentTitle = fileName => {
-  return String(fileName || '思维导图')
+  return String(fileName || DEFAULT_HTML_EXPORT_TITLE)
     .trim()
     .replace(/[<>&]/g, '')
 }
@@ -109,7 +111,7 @@ export const buildMindMapHtmlDocument = ({ fileName, svgMarkup } = {}) => {
       }
 
       body {
-        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+        font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
       }
 
       .html-export-shell,
@@ -293,6 +295,21 @@ export const buildMindMapHtmlDocument = ({ fileName, svgMarkup } = {}) => {
         window.addEventListener('mousemove', onPointerMove)
         window.addEventListener('mouseup', onPointerUp)
         window.addEventListener('mouseleave', onPointerUp)
+        viewport.addEventListener('touchstart', function (event) {
+          if (event.touches.length === 1) {
+            var touch = event.touches[0]
+            onPointerDown({ button: 0, clientX: touch.clientX, clientY: touch.clientY, preventDefault: function () { event.preventDefault() } })
+          }
+        }, { passive: false })
+        window.addEventListener('touchmove', function (event) {
+          if (event.touches.length === 1 && dragState.active) {
+            var touch = event.touches[0]
+            onPointerMove({ clientX: touch.clientX, clientY: touch.clientY })
+            event.preventDefault()
+          }
+        }, { passive: false })
+        window.addEventListener('touchend', onPointerUp)
+        window.addEventListener('touchcancel', onPointerUp)
         viewport.addEventListener('wheel', onWheel, { passive: false })
         window.addEventListener('resize', fitToViewport)
 

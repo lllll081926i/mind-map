@@ -112,6 +112,13 @@ test('流程图文档服务存在并暴露核心能力', () => {
   assert.match(source, /export\s+const\s+buildFlowchartSvgMarkup/)
 })
 
+test('流程图 SVG 导出会在返回前执行安全清理', () => {
+  const source = fs.readFileSync(flowchartDocumentPath, 'utf8')
+
+  assert.match(source, /sanitizeFlowchartSvgMarkup/)
+  assert.match(source, /return sanitizeFlowchartSvgMarkup\(/)
+})
+
 test('流程图文档模型包含节点、连线、视口和模板字段', () => {
   const source = fs.readFileSync(flowchartDocumentPath, 'utf8')
 

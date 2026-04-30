@@ -47,7 +47,9 @@ export const compareVersions = (currentVersion, targetVersion) => {
 
 export const parseUpdateManifest = (data, fallbackUrl = '') => {
   if (!data || typeof data !== 'object' || !data.version) {
-    throw new Error('更新清单格式无效')
+    const error = new Error('更新清单格式无效')
+    error.i18nKey = 'errors.updateManifestInvalid'
+    throw error
   }
 
   return {
@@ -59,7 +61,9 @@ export const parseUpdateManifest = (data, fallbackUrl = '') => {
 
 export const parseGitHubLatestRelease = (data, fallbackUrl = '') => {
   if (!data || typeof data !== 'object' || !data.tag_name) {
-    throw new Error('GitHub Release 数据格式无效')
+    const error = new Error('GitHub Release 数据格式无效')
+    error.i18nKey = 'errors.githubReleaseInvalid'
+    throw error
   }
 
   return {

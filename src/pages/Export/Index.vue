@@ -17,6 +17,7 @@
               class="formatNavItem"
               :aria-pressed="exportState.exportType === item.type"
               :aria-label="item.displayName"
+              :title="item.disabled ? $t('exportPage.upcoming') : item.displayName"
               :class="{
                 active: exportState.exportType === item.type,
                 disabled: item.disabled
@@ -148,11 +149,12 @@ import { getConfig, getData } from '@/api'
 import platform, { ensureBootstrapDocumentState, getBootstrapState } from '@/platform'
 import { getCurrentFileRef, getLastDirectory } from '@/services/documentSession'
 import {
+  DEFAULT_FLOWCHART_TITLE,
   buildFlowchartSvgMarkup,
   createDefaultFlowchartData,
   getFlowchartExportBounds
 } from '@/services/flowchartDocument'
-import { buildMindMapHtmlDocument } from '@/services/htmlExport'
+import { buildMindMapHtmlDocument, sanitizeSvgMarkup } from '@/services/htmlExport'
 import { createWorkspaceTemplateData } from '@/services/workspaceActions'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
@@ -203,7 +205,7 @@ const createFallbackExportFormat = t => ({
 
 const createFallbackData = () => createWorkspaceTemplateData()
 
-const createFallbackFlowchartData = () => createDefaultFlowchartData('流程图')
+const createFallbackFlowchartData = () => createDefaultFlowchartData(DEFAULT_FLOWCHART_TITLE)
 
 const normalizeMindMapData = data => {
   if (
@@ -356,6 +358,7 @@ export default {
       exportContext,
       exportState,
       boundPreviewResize: null,
+      boundExportKeydown: null,
       previewResizeFrame: 0,
       exportWarmupTimer: 0
     }
@@ -518,12 +521,14 @@ export default {
   },
   async mounted() {
     this.bindPreviewResize()
+    this.bindExportKeydown()
     this.ensureExportTypeForMode()
     this.scheduleExportWarmup()
     await ensureBootstrapDocumentState()
     await this.initPreview()
   },
   beforeUnmount() {
+    this.unbindExportKeydown()
     this.unbindPreviewResize()
     this.clearPreviewResizeFrame()
     this.clearExportWarmupTask()
@@ -561,7 +566,7 @@ export default {
       if (!this.$refs.previewRef) {
         throw new Error(this.$t('exportPage.previewContainerMissing'))
       }
-      throw new Error('导出预览容器尺寸尚未就绪')
+      throw new Error(this.$t('exportPage.previewContainerNotReady'))
     },
 
     async onMaskClick() {
@@ -602,6 +607,27 @@ export default {
           console.warn('scheduleExportWarmup failed', error)
         })
       }, 120)
+    },
+
+    bindExportKeydown() {
+      if (typeof window === 'undefined' || this.boundExportKeydown) {
+        return
+      }
+      this.boundExportKeydown = event => {
+        if (event.key === 'Escape' && !this.exporting) {
+          event.preventDefault()
+          this.goEdit()
+        }
+      }
+      window.addEventListener('keydown', this.boundExportKeydown)
+    },
+
+    unbindExportKeydown() {
+      if (typeof window === 'undefined' || !this.boundExportKeydown) {
+        return
+      }
+      window.removeEventListener('keydown', this.boundExportKeydown)
+      this.boundExportKeydown = null
     },
 
     unbindPreviewResize() {
@@ -735,7 +761,9 @@ export default {
         this.syncPreviewViewport()
       } catch (error) {
         console.error('init export preview failed', error)
-        this.$message.error(this.$t('exportPage.previewInitFailed'))
+        this.$message.error(
+          error?.i18nKey ? this.$t(error.i18nKey) : this.$t('exportPage.previewInitFailed')
+        )
       } finally {
         this.previewLoading = false
       }
@@ -771,7 +799,23 @@ export default {
         paddingX: this.exportState.paddingX,
         paddingY: this.exportState.paddingY
       })
-      previewEl.innerHTML = this.flowchartPreviewMarkup
+      this.renderFlowchartPreviewSvg(previewEl, this.flowchartPreviewMarkup)
+    },
+
+    renderFlowchartPreviewSvg(previewEl, svgMarkup) {
+      const safeSvgMarkup = sanitizeSvgMarkup(svgMarkup)
+      const svgDocument = new DOMParser().parseFromString(
+        safeSvgMarkup,
+        'image/svg+xml'
+      )
+      const svgElement = svgDocument.documentElement
+      if (
+        svgDocument.querySelector('parsererror') ||
+        svgElement?.nodeName?.toLowerCase() !== 'svg'
+      ) {
+        throw new Error(this.$t('exportPage.previewInitFailed'))
+      }
+      previewEl.replaceChildren(document.importNode(svgElement, true))
     },
 
     loadImage(url) {
@@ -845,7 +889,7 @@ export default {
         content: await blob.arrayBuffer(),
         defaultPath: this.currentDocument?.path || '',
         extension,
-        name: extension === 'jpg' ? 'JPG 文件' : 'PNG 文件',
+        name: extension === 'jpg' ? this.$t('exportPage.fileTypeJpg') : this.$t('exportPage.fileTypePng'),
         mimeType
       })
     },
@@ -866,7 +910,7 @@ export default {
           content: svgMarkup,
           defaultPath: this.currentDocument?.path || '',
           extension: 'svg',
-          name: 'SVG 文件',
+          name: this.$t('exportPage.fileTypeSvg'),
           mimeType: 'image/svg+xml;charset=utf-8'
         })
         return
@@ -991,7 +1035,9 @@ export default {
         })
       } catch (error) {
         console.error('export failed', error)
-        this.$message.error(error?.message || this.$t('exportPage.exportFailed'))
+        this.$message.error(
+          error?.i18nKey ? this.$t(error.i18nKey) : (error?.message || this.$t('exportPage.exportFailed'))
+        )
       } finally {
         this.exporting = false
       }

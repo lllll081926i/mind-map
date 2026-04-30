@@ -7,6 +7,7 @@ import {
   normalizeBootstrapState
 } from './shared/configMigration'
 import { upsertRecentFile } from './shared/recentFiles'
+import { encodeAiConfigForStorage } from '@/utils/aiProviders.mjs'
 
 const getPlatform = () => {
   return desktopPlatform
@@ -39,13 +40,22 @@ const readBrowserBootstrapSnapshot = (storageKey, normalizer) => {
   }
 }
 
+const serializeBootstrapSnapshot = snapshot => {
+  const nextSnapshot =
+    snapshot && typeof snapshot === 'object' ? { ...snapshot } : {}
+  if (nextSnapshot.aiConfig && typeof nextSnapshot.aiConfig === 'object') {
+    nextSnapshot.aiConfig = encodeAiConfigForStorage(nextSnapshot.aiConfig)
+  }
+  return nextSnapshot
+}
+
 const writeBrowserBootstrapSnapshot = (storageKey, snapshot) => {
   const storage = getBrowserStorage()
   if (!storage) {
     return
   }
   try {
-    storage.setItem(storageKey, JSON.stringify(snapshot || {}))
+    storage.setItem(storageKey, JSON.stringify(serializeBootstrapSnapshot(snapshot)))
   } catch (error) {
     console.error(`write browser bootstrap snapshot failed: ${storageKey}`, error)
   }
@@ -68,6 +78,20 @@ let metaWriteQueue = Promise.resolve()
 let documentWriteQueue = Promise.resolve()
 let metaMutationVersion = 0
 let documentMutationVersion = 0
+
+const WRITE_TIMEOUT_MS = 10000
+
+const withWriteTimeout = (promise, label) => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${WRITE_TIMEOUT_MS}ms`))
+    }, WRITE_TIMEOUT_MS)
+    promise.then(
+      value => { clearTimeout(timer); resolve(value) },
+      error => { clearTimeout(timer); reject(error) }
+    )
+  })
+}
 
 const BOOTSTRAP_META_KEYS = [
   'version',
@@ -143,7 +167,10 @@ const queueMetaWrite = snapshot => {
       return undefined
     })
     .then(async () => {
-      await platform.writeBootstrapMetaState(snapshot)
+      await withWriteTimeout(
+        platform.writeBootstrapMetaState(serializeBootstrapSnapshot(snapshot)),
+        'queueMetaWrite'
+      )
       return snapshot
     })
   return metaWriteQueue
@@ -160,7 +187,10 @@ const queueDocumentWrite = snapshot => {
       return undefined
     })
     .then(async () => {
-      await platform.writeBootstrapDocumentState(snapshot)
+      await withWriteTimeout(
+        platform.writeBootstrapDocumentState(snapshot),
+        'queueDocumentWrite'
+      )
       return snapshot
     })
   return documentWriteQueue

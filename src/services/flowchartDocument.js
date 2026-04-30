@@ -1,9 +1,16 @@
 import { parseExternalJsonSafely } from '@/utils/json'
 
+const createI18nError = (message, i18nKey) => {
+  const error = new Error(message)
+  error.i18nKey = i18nKey
+  return error
+}
+
 export const FLOWCHART_DOCUMENT_MODE = 'flowchart'
 export const MINDMAP_DOCUMENT_MODE = 'mindmap'
 export const FLOWCHART_DOCUMENT_VERSION = 1
 export const DEFAULT_FLOWCHART_TITLE = '流程图'
+export const DEFAULT_UNNAMED_NODE_TEXT = '未命名节点'
 
 export const FLOWCHART_NODE_TYPES = [
   { type: 'start', label: '开始' },
@@ -1336,6 +1343,64 @@ const escapeXml = value => {
     .replace(/"/g, '&quot;')
 }
 
+const sanitizeFlowchartSvgMarkup = svgMarkup => {
+  const normalizedSvgMarkup = String(svgMarkup || '')
+    .trim()
+    .replace(/<\?xml[\s\S]*?\?>/gi, '')
+  if (!normalizedSvgMarkup) {
+    return ''
+  }
+  const stripUnsafeSvgMarkup = markup => {
+    return String(markup || '')
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/\s+on[a-z-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(
+        /\s+(href|xlink:href)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi,
+        ''
+      )
+  }
+  if (
+    typeof DOMParser === 'undefined' ||
+    typeof XMLSerializer === 'undefined'
+  ) {
+    return stripUnsafeSvgMarkup(normalizedSvgMarkup)
+  }
+  try {
+    const svgDocument = new DOMParser().parseFromString(
+      normalizedSvgMarkup,
+      'image/svg+xml'
+    )
+    if (
+      svgDocument.querySelector('parsererror') ||
+      svgDocument.documentElement?.nodeName?.toLowerCase() !== 'svg'
+    ) {
+      return stripUnsafeSvgMarkup(normalizedSvgMarkup)
+    }
+    svgDocument.querySelectorAll('script').forEach(node => {
+      node.remove()
+    })
+    svgDocument.querySelectorAll('*').forEach(element => {
+      Array.from(element.attributes).forEach(attribute => {
+        const name = attribute.name.toLowerCase()
+        const value = String(attribute.value || '')
+        if (name.startsWith('on')) {
+          element.removeAttribute(attribute.name)
+          return
+        }
+        if (
+          (name === 'href' || name === 'xlink:href') &&
+          /^\s*javascript:/i.test(value)
+        ) {
+          element.removeAttribute(attribute.name)
+        }
+      })
+    })
+    return new XMLSerializer().serializeToString(svgDocument.documentElement)
+  } catch (_error) {
+    return stripUnsafeSvgMarkup(normalizedSvgMarkup)
+  }
+}
+
 const createSvgSafeId = value =>
   String(value || 'item').replace(/[^a-zA-Z0-9_-]/g, '-')
 
@@ -1352,7 +1417,7 @@ function createFlowchartNode({
   return {
     id: String(id || ''),
     type,
-    text: String(text || '').trim() || '未命名节点',
+    text: String(text || '').trim() || DEFAULT_UNNAMED_NODE_TEXT,
     x: Number.isFinite(Number(x)) ? Number(x) : 0,
     y: Number.isFinite(Number(y)) ? Number(y) : 0,
     width: Number.isFinite(Number(width)) ? Number(width) : 168,
@@ -5054,7 +5119,7 @@ export const parseStoredDocumentContent = content => {
   const parsed =
     typeof content === 'string' ? parseExternalJsonSafely(content) : content
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('文件内容不是有效的项目数据')
+    throw createI18nError('文件内容不是有效的项目数据', 'errors.invalidProjectData')
   }
   if (
     parsed.documentMode === FLOWCHART_DOCUMENT_MODE ||
@@ -5181,7 +5246,7 @@ export const normalizeFlowchartAiResult = result => {
         ? result
         : null
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('AI 返回的流程图数据无效')
+    throw createI18nError('AI 返回的流程图数据无效', 'errors.invalidFlowchartData')
   }
   const payload =
     parsed.flowchartData && typeof parsed.flowchartData === 'object'
@@ -5371,7 +5436,7 @@ export const buildFlowchartSvgMarkup = (
     .map(({ edge, layout }) => {
       const dash = layout.style.dashArray ? ` stroke-dasharray="${layout.style.dashArray}"` : ''
       const label = edge.label
-        ? `<text x="${layout.labelX}" y="${layout.labelY}" font-size="14" font-weight="700" fill="${escapeXml(layout.style.labelColor)}" stroke="${escapeXml(theme.canvasBg)}" stroke-width="4" paint-order="stroke" stroke-linejoin="round" text-anchor="middle" dominant-baseline="middle">${escapeXml(edge.label)}</text>`
+        ? `<text x="${layout.labelX}" y="${layout.labelY}" font-size="14" font-weight="700" font-family="&quot;Microsoft YaHei&quot;, &quot;PingFang SC&quot;, &quot;Noto Sans SC&quot;, sans-serif" fill="${escapeXml(layout.style.labelColor)}" stroke="${escapeXml(theme.canvasBg)}" stroke-width="4" paint-order="stroke" stroke-linejoin="round" text-anchor="middle" dominant-baseline="middle">${escapeXml(edge.label)}</text>`
         : ''
       return `<g><path d="${layout.path}" fill="none" stroke="${escapeXml(layout.style.stroke)}" stroke-width="2"${dash}/>${label}</g>`
     })
@@ -5408,7 +5473,7 @@ export const buildFlowchartSvgMarkup = (
         Number(node.x || 0) + Number(node.width || 0) / 2
       }" y="${
         Number(node.y || 0) + Number(node.height || 0) / 2
-      }" font-size="16" fill="${escapeXml(visualStyle.textColor)}" text-anchor="middle" dominant-baseline="middle">${escapeXml(node.text)}</text></g>`
+      }" font-size="16" font-family="&quot;Microsoft YaHei&quot;, &quot;PingFang SC&quot;, &quot;Noto Sans SC&quot;, sans-serif" fill="${escapeXml(visualStyle.textColor)}" text-anchor="middle" dominant-baseline="middle">${escapeXml(node.text)}</text></g>`
     })
     .join('')
   const background = transparent
@@ -5421,7 +5486,9 @@ export const buildFlowchartSvgMarkup = (
           : theme.canvasBg
       }"/>`
   const arrowLayer = arrows ? `<g class="flowchart-arrow-layer">${arrows}</g>` : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}"><defs>${backgroundPatternDefs}</defs>${background}${lanes}${edges}${nodes}${arrowLayer}</svg>`
+  return sanitizeFlowchartSvgMarkup(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}"><defs>${backgroundPatternDefs}</defs>${background}${lanes}${edges}${nodes}${arrowLayer}</svg>`
+  )
 }
 
 export const getFlowchartTemplateIds = () => Object.keys(FLOWCHART_TEMPLATES)

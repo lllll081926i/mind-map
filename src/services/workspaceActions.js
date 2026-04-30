@@ -72,7 +72,9 @@ export const parseStoredDocumentContent = content => {
   const parsed =
     typeof content === 'string' ? parseExternalJsonSafely(content) : content
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('文件内容不是有效的项目数据')
+    const error = new Error('文件内容不是有效的项目数据')
+    error.i18nKey = 'errors.invalidProjectData'
+    throw error
   }
   return parseStoredDocumentPayload(parsed)
 }

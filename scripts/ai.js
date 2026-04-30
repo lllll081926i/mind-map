@@ -16,6 +16,60 @@ const DEFAULT_BODY_LIMIT = '256kb'
 const AUTH_HEADER_NAME = 'x-ai-proxy-token'
 const DEFAULT_ALLOWED_ORIGIN = 'http://localhost:5173'
 
+/** @param {string} hostname */
+const isPrivateOrReservedHostname = hostname => {
+  if (!hostname) return true
+  const lower = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (lower === 'localhost' || lower.endsWith('.localhost')) return true
+  const ipv4Match = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4Match) {
+    const octets = ipv4Match.slice(1).map(Number)
+    if (octets.some(octet => octet < 0 || octet > 255)) return true
+    const [first, second] = octets
+    if (first === 0 || first === 10 || first === 127) return true
+    if (first === 100 && second >= 64 && second <= 127) return true
+    if (first === 169 && second === 254) return true
+    if (first === 172 && second >= 16 && second <= 31) return true
+    if (first === 192 && second === 168) return true
+    if (first === 198 && (second === 18 || second === 19)) return true
+    if (first >= 224) return true
+    return false
+  }
+  if (lower === '::' || lower === '::1') return true
+  if (lower.startsWith('::ffff:')) return true
+  if (/^(fc|fd|fe80:|2001:db8:)/i.test(lower)) return true
+  if (lower.endsWith('.local') || lower.endsWith('.internal')) return true
+  return false
+}
+
+/**
+ * Validates that a URL points to a public endpoint, not a private/internal address.
+ * @param {string} urlString
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+const validateProxyTargetUrl = urlString => {
+  const value = String(urlString || '').trim()
+  if (!value) {
+    return { valid: false, reason: 'API URL 不能为空 / API URL is required' }
+  }
+  let parsed
+  try {
+    parsed = new URL(value)
+  } catch (_error) {
+    return { valid: false, reason: 'API URL 格式无效 / Invalid API URL format' }
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { valid: false, reason: '仅支持 http/https 协议 / Only http/https protocols are allowed' }
+  }
+  if (isPrivateOrReservedHostname(parsed.hostname)) {
+    return {
+      valid: false,
+      reason: '不允许请求内网或保留地址 / Requests to private or reserved addresses are not allowed'
+    }
+  }
+  return { valid: true }
+}
+
 /** @param {unknown} value */
 const parsePortNumber = value => {
   const port = Number(value)
@@ -53,9 +107,23 @@ const proxyAuthToken = String(process.env.AI_PROXY_TOKEN || '').trim()
 const resolveProxyAuthToken = value => {
   const normalizedToken = String(value || '').trim()
   if (!normalizedToken) {
-    throw new Error('AI_PROXY_TOKEN 未配置，AI 本地代理拒绝无认证启动')
+    throw new Error(
+      'AI_PROXY_TOKEN 未配置，AI 本地代理拒绝无认证启动\n' +
+      'AI_PROXY_TOKEN is not set. The local AI proxy refuses to start without authentication.'
+    )
   }
   return normalizedToken
+}
+
+/** @param {unknown} value */
+const normalizeAllowedOrigins = value => {
+  if (Array.isArray(value)) {
+    return value.map(item => String(item || '').trim()).filter(Boolean)
+  }
+  return String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
 }
 
 /** @param {number} port */
@@ -87,13 +155,33 @@ const createServe = (
   { authToken = proxyAuthToken, allowedOrigin = DEFAULT_ALLOWED_ORIGIN, host } = {}
 ) => {
   const requiredAuthToken = resolveProxyAuthToken(authToken)
+  const allowedOrigins = new Set(normalizeAllowedOrigins(allowedOrigin))
   const app = express()
   app.use(express.json({ limit: DEFAULT_BODY_LIMIT }))
   app.use(express.urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }))
 
   /** @type {import('express').RequestHandler} */
+  const requireAllowedOrigin = (req, res, next) => {
+    const requestOrigin = String(req.headers.origin || '').trim()
+    if (!requestOrigin || allowedOrigins.size === 0 || allowedOrigins.has(requestOrigin)) {
+      next()
+      return
+    }
+    res.status(403).json({
+      code: 403,
+      msg: 'AI 代理来源未授权 / Origin not allowed',
+      detail: '当前浏览器来源不在本地代理白名单内 / The browser origin is not in the proxy allowlist'
+    })
+  }
+  app.use(requireAllowedOrigin)
+
+  /** @type {import('express').RequestHandler} */
   const applyCorsHeaders = (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', allowedOrigin)
+    const requestOrigin = String(req.headers.origin || '').trim()
+    if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+      res.header('Access-Control-Allow-Origin', requestOrigin)
+      res.header('Vary', 'Origin')
+    }
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
     res.header(
       'Access-Control-Allow-Headers',
@@ -112,8 +200,8 @@ const createServe = (
     if (requestToken !== requiredAuthToken) {
       res.status(401).json({
         code: 401,
-        msg: 'AI 代理认证失败',
-        detail: '缺少或无效的代理访问令牌'
+        msg: 'AI 代理认证失败 / Authentication failed',
+        detail: '缺少或无效的代理访问令牌 / Missing or invalid proxy access token'
       })
       return
     }
@@ -139,6 +227,16 @@ const createServe = (
       data,
       timeout = DEFAULT_TIMEOUT
     } = req.body
+
+    const urlValidation = validateProxyTargetUrl(api)
+    if (!urlValidation.valid) {
+      res.status(400).json({
+        code: 400,
+        msg: 'API URL 校验失败 / API URL validation failed',
+        detail: urlValidation.reason
+      })
+      return
+    }
 
     try {
       const response = await axios({
@@ -186,22 +284,32 @@ const createServe = (
   return server
 }
 
+const MAX_ERROR_BODY_BYTES = 4096
+
 /** @param {NodeJS.ReadableStream | null | undefined} stream */
 const readStreamBody = async stream => {
   if (!stream || typeof stream.on !== 'function') return ''
   return new Promise(resolve => {
     /** @type {string[]} */
     const chunks = []
+    let totalBytes = 0
+    let truncated = false
     stream.setEncoding('utf8')
     /** @param {string} chunk */
     stream.on('data', chunk => {
+      if (truncated) return
+      totalBytes += Buffer.byteLength(chunk, 'utf8')
       chunks.push(chunk)
+      if (totalBytes > MAX_ERROR_BODY_BYTES) {
+        truncated = true
+        resolve(chunks.join('').slice(0, MAX_ERROR_BODY_BYTES))
+      }
     })
     stream.on('end', () => {
-      resolve(chunks.join(''))
+      if (!truncated) resolve(chunks.join(''))
     })
     stream.on('error', () => {
-      resolve(chunks.join(''))
+      if (!truncated) resolve(chunks.join(''))
     })
   })
 }
@@ -238,7 +346,7 @@ const normalizeProxyError = async error => {
   }
 
   if (error?.code === 'ECONNABORTED') {
-    message = '上游 AI 服务请求超时'
+    message = '上游 AI 服务请求超时 / Upstream AI service request timed out'
   }
 
   return {
@@ -272,5 +380,6 @@ module.exports = {
   isPortUsed,
   createServe,
   resolveProxyAuthToken,
-  normalizeProxyError
+  normalizeProxyError,
+  validateProxyTargetUrl
 }

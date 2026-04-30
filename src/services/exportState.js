@@ -3,6 +3,7 @@ import { createExportContext } from '@/services/workspaceProjectModel'
 import { parseExternalJsonSafely } from '@/utils/json'
 
 const EXPORT_STATE_STORAGE_KEY = 'mind-map.desktop.export-state.v1'
+const DEFAULT_EXPORT_FILE_NAME = '思维导图'
 const PERSISTED_EXPORT_FIELDS = [
   'exportType',
   'withConfig',
@@ -70,7 +71,7 @@ export const createDefaultExportState = (
 ) => ({
   exportType:
     String(documentMode || '').trim() === 'flowchart' ? 'svg' : 'smm',
-  fileName: fileName || '思维导图',
+  fileName: fileName || DEFAULT_EXPORT_FILE_NAME,
   withConfig: true,
   isTransparent: false,
   withBackground: String(documentMode || '').trim() === 'flowchart' ? false : true,
