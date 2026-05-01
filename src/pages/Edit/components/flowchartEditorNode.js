@@ -52,8 +52,8 @@ export const flowchartNodeMethods = {
     }
   },
 
-  isFlowchartPlacementOccupied(rect, gap = 24) {
-    return (this.flowchartData.nodes || []).some(node => {
+  isFlowchartPlacementOccupied(rect, gap = 24, nodes = this.flowchartData.nodes) {
+    return (nodes || []).some(node => {
       const nodeRect = {
         x: Number(node.x || 0),
         y: Number(node.y || 0),
@@ -69,7 +69,11 @@ export const flowchartNodeMethods = {
     })
   },
 
-  findAvailableNodePlacementPoint(type = 'process', preferredPoint = null) {
+  findAvailableNodePlacementPoint(
+    type = 'process',
+    preferredPoint = null,
+    occupiedNodes = this.flowchartData.nodes
+  ) {
     const size = this.getDefaultNodeSizeByType(type)
     const origin = {
       x: Number(preferredPoint?.x || 0),
@@ -77,7 +81,7 @@ export const flowchartNodeMethods = {
     }
     const isAvailable = point => {
       const rect = this.getPlacementRectFromCenter(point, size)
-      return !this.isFlowchartPlacementOccupied(rect)
+      return !this.isFlowchartPlacementOccupied(rect, 24, occupiedNodes)
     }
     if (isAvailable(origin)) {
       return origin
@@ -104,6 +108,27 @@ export const flowchartNodeMethods = {
       x: origin.x + stepX,
       y: origin.y
     }
+  },
+
+  getOffsetNodePlacement(node, offset = { x: 48, y: 48 }, occupiedNodes = this.flowchartData.nodes) {
+    const width = Number(node.width || this.getDefaultNodeSizeByType(node.type).width)
+    const height = Number(node.height || this.getDefaultNodeSizeByType(node.type).height)
+    const preferredCenter = {
+      x: Number(node.x || 0) + width / 2 + Number(offset.x || 0),
+      y: Number(node.y || 0) + height / 2 + Number(offset.y || 0)
+    }
+    const availableCenter = this.findAvailableNodePlacementPoint(
+      node.type || 'process',
+      preferredCenter,
+      occupiedNodes
+    )
+    const nextPosition = {
+      x: availableCenter.x - width / 2,
+      y: availableCenter.y - height / 2
+    }
+    return this.snapPositionToGrid
+      ? this.snapPositionToGrid(nextPosition)
+      : nextPosition
   },
 
   normalizeAddNodePayload(payload = 'process') {
@@ -240,15 +265,23 @@ export const flowchartNodeMethods = {
       return
     }
     const sourceIdMap = new Map()
+    const occupiedNodes = [...this.flowchartData.nodes]
     const pastedNodes = this.flowchartClipboard.nodes.map(node => {
       const nextId = createNodeId(node.type || 'node')
       sourceIdMap.set(node.id, nextId)
-      return {
+      const nextPosition = this.getOffsetNodePlacement(
+        node,
+        { x: 36, y: 36 },
+        occupiedNodes
+      )
+      const nextNode = {
         ...cloneJson(node),
         id: nextId,
-        x: Number(node.x || 0) + 36,
-        y: Number(node.y || 0) + 36
+        x: nextPosition.x,
+        y: nextPosition.y
       }
+      occupiedNodes.push(nextNode)
+      return nextNode
     })
     const copiedEdges = this.flowchartClipboard.copiedEdges || []
     const pastedEdges = copiedEdges
@@ -281,15 +314,23 @@ export const flowchartNodeMethods = {
     }
     const selectedSet = new Set(selectedNodes.map(node => node.id))
     const sourceIdMap = new Map()
+    const occupiedNodes = [...this.flowchartData.nodes]
     const duplicatedNodes = selectedNodes.map(node => {
       const nextId = createNodeId(node.type || 'node')
       sourceIdMap.set(node.id, nextId)
-      return {
+      const nextPosition = this.getOffsetNodePlacement(
+        node,
+        { x: 48, y: 48 },
+        occupiedNodes
+      )
+      const nextNode = {
         ...cloneJson(node),
         id: nextId,
-        x: Number(node.x || 0) + 48,
-        y: Number(node.y || 0) + 48
+        x: nextPosition.x,
+        y: nextPosition.y
       }
+      occupiedNodes.push(nextNode)
+      return nextNode
     })
     const duplicatedEdges = this.flowchartData.edges
       .filter(edge => selectedSet.has(edge.source) && selectedSet.has(edge.target))

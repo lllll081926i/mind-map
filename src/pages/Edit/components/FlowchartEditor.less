@@ -328,6 +328,43 @@
   }
 }
 
+.flowchartQuickShapeSearch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 126px;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--flowchart-toolbar-btn-hover) 70%, transparent);
+  color: var(--flowchart-subtle-text);
+
+  svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: var(--flowchart-icon-stroke);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  input {
+    min-width: 0;
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--flowchart-text);
+    font-size: 12px;
+
+    &::placeholder {
+      color: var(--flowchart-subtle-text);
+    }
+  }
+}
+
 .flowchartViewportBtn {
   min-width: 34px;
   height: 32px;

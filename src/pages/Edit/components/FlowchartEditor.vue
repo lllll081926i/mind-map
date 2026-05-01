@@ -488,6 +488,7 @@ export default {
         addDecision: this.$t('flowchart.addDecision'),
         addInput: this.$t('flowchart.addInput'),
         addEnd: this.$t('flowchart.addEnd'),
+        shapeSearchPlaceholder: this.$t('flowchart.shapeSearchPlaceholder'),
         duplicate: this.$t('flowchart.duplicate'),
         alignLeft: this.$t('flowchart.alignLeft'),
         distributeHorizontal: this.$t('flowchart.distributeHorizontal'),

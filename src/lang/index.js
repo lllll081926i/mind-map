@@ -646,6 +646,7 @@ const zh = {
     "addDecision": "判断",
     "addInput": "输入",
     "addEnd": "结束",
+    "shapeSearchPlaceholder": "搜索形状",
     "delete": "删除选择",
     "duplicate": "复制",
     "alignLeft": "左对齐",
