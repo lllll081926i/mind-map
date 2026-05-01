@@ -37,8 +37,9 @@ test('AI 配置写入会走密钥安全存储而不是直接明文落盘', () =>
   assert.match(appStateSource, /hydrate_meta_state_with_secret/)
 })
 
-test('工程脚本接入行为测试与 E2E 测试', () => {
-  assert.match(packageJson.scripts['test:all'], /test:behavior/)
+test('工程脚本接入全量根测试与 E2E 测试', () => {
+  assert.equal(packageJson.scripts['test:root'], 'node --test tests/*.test.mjs')
+  assert.equal(packageJson.scripts['test:all'], 'npm run test:root')
   assert.match(packageJson.scripts['test:behavior'], /tests\/review-remediation\.test\.mjs/)
   assert.match(
     packageJson.scripts['test:behavior'],

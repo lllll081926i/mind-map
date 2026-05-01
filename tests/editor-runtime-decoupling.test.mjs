@@ -42,7 +42,7 @@ const targets = [
   'src/pages/Edit/components/BaseStyle.vue'
 ]
 
-test('编辑器核心组件不再直接依赖 vuex 兼容层', () => {
+test('编辑器核心组件只通过当前 store 层访问运行时状态', () => {
   const offenders = targets.filter(filePath => {
     const source = fs.readFileSync(path.resolve(filePath), 'utf8')
     return /from ['"]vuex['"]/.test(source)
@@ -51,7 +51,7 @@ test('编辑器核心组件不再直接依赖 vuex 兼容层', () => {
   assert.deepEqual(offenders, [])
 })
 
-test('api 模块不再直接依赖 legacy store 兼容层', () => {
+test('api 模块保持与历史全局 store 解耦', () => {
   const source = fs.readFileSync(path.resolve('src/api/index.js'), 'utf8')
 
   assert.equal(source.includes("import vuexStore from '@/store'"), false)
