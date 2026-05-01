@@ -31,11 +31,19 @@ const toolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Toolbar.vue'),
   'utf8'
 )
+const flowchartToolbarSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/FlowchartToolbar.vue'),
+  'utf8'
+)
 const editSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/Edit.vue'),
   'utf8'
 )
 const langSource = fs.readFileSync(path.resolve('src/lang/index.js'), 'utf8')
+const editorToolbarActionPath = path.resolve(
+  'src/pages/Edit/components/EditorToolbarAction.vue'
+)
+const editorToolbarActionSource = fs.readFileSync(editorToolbarActionPath, 'utf8')
 
 // ─── Contextmenu position fix ───
 
@@ -207,6 +215,11 @@ test('RichTextToolbar has CSS transition', () => {
 })
 
 test('思维导图顶部快捷区提供专注、大纲和粘贴大纲入口', () => {
+  assert.equal(fs.existsSync(editorToolbarActionPath), true)
+  assert.match(toolbarSource, /EditorToolbarAction/)
+  assert.match(flowchartToolbarSource, /EditorToolbarAction/)
+  assert.doesNotMatch(editorToolbarActionSource, /@keydown\.\w+\.prevent/)
+  assert.match(editorToolbarActionSource, /v-on="keyboardListeners"/)
   assert.match(toolbarSource, /toggleZenMode\(/)
   assert.match(toolbarSource, /openOutlinePanel\(/)
   assert.match(toolbarSource, /pasteOutlineFromClipboard\(/)

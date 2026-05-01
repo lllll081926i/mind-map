@@ -249,6 +249,7 @@ test('流程图快速加节点条提供形状搜索和回车添加，吸收 draw
 
 test('流程图顶栏使用压缩标签和极简线条图标，不再堆长文案', () => {
   assert.match(flowchartEditorSource, /flowchartToolbarText\(\)/)
+  assert.match(flowchartToolbarSource, /EditorToolbarAction/)
   assert.match(flowchartToolbarSource, /flowchartToolbarIcon/)
   assert.match(flowchartToolbarSource, /<svg viewBox="0 0 24 24">/)
   assert.match(flowchartStyleSource, /\.flowchartToolbarIcon/)

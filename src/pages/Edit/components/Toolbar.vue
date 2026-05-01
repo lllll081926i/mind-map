@@ -282,54 +282,38 @@
       </div>
       <div class="toolbarBlock toolbarMetaBlock" v-if="!isMobile">
         <div class="toolbarQuickActions">
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.searchAction')"
-            @click="showSearch"
-            @keydown.enter.prevent="showSearch"
-            @keydown.space.prevent="showSearch"
-          >
-            <span class="icon iconfont iconsousuo"></span>
-            <span class="text">{{ $t('toolbar.searchAction') }}</span>
-          </div>
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.focusModeAction')"
-            @click="toggleZenMode"
-            @keydown.enter.prevent="toggleZenMode"
-            @keydown.space.prevent="toggleZenMode"
-          >
-            <span class="icon iconfont iconquanping1"></span>
-            <span class="text">{{ $t('toolbar.focusModeAction') }}</span>
-          </div>
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.outlineAction')"
-            @click="openOutlinePanel"
-            @keydown.enter.prevent="openOutlinePanel"
-            @keydown.space.prevent="openOutlinePanel"
-          >
-            <span class="icon iconfont iconfuhao-dagangshu"></span>
-            <span class="text">{{ $t('toolbar.outlineAction') }}</span>
-          </div>
-          <div
-            class="toolbarBtn quickActionBtn"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('toolbar.pasteOutlineAction')"
-            @click="pasteOutlineFromClipboard"
-            @keydown.enter.prevent="pasteOutlineFromClipboard"
-            @keydown.space.prevent="pasteOutlineFromClipboard"
-          >
-            <span class="icon iconfont icontianjiazijiedian"></span>
-            <span class="text">{{ $t('toolbar.pasteOutlineAction') }}</span>
-          </div>
+          <EditorToolbarAction
+            tag="div"
+            action-class="toolbarBtn quickActionBtn"
+            icon-class="icon iconfont iconsousuo"
+            text-class="text"
+            :label="$t('toolbar.searchAction')"
+            @action="showSearch"
+          ></EditorToolbarAction>
+          <EditorToolbarAction
+            tag="div"
+            action-class="toolbarBtn quickActionBtn"
+            icon-class="icon iconfont iconquanping1"
+            text-class="text"
+            :label="$t('toolbar.focusModeAction')"
+            @action="toggleZenMode"
+          ></EditorToolbarAction>
+          <EditorToolbarAction
+            tag="div"
+            action-class="toolbarBtn quickActionBtn"
+            icon-class="icon iconfont iconfuhao-dagangshu"
+            text-class="text"
+            :label="$t('toolbar.outlineAction')"
+            @action="openOutlinePanel"
+          ></EditorToolbarAction>
+          <EditorToolbarAction
+            tag="div"
+            action-class="toolbarBtn quickActionBtn"
+            icon-class="icon iconfont icontianjiazijiedian"
+            text-class="text"
+            :label="$t('toolbar.pasteOutlineAction')"
+            @action="pasteOutlineFromClipboard"
+          ></EditorToolbarAction>
         </div>
       </div>
       <div class="toolbarMeasure">
@@ -362,6 +346,7 @@
 import { defineAsyncComponent } from 'vue'
 import { mapState } from 'pinia'
 import { getConfig, getData } from '@/api'
+import EditorToolbarAction from './EditorToolbarAction.vue'
 import ToolbarNodeBtnList from './ToolbarNodeBtnList.vue'
 import {
   parseStoredDocumentContent,
@@ -504,6 +489,7 @@ export default {
     NodeNote,
     NodeTag,
     Import,
+    EditorToolbarAction,
     ToolbarNodeBtnList
   },
   data() {
