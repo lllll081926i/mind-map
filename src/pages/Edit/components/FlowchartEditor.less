@@ -35,6 +35,7 @@
   --flowchart-template-node-fill: rgba(255, 255, 255, 0.88);
   --flowchart-template-node-stroke: rgba(0, 0, 0, 0.8);
   --flowchart-icon-stroke: #31302e;
+  --flowchart-toolbar-height: 84px;
   min-height: 100vh;
   background: var(--flowchart-bg);
   color: var(--flowchart-text);
@@ -93,8 +94,10 @@
 .flowchartToolbar {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
   min-height: 72px;
+  overflow: hidden;
   padding: 6px 16px;
   font-size: 12px;
   color: var(--flowchart-subtle-text);
@@ -106,6 +109,7 @@
   gap: 4px;
   min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   scrollbar-width: none;
 
   &::-webkit-scrollbar {
@@ -118,7 +122,7 @@
 }
 
 .flowchartToolbarGroup.isSecondary {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
 }
 
 .flowchartToolbarBtn {
@@ -127,6 +131,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  flex: 0 0 auto;
   min-width: 58px;
   border: none;
   background: var(--flowchart-toolbar-btn-bg);
@@ -134,7 +139,7 @@
   border-radius: 8px;
   padding: 8px 8px 7px;
   line-height: 1.1;
-  white-space: normal;
+  white-space: nowrap;
   cursor: pointer;
   text-align: center;
   transition:
@@ -168,16 +173,16 @@
 .flowchartStage {
   position: relative;
   min-height: 100vh;
-  padding-top: 84px;
+  padding-top: var(--flowchart-toolbar-height);
 }
 
 .flowchartCanvasShell {
-  min-height: calc(100vh - 84px);
+  min-height: calc(100vh - var(--flowchart-toolbar-height));
 }
 
 .flowchartCanvasViewport {
   position: relative;
-  min-height: calc(100vh - 84px);
+  min-height: calc(100vh - var(--flowchart-toolbar-height));
   overflow: hidden;
   isolation: isolate;
   cursor: grab;
@@ -286,12 +291,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   padding: 8px;
   border: 1px solid var(--flowchart-dock-border);
   border-radius: 18px;
   background: var(--flowchart-dock-bg);
   box-shadow: var(--flowchart-dock-shadow);
   backdrop-filter: blur(18px);
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .flowchartQuickAddBar {
@@ -332,12 +345,25 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 126px;
   width: 126px;
   height: 32px;
   padding: 0 9px;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: color-mix(in srgb, var(--flowchart-toolbar-btn-hover) 70%, transparent);
   color: var(--flowchart-subtle-text);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+
+  &:focus-within {
+    border-color: var(--flowchart-accent);
+    background: var(--flowchart-panel-bg);
+    box-shadow: 0 0 0 3px var(--flowchart-selection-ring);
+    color: var(--flowchart-text);
+  }
 
   svg {
     width: 15px;
@@ -1316,22 +1342,14 @@
 }
 
 @media (max-width: 1180px) {
+  .flowchartEditor {
+    --flowchart-toolbar-height: 76px;
+  }
+
   .flowchartToolbar {
-    flex-wrap: wrap;
-    padding: 8px 12px;
-  }
-
-  .flowchartToolbarGroup {
-    width: 100%;
-  }
-
-  .flowchartStage {
-    padding-top: 156px;
-  }
-
-  .flowchartCanvasShell,
-  .flowchartCanvasViewport {
-    min-height: calc(100vh - 156px);
+    gap: 8px;
+    min-height: 64px;
+    padding: 6px 12px;
   }
 
   .flowchartDockRail {
@@ -1392,13 +1410,10 @@
 }
 
 @media (max-width: 900px) {
-  .flowchartStage {
-    padding-top: 116px;
-  }
-
-  .flowchartCanvasShell,
-  .flowchartCanvasViewport {
-    min-height: calc(100vh - 116px);
+  .flowchartToolbarBtn {
+    min-width: 52px;
+    padding: 7px 6px;
+    font-size: 11px;
   }
 }
 
@@ -1409,7 +1424,7 @@
   }
 
   .flowchartToolbarBtn {
-    min-width: 52px;
+    min-width: 48px;
     padding: 7px 6px;
     font-size: 11px;
   }
@@ -1421,7 +1436,14 @@
 
   .flowchartQuickAddBar {
     gap: 4px;
+    right: 10px;
+    bottom: 68px;
     padding: 6px;
+  }
+
+  .flowchartQuickShapeSearch {
+    flex-basis: 112px;
+    width: 112px;
   }
 
   .flowchartMinimap {
