@@ -750,6 +750,10 @@ export default {
       this.$bus.$on('startTextEdit', this.handleStartTextEdit)
       this.$bus.$on('endTextEdit', this.handleEndTextEdit)
       this.$bus.$on(
+        'pasteOutlineFromClipboard',
+        this.pasteOutlineFromClipboard
+      )
+      this.$bus.$on(
         'createAssociativeLine',
         this.handleCreateLineFromActiveNode
       )
@@ -770,6 +774,10 @@ export default {
       this.$bus.$off('setData', this.setData)
       this.$bus.$off('startTextEdit', this.handleStartTextEdit)
       this.$bus.$off('endTextEdit', this.handleEndTextEdit)
+      this.$bus.$off(
+        'pasteOutlineFromClipboard',
+        this.pasteOutlineFromClipboard
+      )
       this.$bus.$off('createAssociativeLine', this.handleCreateLineFromActiveNode)
       this.$bus.$off('startPainter', this.handleStartPainter)
       this.$bus.$off('node_tree_render_end', this.handleHideLoading)
@@ -823,6 +831,93 @@ export default {
 
     handleEndTextEdit() {
       this.mindMap?.renderer?.endTextEdit()
+    },
+
+    async readClipboardText() {
+      const clipboard = globalThis.navigator?.clipboard
+      if (!clipboard || typeof clipboard.readText !== 'function') {
+        throw new Error('Clipboard readText is unavailable')
+      }
+      return clipboard.readText()
+    },
+
+    parsePastedOutlineText(text) {
+      return String(text || '')
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .map(rawLine => {
+          const indentText = rawLine.match(/^[\t ]*/)?.[0] || ''
+          const content = rawLine
+            .trim()
+            .replace(/^([-*+]|[•])\s+/, '')
+            .replace(/^\d+[.)]\s+/, '')
+            .trim()
+          return {
+            indent: Array.from(indentText).reduce((total, char) => {
+              return total + (char === '\t' ? 2 : 1)
+            }, 0),
+            content
+          }
+        })
+        .filter(item => item.content)
+        .reduce(
+          (state, item) => {
+            const node = {
+              data: {
+                text: item.content
+              },
+              children: []
+            }
+            while (
+              state.stack.length > 0 &&
+              item.indent <= state.stack[state.stack.length - 1].indent
+            ) {
+              state.stack.pop()
+            }
+            const parent = state.stack[state.stack.length - 1]
+            if (parent) {
+              parent.node.children.push(node)
+            } else {
+              state.roots.push(node)
+            }
+            state.stack.push({
+              indent: item.indent,
+              node
+            })
+            return state
+          },
+          {
+            roots: [],
+            stack: []
+          }
+        ).roots
+    },
+
+    async pasteOutlineFromClipboard() {
+      const activeNodeList = this.mindMap?.renderer?.activeNodeList || []
+      if (activeNodeList.length <= 0) {
+        this.$message.warning(this.$t('toolbar.pasteOutlineNeedSelection'))
+        return
+      }
+      let text
+      try {
+        text = await this.readClipboardText()
+      } catch (error) {
+        console.error('readClipboardText failed', error)
+        this.$message.warning(this.$t('toolbar.pasteOutlineFailed'))
+        return
+      }
+      const childList = this.parsePastedOutlineText(text)
+      if (childList.length <= 0) {
+        this.$message.warning(this.$t('toolbar.pasteOutlineEmpty'))
+        return
+      }
+      this.mindMap.execCommand(
+        'INSERT_MULTI_CHILD_NODE',
+        activeNodeList,
+        childList
+      )
+      this.$message.success(this.$t('toolbar.pasteOutlineSuccess'))
     },
 
     handleCreateLineFromActiveNode() {

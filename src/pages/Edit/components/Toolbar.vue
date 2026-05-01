@@ -294,6 +294,42 @@
             <span class="icon iconfont iconsousuo"></span>
             <span class="text">{{ $t('toolbar.searchAction') }}</span>
           </div>
+          <div
+            class="toolbarBtn quickActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.focusModeAction')"
+            @click="toggleZenMode"
+            @keydown.enter.prevent="toggleZenMode"
+            @keydown.space.prevent="toggleZenMode"
+          >
+            <span class="icon iconfont iconquanping1"></span>
+            <span class="text">{{ $t('toolbar.focusModeAction') }}</span>
+          </div>
+          <div
+            class="toolbarBtn quickActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.outlineAction')"
+            @click="openOutlinePanel"
+            @keydown.enter.prevent="openOutlinePanel"
+            @keydown.space.prevent="openOutlinePanel"
+          >
+            <span class="icon iconfont iconfuhao-dagangshu"></span>
+            <span class="text">{{ $t('toolbar.outlineAction') }}</span>
+          </div>
+          <div
+            class="toolbarBtn quickActionBtn"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('toolbar.pasteOutlineAction')"
+            @click="pasteOutlineFromClipboard"
+            @keydown.enter.prevent="pasteOutlineFromClipboard"
+            @keydown.space.prevent="pasteOutlineFromClipboard"
+          >
+            <span class="icon iconfont icontianjiazijiedian"></span>
+            <span class="text">{{ $t('toolbar.pasteOutlineAction') }}</span>
+          </div>
         </div>
       </div>
       <div class="toolbarMeasure">
@@ -358,6 +394,7 @@ import {
   onWriteLocalFile
 } from '@/services/appEvents'
 import {
+  applyLocalConfigPatch,
   setActiveSidebar,
   setIsHandleLocalFile,
   syncRuntimeFromWorkspaceMeta
@@ -728,6 +765,20 @@ export default {
 
     showSearch() {
       emitShowSearch()
+    },
+
+    toggleZenMode() {
+      applyLocalConfigPatch({
+        isZenMode: !this.localConfig.isZenMode
+      })
+    },
+
+    openOutlinePanel() {
+      setActiveSidebar('outline')
+    },
+
+    pasteOutlineFromClipboard() {
+      this.$bus.$emit('pasteOutlineFromClipboard')
     },
 
     openShortcutKey() {

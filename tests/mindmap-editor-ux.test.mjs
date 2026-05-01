@@ -27,6 +27,15 @@ const richTextToolbarSource = fs.readFileSync(
   path.resolve('src/pages/Edit/components/RichTextToolbar.vue'),
   'utf8'
 )
+const toolbarSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Toolbar.vue'),
+  'utf8'
+)
+const editSource = fs.readFileSync(
+  path.resolve('src/pages/Edit/components/Edit.vue'),
+  'utf8'
+)
+const langSource = fs.readFileSync(path.resolve('src/lang/index.js'), 'utf8')
 
 // ─── Contextmenu position fix ───
 
@@ -195,4 +204,30 @@ test('RichTextToolbar has CSS transition', () => {
     richTextToolbarSource.includes('transition'),
     'RichTextToolbar should have CSS transition'
   )
+})
+
+test('思维导图顶部快捷区提供专注、大纲和粘贴大纲入口', () => {
+  assert.match(toolbarSource, /toggleZenMode\(/)
+  assert.match(toolbarSource, /openOutlinePanel\(/)
+  assert.match(toolbarSource, /pasteOutlineFromClipboard\(/)
+  assert.match(toolbarSource, /\$t\('toolbar\.focusModeAction'\)/)
+  assert.match(toolbarSource, /\$t\('toolbar\.outlineAction'\)/)
+  assert.match(toolbarSource, /\$t\('toolbar\.pasteOutlineAction'\)/)
+  assert.match(langSource, /"focusModeAction": "专注"/)
+  assert.match(langSource, /"outlineAction": "大纲"/)
+  assert.match(langSource, /"pasteOutlineAction": "粘贴大纲"/)
+})
+
+test('思维导图支持把剪贴板多行文本作为当前节点的子主题导入', () => {
+  assert.match(toolbarSource, /\$bus\.\$emit\('pasteOutlineFromClipboard'\)/)
+  assert.match(editSource, /\$bus\.\$on\(\s*'pasteOutlineFromClipboard'/)
+  assert.match(editSource, /\$bus\.\$off\(\s*'pasteOutlineFromClipboard'/)
+  assert.match(editSource, /readClipboardText\(/)
+  assert.match(editSource, /parsePastedOutlineText\(/)
+  assert.match(editSource, /INSERT_MULTI_CHILD_NODE/)
+  assert.match(editSource, /renderer\?\.activeNodeList|renderer\.activeNodeList/)
+  assert.match(editSource, /\$t\('toolbar\.pasteOutlineNeedSelection'\)/)
+  assert.match(editSource, /\$t\('toolbar\.pasteOutlineEmpty'\)/)
+  assert.match(langSource, /"pasteOutlineNeedSelection": "请先选择一个主题"/)
+  assert.match(langSource, /"pasteOutlineSuccess": "已从剪贴板生成子主题"/)
 })
