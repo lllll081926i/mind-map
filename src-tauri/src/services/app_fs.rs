@@ -175,8 +175,8 @@ async fn ensure_directory_scope_allowed(
 ) -> Result<(), String> {
   let allowed_roots = collect_allowed_directory_roots(app).await?;
   if allowed_roots.is_empty() {
-    eprintln!("[MindMap] 警告: 没有允许的目录根节点，放行所有访问");
-    return Ok(());
+    eprintln!("[MindMap] 警告: 没有可用的目录访问授权，拒绝访问");
+    return Err("没有可用的目录访问授权".into());
   }
 
   let requested_path = Path::new(path);

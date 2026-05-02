@@ -239,7 +239,7 @@ jobs:
           - label: Windows Portable
             os: windows-latest
             args: --no-bundle
-            release_args: --no-bundle
+            release_args: --no-bundle --config src-tauri/tauri.release.conf.json
             upload_plain_binary: false
             target_triple: ''
             portable_asset_suffix: windows_x64
@@ -263,7 +263,7 @@ jobs:
           - label: Windows ARM64 Portable
             os: windows-latest
             args: --no-bundle --target aarch64-pc-windows-msvc
-            release_args: --no-bundle --target aarch64-pc-windows-msvc
+            release_args: --no-bundle --target aarch64-pc-windows-msvc --config src-tauri/tauri.release.conf.json
             upload_plain_binary: false
             target_triple: aarch64-pc-windows-msvc
             portable_asset_suffix: windows_arm64
@@ -498,7 +498,7 @@ jobs:
         if: matrix.portable_asset_suffix != ''
         shell: pwsh
         run: |
-          npx tauri build ${{ matrix.args }}
+          npx tauri build ${{ matrix.release_args }}
 
       - name: Normalize Windows portable asset name
         id: portable_asset

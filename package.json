@@ -34,9 +34,9 @@
     "tauri": "tauri",
     "ai:serve": "node ./scripts/ai.js",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build --bundles nsis",
-    "desktop:build:windows": "tauri build --bundles nsis",
-    "desktop:build:linux": "tauri build --bundles deb,appimage",
+    "desktop:build": "tauri build --bundles nsis --config src-tauri/tauri.release.conf.json",
+    "desktop:build:windows": "tauri build --bundles nsis --config src-tauri/tauri.release.conf.json",
+    "desktop:build:linux": "tauri build --bundles deb,appimage --config src-tauri/tauri.release.conf.json",
     "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "format": "prettier --write \"src/**/*.{js,ts,vue,css,less,html,json}\"",
     "frontend:preview": "vite preview"

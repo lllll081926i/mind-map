@@ -11,6 +11,11 @@ const tauriReleaseConfigSource = fs.readFileSync(
   path.resolve('src-tauri/tauri.release.conf.json'),
   'utf8'
 )
+const releaseWorkflowSource = fs.readFileSync(
+  path.resolve('.github/workflows/desktop-release.yml'),
+  'utf8'
+)
+const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
 
 test('P2 治理文件已经补齐', () => {
   assert.equal(fs.existsSync(path.resolve('CHANGELOG.md')), true)
@@ -35,4 +40,15 @@ test('Tauri 发布态 CSP 保持仅远程安全连接源', () => {
   assert.doesNotMatch(tauriReleaseConfigSource, /http:\/\/localhost/)
   assert.doesNotMatch(tauriReleaseConfigSource, /ws:\/\/localhost/)
   assert.match(tauriReleaseConfigSource, /connect-src 'self' https: wss:/)
+})
+
+test('Tauri 发布态配置明确关闭 devtools', () => {
+  assert.match(tauriReleaseConfigSource, /"devtools":\s*false/)
+})
+
+test('所有桌面发布构建都使用 release config', () => {
+  assert.match(packageJson.scripts['desktop:build'], /--config src-tauri\/tauri\.release\.conf\.json/)
+  assert.doesNotMatch(releaseWorkflowSource, /release_args: --no-bundle(?![^\n]*--config src-tauri\/tauri\.release\.conf\.json)/)
+  assert.doesNotMatch(releaseWorkflowSource, /npx tauri build \$\{\{ matrix\.args \}\}/)
+  assert.match(releaseWorkflowSource, /npx tauri build \$\{\{ matrix\.release_args \}\}/)
 })
